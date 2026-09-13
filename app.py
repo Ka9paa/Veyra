@@ -32,10 +32,15 @@ load_dotenv(BASE/'.env')
 app=Flask(__name__)
 app.secret_key=os.getenv('FLASK_SECRET_KEY','local-dev-change-me')
 app.config.update(SESSION_COOKIE_HTTPONLY=True,SESSION_COOKIE_SAMESITE='Lax')
-DB=BASE/'data'/'veyra.db'
+# Vercel's /var/task filesystem is read-only.
+# Use /tmp while deployed on Vercel; use the normal local data folder elsewhere.
+if os.getenv('VERCEL'):
+    DB = Path('/tmp/veyra.db')
+else:
+    DB = BASE/'data'/'veyra.db'
 
 def db():
-    DB.parent.mkdir(parents=True, exist_ok=True)
+    DB.parent.mkdir(parents=True,exist_ok=True)
     c=sqlite3.connect(DB); c.row_factory=sqlite3.Row; return c
 
 def now(): return datetime.now(timezone.utc).isoformat(timespec='seconds')
@@ -591,4 +596,4 @@ def feature_lab(): return render_template('feature_lab.html',user=current_user()
 init_db()
 if __name__=='__main__':
     from waitress import serve
-    host=os.getenv('HOST','127.0.0.1');port=int(os.getenv('PORT','8765'));print(f'VEYRA ready at http://{host}:{port}');serve(app,host=host,port=port) 
+    host=os.getenv('HOST','127.0.0.1');port=int(os.getenv('PORT','8765'));print(f'VEYRA ready at http://{host}:{port}');serve(app,host=host,port=port)
