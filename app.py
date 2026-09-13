@@ -35,7 +35,7 @@ app.config.update(SESSION_COOKIE_HTTPONLY=True,SESSION_COOKIE_SAMESITE='Lax')
 DB=BASE/'data'/'veyra.db'
 
 def db():
-    DB.parent.mkdir(parents=True,exist_ok=True)
+    DB.parent.mkdir(parents=True, exist_ok=True)
     c=sqlite3.connect(DB); c.row_factory=sqlite3.Row; return c
 
 def now(): return datetime.now(timezone.utc).isoformat(timespec='seconds')
