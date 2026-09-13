@@ -1,0 +1,46 @@
+{% extends "base.html" %}{% set active='projects' %}
+{% block title %}Projects — Veyra{% endblock %}
+{% block body %}
+<div class="v22-app">{% include '_sidebar.html' %}
+<main class="v22-main">
+  <header class="v22-pagehead v23-project-head">
+    <div><small>PROJECTS</small><h1>Your Projects</h1><p>Every product, experiment, and client build in one place.</p></div>
+    <a href="/studio" class="v22-primary v23-linkbtn">＋ New Project</a>
+  </header>
+
+  <section class="v22-pagecontent">
+    <div class="v23-project-toolbar">
+      <div class="v23-project-search">⌕ <input placeholder="Search projects…"></div>
+      <div class="v23-project-filters"><button class="active">All</button><button>Recent</button><button>Deployed</button><button>Drafts</button></div>
+    </div>
+
+    <div class="v23-project-grid">
+      <a class="v23-create-project" href="/studio">
+        <span>＋</span><b>Create a new project</b><p>Start from a prompt, template, or blank canvas.</p>
+      </a>
+
+      {% for n,d,c,status in [
+        ('SaaS Landing Page','Conversion-focused website with responsive sections','purple','Draft'),
+        ('AI Chat Platform','Full chat product with auth and project memory','blue','Live'),
+        ('E-Commerce Store','Premium storefront and checkout experience','gold','Live'),
+        ('Analytics Dashboard','Real-time business metrics and reporting','violet','Draft'),
+        ('Portfolio Website','Editorial creative showcase and case studies','dark','Live')
+      ] %}
+      <article class="v23-project-card">
+        <div class="v23-project-preview {{c}}">
+          <header><i></i><i></i><i></i></header>
+          <div class="mini-side"></div>
+          <div class="mini-content"><span></span><b></b><b></b><b></b></div>
+          <em>{{status}}</em>
+        </div>
+        <div class="v23-project-copy">
+          <div><h3>{{n}}</h3><p>{{d}}</p></div>
+          <button>•••</button>
+        </div>
+        <footer><span>Updated recently</span><a href="/studio">Open project →</a></footer>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+</main></div>
+{% endblock %}

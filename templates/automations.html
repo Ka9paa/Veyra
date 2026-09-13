@@ -1,0 +1,8 @@
+{% set active='automations' %}{% block title %}Automations — Veyra{% endblock %}{% extends "base.html" %}{% block body %}<div class="appwrap">{% include '_sidebar.html' %}<main class="v9slide">
+<header class="slideTop"><div><small>VEYRA LABS / AUTOMATIONS</small><h1>Build once. Automate the rest.</h1><p>Create rules that run QA, repair problems, save versions, generate release notes, or prepare deployment automatically.</p></div><div class="slideActions"><button>Templates</button><a href="#">＋ New automation</a></div></header>
+<section class="automationBuilder"><div class="autoStep trigger"><small>WHEN</small><b>A project build finishes</b></div><span>→</span><div class="autoStep"><small>VEYRA</small><b>Run QA Agent</b></div><span>→</span><div class="autoStep"><small>IF ISSUE</small><b>Run Repair Agent</b></div><span>→</span><div class="autoStep"><small>THEN</small><b>Create snapshot</b></div></section>
+<section class="automationList">
+ {% for title,desc,state in [('Build QA','Run quality checks after every generation','ON'),('Auto Repair','Repair critical issues when detected','ON'),('Release Notes','Summarize changes before deployment','ON'),('Nightly Regression','Scan every active project each night','PAUSED')] %}
+ <article><div class="autoIcon">↻</div><div><h3>{{title}}</h3><p>{{desc}}</p></div><span class="{{'enabled' if state=='ON' else ''}}">{{state}}</span><button>•••</button></article>
+ {% endfor %}
+</section></main></div>{% endblock %}

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}{{'Create account' if mode=='signup' else 'Log in'}} — Veyra{% endblock %}
+{% block body %}
+<div class="v21-auth-page">
+  <div class="v21-auth-shell">
+    <header class="v21-auth-brand">
+      <img src="{{url_for('static',filename='veyra-mark.svg')}}" alt="Veyra">
+      <b>VEYRA</b><span class="v26-auth-beta">BETA</span>
+    </header>
+
+    <section class="v21-auth-left">
+      <div class="v21-auth-card">
+        <small>{{'WELCOME TO VEYRA' if mode=='signup' else 'WELCOME BACK'}}</small>
+        <h1>{{'Create your Veyra account' if mode=='signup' else 'Sign in to'}} {% if mode!='signup' %}<em>Veyra</em>{% endif %}</h1>
+        <p>{{'Start building products from one connected workspace.' if mode=='signup' else 'Continue building, creating, and shipping your ideas from one connected workspace.'}}</p>
+
+        {% with msgs=get_flashed_messages(with_categories=true) %}
+          {% for c,m in msgs %}<div class="v21-flash {{c}}"><span>!</span>{{m}}</div>{% endfor %}
+        {% endwith %}
+
+        {% if mode=='signup' %}
+        <form method="post" action="/signup/email">
+          <label>Full name<div class="v21-input"><span>◇</span><input name="name" placeholder="Enter your full name" required minlength="2"></div></label>
+          <label>Email address<div class="v21-input"><span>✉</span><input name="email" type="email" placeholder="name@company.com" required></div></label>
+          <label>Password<div class="v21-input"><span>▢</span><input name="password" type="password" placeholder="8+ characters" required minlength="8"></div></label>
+          <button class="v21-submit">Create account <span>→</span></button>
+        </form>
+        {% else %}
+        <form method="post" action="/login/email">
+          <label>Email address<div class="v21-input"><span>✉</span><input name="email" type="email" placeholder="name@company.com" required></div></label>
+          <label>Password<div class="v21-input"><span>▢</span><input name="password" type="password" placeholder="Your password" required><button type="button" class="v21-eye" tabindex="-1">◉</button></div></label>
+          <div class="v21-login-row"><label class="v21-check"><input type="checkbox" checked><span></span>Remember me</label><a href="#">Forgot password?</a></div>
+          <button class="v21-submit">Sign in <span>→</span></button>
+        </form>
+        {% endif %}
+
+        <div class="v21-or"><span>or continue with</span></div>
+
+        <div class="v21-oauth">
+          <a href="/auth/google" aria-label="Continue with Google">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3A12 12 0 1 1 31.9 15l5.7-5.7A20 20 0 1 0 44 24c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8A12 12 0 0 1 31.9 15l5.7-5.7A20 20 0 0 0 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.5-5.2l-6.2-5.2A12 12 0 0 1 12.9 28l-6.5 5A20 20 0 0 0 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3a12 12 0 0 1-4 5.6l6.2 5.2C41.2 35.4 44 30.2 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>
+            <span>Continue with Google</span>
+          </a>
+          <a href="/auth/github" aria-label="Continue with GitHub">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .7a11.5 11.5 0 0 0-3.6 22.4c.6.1.8-.2.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.5-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0C16.2 4.4 17.2 4.7 17.2 4.7c.6 1.6.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6A11.5 11.5 0 0 0 12 .7z"/></svg>
+            <span>Continue with GitHub</span>
+          </a>
+        </div>
+
+        <div class="v21-switch">
+          {{'Already have an account?' if mode=='signup' else "Don't have an account?"}}
+          <a href="{{'/login' if mode=='signup' else '/signup'}}">{{'Log in' if mode=='signup' else 'Create one'}}</a>
+        </div>
+      </div>
+    </section>
+
+    <aside class="v21-auth-right">
+      <div class="v21-auth-stars"></div>
+      <img class="v21-hero-logo" src="{{url_for('static',filename='veyra-mark.svg')}}" alt="Veyra">
+      <h2>Ideas to real<br>products <em>in minutes.</em></h2>
+      <p>Design, code, test, and deploy from<br>one connected workspace.</p>
+
+      <div class="v21-product-ghost">
+        <div class="ghost-window">
+          <div class="ghost-top"><i></i><i></i><i></i><span></span></div>
+          <div class="ghost-body">
+            <aside></aside>
+            <main><span></span><span></span><b></b><b></b><b></b></main>
+          </div>
+        </div>
+        <div class="ghost-card deploy"><span>✓</span><div><b>Deploy Preview</b><small>Production ready</small></div></div>
+        <div class="ghost-card activity"><b>Activity</b><div class="spark"><i></i><i></i><i></i><i></i><i></i></div></div>
+        <div class="ghost-card success"><span>✓</span><div><b>Build successful</b><small>All checks passed</small></div></div>
+      </div>
+    </aside>
+
+    <footer class="v21-auth-footer">
+      <div><a href="#">Privacy</a><span>•</span><a href="#">Terms</a><span>•</span><a href="#">Status</a><span>•</span><a href="#">Docs</a></div>
+      <span>© 2026 Veyra. All rights reserved.</span>
+    </footer>
+  </div>
+</div>
+{% endblock %}

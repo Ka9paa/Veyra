@@ -1,0 +1,44 @@
+{% extends "base.html" %}{% set active='settings' %}
+{% block title %}Settings — Veyra{% endblock %}
+{% block body %}
+<div class="v22-app">{% include '_sidebar.html' %}
+<main class="v22-main">
+  <header class="v22-pagehead"><div><small>SETTINGS</small><h1>Settings</h1><p>Manage your workspace settings and preferences.</p></div><button class="v22-primary">▣ Save changes</button></header>
+  <section class="v22-pagecontent">
+    <div class="v22-settings">
+      <nav>
+        <button class="active">⚙ <span>General</span></button>
+        <button>▣ <span>Billing</span></button>
+        <button>◇ <span>Security</span></button>
+        <button>⌁ <span>Integrations</span></button>
+        <button>⌘ <span>API Keys</span></button>
+        <button>♧ <span>Notifications</span></button>
+        <button id="aiSettings">✦ <span>Veyra AI</span></button>
+      </nav>
+      <main>
+        <h2>General Settings</h2><p class="settings-sub">Update your workspace details and preferences.</p>
+
+        <div class="v22-setting-row"><div class="v22-setting-icon">▦</div><span><b>Workspace Name</b><small>The name shown across Veyra.</small></span><input value="Veyra Studio"></div>
+        <div class="v22-setting-row"><div class="v22-setting-icon">⌁</div><span><b>Workspace URL</b><small>Your workspace address.</small></span><div class="v22-inline-input"><input value="veyra.studio"><button>Change</button></div></div>
+        <div class="v22-setting-row"><div class="v22-setting-icon">◷</div><span><b>Timezone</b><small>Used for activity and analytics.</small></span><select><option>UTC-6 (Central Time)</option></select></div>
+        <div class="v22-setting-row"><div class="v22-setting-icon">◎</div><span><b>Language</b><small>Interface language.</small></span><select><option>English</option></select></div>
+
+        <div class="v22-ai-diagnostic">
+          <div class="v22-setting-icon large">✦</div>
+          <span><b>Veyra AI Diagnostics</b><small id="diagText">Check your live AI connection and system health.</small></span>
+          <button id="diagBtn">Run diagnostics</button>
+        </div>
+      </main>
+    </div>
+  </section>
+</main></div>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('diagBtn')?.addEventListener('click',async()=>{
+    const t=document.getElementById('diagText'); t.textContent='Checking Veyra AI…';
+    try{const r=await fetch('/api/ai/status');const d=await r.json();t.textContent=d.configured?'Veyra AI is configured and ready.':'No live key detected. Veyra Local Engine is available.'}
+    catch(e){t.textContent='Could not reach diagnostics.'}
+  });
+});
+</script>
+{% endblock %}

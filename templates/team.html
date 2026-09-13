@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% set active='team' %}
+{% block title %}Team — Veyra{% endblock %}
+{% block body %}
+<div class="v22-app">{% include '_sidebar.html' %}
+<main class="v22-main">
+  <header class="v22-pagehead"><div><small>TEAM MANAGEMENT</small><h1>Team Members</h1><p>Manage your team and permissions.</p></div><button class="v22-primary">＋ Invite Member</button></header>
+  <section class="v22-pagecontent">
+    <div class="v22-team-list">
+      {% for initials,name,email,role,color in [('CP',user.name,user.email,'Owner','peach'),('SJ','Sarah Johnson','sarah@example.com','Editor','pink'),('MC','Mike Chen','mike@example.com','Viewer','blue'),('ED','Emily Davis','emily@example.com','Editor','green')] %}
+      <article>
+        <i class="{{color}}">{{initials}}</i>
+        <div><b>{{name}}</b><small>{{email}}</small></div>
+        <span>{{role}}</span><button>•••</button>
+      </article>
+      {% endfor %}
+    </div>
+    <div class="v22-team-tools">
+      <article><span>◈</span><div><b>Permissions</b><p>Manage what your team can access and modify.</p></div><i>›</i></article>
+      <article><span>♙</span><div><b>Roles</b><p>Create and manage roles to simplify permissions.</p></div><i>›</i></article>
+      <article><span>⌁</span><div><b>Activity</b><p>See recent team activity and changes.</p></div><i>›</i></article>
+    </div>
+  </section>
+</main></div>
+{% endblock %}

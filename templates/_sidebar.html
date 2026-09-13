@@ -1,0 +1,52 @@
+<aside class="v22-side">
+  <a class="v22-side-brand" href="/dashboard">
+    <img src="{{ url_for('static',filename='veyra-mark.svg') }}" alt="Veyra">
+    <b>VEYRA</b><em class="v24-beta-badge">BETA</em>
+  </a>
+
+  <a class="v22-new" href="/studio">
+    <span>＋</span><b>New project</b>
+  </a>
+
+  <nav>
+    <a class="{{'active' if active=='dashboard' else ''}}" href="/dashboard">
+      <svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19.5z"/><path d="M9 21v-6h6v6"/></svg><span>Dashboard</span>
+    </a>
+    <a class="{{'active' if active=='projects' else ''}}" href="/app/projects">
+      <svg viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v10A1.5 1.5 0 0 1 19.5 20h-15A1.5 1.5 0 0 1 3 18.5z"/></svg><span>Projects</span>
+    </a>
+    <a class="{{'active' if active=='templates' else ''}}" href="/app/templates">
+      <svg viewBox="0 0 24 24"><rect x="4" y="3" width="15" height="17" rx="2"/><path d="M8 8h7M8 12h7M8 16h4"/></svg><span>Templates</span>
+    </a>
+    <a class="{{'active' if active=='agents' else ''}}" href="/app/agents">
+      <svg viewBox="0 0 24 24"><path d="m12 2 1.4 4.1L18 7.5l-4.1 1.4L12.5 13 11 8.9 7 7.5l4-1.4z"/><path d="m18.5 13 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/><path d="m5.5 14 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg><span>Agents</span>
+    </a>
+    <a class="{{'active' if active=='databases' else ''}}" href="/app/databases">
+      <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="7.5" ry="3"/><path d="M4.5 5v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V5"/><path d="M4.5 11v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/></svg><span>Databases</span>
+    </a>
+    <a class="{{'active' if active=='deployments' else ''}}" href="/app/deployments">
+      <svg viewBox="0 0 24 24"><path d="M12 3 5 7v10l7 4 7-4V7z"/><path d="m5 7 7 4 7-4M12 11v10"/></svg><span>Deployments</span>
+    </a>
+    <a class="{{'active' if active=='analytics' else ''}}" href="/app/analytics">
+      <svg viewBox="0 0 24 24"><path d="m4 17 5-5 4 3 7-8"/><path d="M15 7h5v5"/></svg><span>Analytics</span>
+    </a>
+    <a class="{{'active' if active=='team' else ''}}" href="/app/team">
+      <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c.4-4 2.4-6 6-6s5.6 2 6 6"/><path d="M14 15c3.5-.4 6 1.2 7 4"/></svg><span>Team</span>
+    </a>
+    <a class="{{'active' if active=='settings' else ''}}" href="/app/settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21H10v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3.1 14H3v-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3.1V3h4v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.1v4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Settings</span>
+    </a>
+  </nav>
+
+  <div class="v22-side-spacer"></div>
+
+  <div class="v22-user">
+    {% if user.avatar_url %}<img src="{{user.avatar_url}}" alt="">{% else %}<i>{{(user.name or 'V')[:1]}}</i>{% endif %}
+    <div><b>{{user.name}}</b><small>{{user.email or user.provider}}</small></div>
+    <a href="/logout">›</a>
+  </div>
+</aside>
+<button class="v23-sidebar-toggle" id="sidebarToggle" title="Hide sidebar" aria-label="Toggle sidebar">
+  <span class="collapse-icon">‹</span>
+  <span class="expand-icon">›</span>
+</button>

@@ -1,0 +1,10 @@
+{% set active='tokens' %}{% block title %}Design Tokens — Veyra{% endblock %}{% extends "base.html" %}{% block body %}<div class="appwrap">{% include '_sidebar.html' %}<main class="v9slide">
+<header class="slideTop"><div><small>DESIGN SYSTEM / TOKENS</small><h1>Change the system once.</h1><p>Colors, type, spacing, radius, shadows, and motion update the entire project together.</p></div><div class="slideActions"><button>Import JSON</button><a href="#">Export tokens</a></div></header>
+<section class="tokenLayout">
+ <article class="tokenPanel"><h3>Color system</h3><div class="swatches"><i style="--c:#8B5CF6"></i><i style="--c:#6366F1"></i><i style="--c:#38BDF8"></i><i style="--c:#0F172A"></i><i style="--c:#F8FAFC"></i></div><p>18 semantic color tokens</p></article>
+ <article class="tokenPanel"><h3>Typography</h3><div class="typeSample"><b>Aa</b><span>Display / 64 / Bold<br>Body / 16 / Regular</span></div><p>9 shared text styles</p></article>
+ <article class="tokenPanel"><h3>Radius</h3><div class="radiusSample"><i></i><i></i><i></i><i></i></div><p>8px → 28px scale</p></article>
+ <article class="tokenPanel"><h3>Spacing</h3><div class="spaceBars"><i></i><i></i><i></i><i></i><i></i></div><p>4px base rhythm</p></article>
+ <article class="tokenPanel"><h3>Motion</h3><div class="motionTrack"><i></i></div><p>5 motion presets</p></article>
+ <article class="tokenPanel"><h3>Shadows</h3><div class="shadowDemo"></div><p>8 elevation levels</p></article>
+</section></main></div>{% endblock %}

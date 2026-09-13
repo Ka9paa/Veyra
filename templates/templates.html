@@ -1,0 +1,38 @@
+{% extends "base.html" %}{% set active='templates' %}
+{% block title %}Templates — Veyra{% endblock %}
+{% block body %}
+<div class="v22-app">{% include '_sidebar.html' %}
+<main class="v22-main">
+  <header class="v22-pagehead"><div><small>TEMPLATES</small><h1>Templates</h1><p>Start from a polished foundation and make it yours.</p></div></header>
+  <section class="v22-pagecontent">
+    <div class="v22-template-toolbar">
+      <input id="templateSearch" placeholder="⌕  Search templates…">
+      <div class="v22-template-tabs">
+        <button class="active">All</button><button>Web Apps</button><button>SaaS</button><button>Landing Pages</button><button>E-Commerce</button><button>Dashboards</button>
+      </div>
+    </div>
+
+    <div class="v22-template-grid">
+      {% for tag,title,stack,img,prompt in [
+        ('SaaS','SaaS Landing Page','Next.js · Tailwind CSS','saas.jpg','Build a premium SaaS landing page with a purple Veyra style'),
+        ('AI','AI Chat Application','React · Node.js','ai-chat.jpg','Build a polished AI chat application'),
+        ('Commerce','E-Commerce Store','Next.js · Stripe','commerce.jpg','Build a luxury ecommerce storefront'),
+        ('Dashboard','Analytics Dashboard','React · Charts','analytics.jpg','Build a modern analytics dashboard'),
+        ('Portfolio','Portfolio Website','Next.js · Tailwind CSS','portfolio.jpg','Build a premium creative portfolio'),
+        ('Content','Blog Platform','Next.js · MDX','blog.jpg','Build a polished editorial blog platform')
+      ] %}
+      <article class="v22-template-card" data-title="{{title|lower}}">
+        <div class="v22-template-image"><img src="{{url_for('static',filename='template-previews/'+img)}}" alt="{{title}} preview"><span>{{tag}}</span></div>
+        <div class="v22-template-copy"><h3>{{title}}</h3><p>{{stack}}</p><footer><button>Preview</button><a href="/studio?prompt={{prompt|urlencode}}">Use template</a></footer></div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+</main></div>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+ const input=document.getElementById('templateSearch');
+ input?.addEventListener('input',()=>{const q=input.value.toLowerCase();document.querySelectorAll('.v22-template-card').forEach(c=>c.style.display=c.dataset.title.includes(q)?'':'none')});
+});
+</script>
+{% endblock %}

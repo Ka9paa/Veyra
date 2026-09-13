@@ -1,0 +1,13 @@
+{% set active='flows' %}{% block title %}User Flows — Veyra{% endblock %}{% extends "base.html" %}{% block body %}<div class="appwrap">{% include '_sidebar.html' %}<main class="v9slide">
+<header class="slideTop"><div><small>VEYRA LABS / USER FLOWS</small><h1>See the journey before the screens.</h1><p>Map product logic visually, find dead ends, then have Veyra generate the missing interfaces.</p></div><div class="slideActions"><button>Import flow</button><a href="/studio">＋ Generate flow</a></div></header>
+<section class="flowCanvas">
+  <div class="flowNode n1"><small>01</small><b>Landing</b><span>Entry point</span></div>
+  <div class="flowLine l1"></div>
+  <div class="flowNode n2"><small>02</small><b>Sign up</b><span>Create account</span></div>
+  <div class="flowLine l2"></div>
+  <div class="flowNode n3"><small>03</small><b>Onboarding</b><span>Setup workspace</span></div>
+  <div class="flowLine l3"></div>
+  <div class="flowNode n4"><small>04</small><b>Dashboard</b><span>Activation</span></div>
+  <aside><b>Flow intelligence</b><p>Veyra found one opportunity to reduce onboarding friction.</p><button>Show suggestion</button></aside>
+</section>
+<section class="flowStats"><article><b>4</b><span>Screens</span></article><article><b>3</b><span>Transitions</span></article><article><b>0</b><span>Dead ends</span></article><article><b>1</b><span>Suggestion</span></article></section></main></div>{% endblock %}

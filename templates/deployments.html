@@ -1,0 +1,9 @@
+{% set active='deployments' %}{% block title %}Deployments — Veyra{% endblock %}{% extends "base.html" %}{% block body %}<div class="appwrap">{% include '_sidebar.html' %}<main class="v9slide">
+<header class="slideTop"><div><small>SHIP / DEPLOYMENTS</small><h1>From preview to production.</h1><p>Every release, environment, build health check, and rollback in one place.</p></div><div class="slideActions"><button>Connect domain</button><a href="/studio">Deploy project</a></div></header>
+<section class="deployHero"><div class="pulseRing"><i></i></div><div><small>PRODUCTION STATUS</small><h2>All systems healthy</h2><p>Latest production build passed Veyra QA and is serving normally.</p></div><div><b>99.99%</b><span>uptime</span></div></section>
+<section class="deployList">
+  <article><div><i class="green"></i><b>Production</b><span>veyra-live.app</span></div><div><small>2m ago</small><button>Open ↗</button></div></article>
+  <article><div><i class="violet"></i><b>Preview</b><span>preview-184.veyra.app</span></div><div><small>12m ago</small><button>Open ↗</button></div></article>
+  <article><div><i class="blue"></i><b>Staging</b><span>staging.veyra.app</span></div><div><small>Yesterday</small><button>Open ↗</button></div></article>
+</section>
+<section class="deployBottom"><article><small>ROLLBACK</small><h3>Version history</h3><p>Restore a previous working build in one action.</p><button>View versions</button></article><article><small>DOMAINS</small><h3>Custom domains</h3><p>Attach production domains without leaving Veyra.</p><button>Manage domains</button></article></section></main></div>{% endblock %}

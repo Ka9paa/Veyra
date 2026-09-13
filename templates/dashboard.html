@@ -1,0 +1,82 @@
+{% extends "base.html" %}{% set active='dashboard' %}
+{% block title %}Dashboard — Veyra{% endblock %}
+{% block body %}
+<div class="v21-dash-app">
+  {% include '_sidebar.html' %}
+  <main class="v21-dash-main">
+    <header class="v21-dash-top">
+      <div><small>DASHBOARD <em class="v26-beta-inline">BETA</em></small><h1>Dashboard</h1></div>
+      <div class="v21-dash-actions">
+        <button class="v26-search-trigger">⌕ <span>Search workspace</span><kbd>⌘ K</kbd></button>
+        <button>♧ <span>Notifications</span></button>
+        <a href="/studio">＋ <span>New Project</span></a>
+      </div>
+    </header>
+
+    <section class="v21-dash-content">
+      <div class="v21-dash-hero-grid">
+        <section class="v21-dash-hero">
+          <small>WELCOME BACK</small>
+          <h2>Build faster with Veyra.</h2>
+          <p>Design, generate, improve, and ship products from one workspace.<br>Your assistant, templates, agents, deployments, and analytics all live here.</p>
+          <div class="v21-dash-hero-actions">
+            <a href="/studio" class="primary">ϟ <span>Open Builder</span></a>
+            <a href="/app/templates">▦ <span>Browse Templates</span></a>
+          </div>
+          <div class="v21-dash-chips">
+            <span>◉ <b>{{user.credits}}</b> credits ready</span>
+            <span>◷ <b>{{stats.projects}}</b> active projects</span>
+            <span>♙ <b>{{stats.team}}</b> workspace member{% if stats.team!=1 %}s{% endif %}</span>
+          </div>
+        </section>
+
+        <section class="v21-live-canvas">
+          <header><span><i></i><i></i><i></i></span><b>Veyra live canvas</b></header>
+          <div class="v21-live-body">
+            <aside>
+              <b>AI Copilot</b>
+              <span>♙ Planning structure</span>
+              <span>▣ Generating UI system</span>
+              <span>▤ Preparing project files</span>
+            </aside>
+            <main>
+              <div class="v21-canvas-hero"><span>＋</span></div>
+              <div class="v21-canvas-grid">
+                <i><b></b><em></em></i><i><b></b><em></em></i><i><b></b><em></em></i><i><b></b><em></em></i>
+              </div>
+            </main>
+          </div>
+        </section>
+      </div>
+
+      <div class="v21-stat-grid">
+        <article><div><span>Projects</span><b>{{stats.projects}}</b><small>● Ready to build</small></div><i>□</i></article>
+        <article><div><span>Deployments</span><b>{{stats.deployments}}</b><small>● Healthy pipeline</small></div><i>♢</i></article>
+        <article><div><span>Credits</span><b>{{user.credits}}</b><small>● Current balance</small></div><i>◎</i></article>
+        <article><div><span>Team</span><b>{{stats.team}}</b><small>● Workspace access</small></div><i>♙</i></article>
+      </div>
+
+      <div class="v21-bottom-grid">
+        <section class="v21-dash-panel">
+          <header><b>Recent projects</b><a href="/app/projects">View all</a></header>
+          <div class="v21-project-list">
+            {% for p in projects %}
+              <article><div class="v21-project-thumb {{loop.cycle('purple','blue','gold','violet')}}"></div><div><b>{{p.name}}</b><span>{{p.description or 'Veyra project'}}</span></div><a href="/studio">Open</a></article>
+            {% else %}
+              <article><div class="v21-project-thumb purple"></div><div><b>Your first Veyra project</b><span>Start from a prompt, idea, or polished template.</span></div><a href="/studio">Create</a></article>
+            {% endfor %}
+          </div>
+          <a class="v21-panel-link" href="/app/templates">Explore templates →</a>
+        </section>
+
+        <section class="v21-dash-panel">
+          <header><b>Activity</b><a href="/app/analytics">View all</a></header>
+          <div class="v21-activity-item">
+            <i></i><div><b>Workspace ready</b><span>Your workspace is all set. Start building something amazing.</span><a href="/studio">Go to builder →</a></div><small>now</small>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+</div>
+{% endblock %}

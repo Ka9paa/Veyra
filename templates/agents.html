@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% set active='agents' %}
+{% block title %}Agents — Veyra{% endblock %}
+{% block body %}
+<div class="v22-app">{% include '_sidebar.html' %}
+<main class="v22-main">
+  <header class="v22-pagehead"><div><small>AGENTS</small><h1>Agents</h1><p>Your AI team working across your projects.</p></div><button class="v22-primary">＋ Create Agent</button></header>
+  <section class="v22-pagecontent">
+    <div class="v22-agent-list">
+      {% for icon,name,desc,tasks in [('⌘','Code Architect','Designs scalable architecture','24'),('◇','UI/UX Designer','Creates polished interfaces','18'),('▤','Backend Developer','Builds robust backend systems','32'),('✓','QA Engineer','Tests and ensures quality','16'),('⬡','DevOps Engineer','Manages deployments','12'),('↻','Repair Agent','Finds and repairs issues','8')] %}
+      <article>
+        <div class="v22-agent-icon">{{icon}}</div>
+        <div class="v22-agent-copy"><h3>{{name}}</h3><p>{{desc}}</p></div>
+        <span class="v22-active">● Active</span>
+        <small>{{tasks}} tasks</small>
+        <button>Open</button>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+</main></div>
+{% endblock %}

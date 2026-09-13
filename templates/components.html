@@ -1,0 +1,8 @@
+{% set active='components' %}{% block title %}Components — Veyra{% endblock %}{% extends "base.html" %}{% block body %}<div class="appwrap">{% include '_sidebar.html' %}<main class="v9slide">
+<header class="slideTop"><div><small>DESIGN SYSTEM / COMPONENTS</small><h1>Your UI system, not random pieces.</h1><p>Reusable components stay linked so Veyra can make global edits without breaking consistency.</p></div><div class="slideActions"><button>Import library</button><a href="#">＋ Component</a></div></header>
+<section class="componentSummary"><article><b>78</b><span>Total components</span></article><article><b>12</b><span>Variants</span></article><article><b>0</b><span>Detached</span></article><article><b>100%</b><span>Token coverage</span></article></section>
+<section class="componentGrid">
+ {% for n,c in [('Buttons','12 variants'),('Inputs','18 controls'),('Navigation','8 patterns'),('Cards','24 patterns'),('Tables','7 layouts'),('Modals','9 patterns')] %}
+ <article><div class="componentStage"><button class="demoBtn">{{n}}</button><i></i><i></i></div><h3>{{n}}</h3><p>{{c}}</p><footer><span>Synced</span><button>Inspect →</button></footer></article>
+ {% endfor %}
+</section></main></div>{% endblock %}

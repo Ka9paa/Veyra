@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% set active='databases' %}
+{% block title %}Databases — Veyra{% endblock %}
+{% block body %}
+<div class="v22-app">{% include '_sidebar.html' %}
+<main class="v22-main">
+  <header class="v22-pagehead"><div><small>DATABASES</small><h1>Databases</h1><p>Manage your application data with ease.</p></div><button class="v22-primary">＋ New Database</button></header>
+  <section class="v22-pagecontent">
+    <div class="v22-db-list">
+      {% for icon,name,type,size in [('◉','Users Database','PostgreSQL','124 MB'),('▥','Analytics Database','PostgreSQL','432.1 MB'),('▤','Session Store','Redis','21.1 MB'),('□','File Storage','Object Storage','1.2 GB')] %}
+      <article><span class="v22-db-icon">{{icon}}</span><b>{{name}}</b><small>{{type}}</small><em>{{size}}</em><i>● Active</i><button>•••</button></article>
+      {% endfor %}
+    </div>
+    <div class="v22-db-tools">
+      <article><span class="v22-tool-icon">⌘</span><div><h2>Visual schema builder</h2><p>Design tables, relations, and indexes beside the product you are building.</p><button>Open schema →</button></div></article>
+      <article><span class="v22-tool-icon">&lt;/&gt;</span><div><h2>Instant mock endpoints</h2><p>Create realistic prototype APIs before your production backend is finished.</p><button>Open API Studio →</button></div></article>
+    </div>
+  </section>
+</main></div>
+{% endblock %}
