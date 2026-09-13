@@ -5,7 +5,7 @@ import sqlite3
 import io
 import zipfile
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from functools import wraps
 
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for, flash, send_file
@@ -13,6 +13,7 @@ from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
 from openai import OpenAI
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 def extract_json_object(text):
     if not text: raise ValueError("Empty Veyra AI response")
@@ -29,38 +30,129 @@ def extract_json_object(text):
 
 BASE=Path(__file__).resolve().parent
 load_dotenv(BASE/'.env')
+
 app=Flask(__name__)
 app.secret_key=os.getenv('FLASK_SECRET_KEY','local-dev-change-me')
-app.config.update(SESSION_COOKIE_HTTPONLY=True,SESSION_COOKIE_SAMESITE='Lax')
-# Vercel's /var/task filesystem is read-only.
-# Use /tmp while deployed on Vercel; use the normal local data folder elsewhere.
-if os.getenv('VERCEL'):
-    DB = Path('/tmp/veyra.db')
-else:
-    DB = BASE/'data'/'veyra.db'
+app.wsgi_app=ProxyFix(app.wsgi_app,x_proto=1,x_host=1)
+
+IS_PRODUCTION=bool(os.getenv('VERCEL') or os.getenv('VEYRA_PRODUCTION'))
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=IS_PRODUCTION,
+    SESSION_COOKIE_SAMESITE='Lax',
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+    SESSION_REFRESH_EACH_REQUEST=True,
+)
+
+DATABASE_URL=(os.getenv('DATABASE_URL') or '').strip()
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL='postgresql://'+DATABASE_URL[len('postgres://'):]
+USE_POSTGRES=bool(DATABASE_URL)
+DB=BASE/'data'/'veyra.db'
+
+class DBConnection:
+    def __init__(self):
+        self.is_postgres=USE_POSTGRES
+        if self.is_postgres:
+            try:
+                import psycopg
+                from psycopg.rows import dict_row
+            except ImportError as exc:
+                raise RuntimeError('DATABASE_URL is set but psycopg is not installed.') from exc
+            self.conn=psycopg.connect(DATABASE_URL,row_factory=dict_row)
+        else:
+            DB.parent.mkdir(parents=True,exist_ok=True)
+            self.conn=sqlite3.connect(DB)
+            self.conn.row_factory=sqlite3.Row
+
+    def execute(self,query,params=()):
+        if self.is_postgres:
+            query=query.replace('?', '%s')
+        return self.conn.execute(query,params)
+
+    def commit(self): self.conn.commit()
+    def rollback(self): self.conn.rollback()
+    def close(self): self.conn.close()
+    def __enter__(self): return self
+
+    def __exit__(self,exc_type,exc,tb):
+        try:
+            if exc_type:self.rollback()
+            else:self.commit()
+        finally:self.close()
+        return False
 
 def db():
-    DB.parent.mkdir(parents=True,exist_ok=True)
-    c=sqlite3.connect(DB); c.row_factory=sqlite3.Row; return c
+    return DBConnection()
 
 def now(): return datetime.now(timezone.utc).isoformat(timespec='seconds')
 
 def init_db():
     with db() as c:
-        c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 50,created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)''')
-        c.execute('''CREATE TABLE IF NOT EXISTS vouches(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,role TEXT DEFAULT '',rating INTEGER NOT NULL DEFAULT 5,message TEXT NOT NULL,project_name TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL,reviewed_at TEXT)''')
-        c.execute('''CREATE TABLE IF NOT EXISTS support_threads(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,question TEXT NOT NULL,answer TEXT NOT NULL,created_at TEXT NOT NULL)''')
-        cols={r['name'] for r in c.execute('PRAGMA table_info(users)').fetchall()}
-        if 'password_hash' not in cols: c.execute('ALTER TABLE users ADD COLUMN password_hash TEXT')
+        if USE_POSTGRES:
+            c.execute('''CREATE TABLE IF NOT EXISTS users(
+                id BIGSERIAL PRIMARY KEY,
+                provider TEXT NOT NULL,
+                provider_user_id TEXT NOT NULL,
+                email TEXT,
+                name TEXT,
+                avatar_url TEXT,
+                password_hash TEXT,
+                credits INTEGER NOT NULL DEFAULT 50,
+                plan TEXT NOT NULL DEFAULT 'free',
+                stripe_customer_id TEXT,
+                stripe_subscription_id TEXT,
+                subscription_status TEXT NOT NULL DEFAULT 'inactive',
+                created_at TEXT NOT NULL,
+                UNIQUE(provider,provider_user_id)
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS projects(
+                id BIGSERIAL PRIMARY KEY,user_id BIGINT NOT NULL,name TEXT NOT NULL,
+                description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',
+                created_at TEXT NOT NULL,updated_at TEXT NOT NULL
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS vouches(
+                id BIGSERIAL PRIMARY KEY,user_id BIGINT NOT NULL,name TEXT NOT NULL,role TEXT DEFAULT '',
+                rating INTEGER NOT NULL DEFAULT 5,message TEXT NOT NULL,project_name TEXT DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL,reviewed_at TEXT
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS support_threads(
+                id BIGSERIAL PRIMARY KEY,user_id BIGINT,question TEXT NOT NULL,answer TEXT NOT NULL,created_at TEXT NOT NULL
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS admin_audit(
+                id BIGSERIAL PRIMARY KEY,admin_user_id BIGINT,action TEXT NOT NULL,target_type TEXT,
+                target_id BIGINT,details TEXT DEFAULT '',created_at TEXT NOT NULL
+            )''')
+            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT")
+            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'free'")
+            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT")
+            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT")
+            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status TEXT NOT NULL DEFAULT 'inactive'")
+        else:
+            c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 50,plan TEXT NOT NULL DEFAULT 'free',stripe_customer_id TEXT,stripe_subscription_id TEXT,subscription_status TEXT NOT NULL DEFAULT 'inactive',created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
+            c.execute('''CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)''')
+            c.execute('''CREATE TABLE IF NOT EXISTS vouches(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,role TEXT DEFAULT '',rating INTEGER NOT NULL DEFAULT 5,message TEXT NOT NULL,project_name TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL,reviewed_at TEXT)''')
+            c.execute('''CREATE TABLE IF NOT EXISTS support_threads(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,question TEXT NOT NULL,answer TEXT NOT NULL,created_at TEXT NOT NULL)''')
+            c.execute('''CREATE TABLE IF NOT EXISTS admin_audit(id INTEGER PRIMARY KEY AUTOINCREMENT,admin_user_id INTEGER,action TEXT NOT NULL,target_type TEXT,target_id INTEGER,details TEXT DEFAULT '',created_at TEXT NOT NULL)''')
+            cols={r['name'] for r in c.execute('PRAGMA table_info(users)').fetchall()}
+            additions={'password_hash':'TEXT','plan':"TEXT NOT NULL DEFAULT 'free'",'stripe_customer_id':'TEXT','stripe_subscription_id':'TEXT','subscription_status':"TEXT NOT NULL DEFAULT 'inactive'"}
+            for name,sql_type in additions.items():
+                if name not in cols:c.execute(f'ALTER TABLE users ADD COLUMN {name} {sql_type}')
         c.commit()
 
 def current_user():
     uid=session.get('user_id')
     if not uid:return None
-    with db() as c:
-        r=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
-        return dict(r) if r else None
+    with db() as c:r=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
+    if not r:
+        session.clear()
+        return None
+    return dict(r)
+
+def start_user_session(uid):
+    session.clear()
+    session.permanent=True
+    session['user_id']=int(uid)
 
 def is_admin(user=None):
     user=user or current_user()
@@ -76,7 +168,9 @@ def login_required(fn):
     return w
 
 @app.context_processor
-def inject():return {'current_user':current_user()}
+def inject():
+    u=current_user()
+    return {'current_user':u,'is_admin_user':is_admin(u)}
 
 def upsert_oauth(provider,pid,email,name,avatar):
     with db() as c:
@@ -84,7 +178,12 @@ def upsert_oauth(provider,pid,email,name,avatar):
         if r:
             c.execute('UPDATE users SET email=?,name=?,avatar_url=? WHERE id=?',(email,name,avatar,r['id']));uid=r['id']
         else:
-            cur=c.execute('INSERT INTO users(provider,provider_user_id,email,name,avatar_url,password_hash,credits,created_at) VALUES(?,?,?,?,?,NULL,50,?)',(provider,pid,email,name,avatar,now()));uid=cur.lastrowid
+            if USE_POSTGRES:
+                cur=c.execute('INSERT INTO users(provider,provider_user_id,email,name,avatar_url,password_hash,credits,created_at) VALUES(?,?,?,?,?,NULL,50,?) RETURNING id',(provider,pid,email,name,avatar,now()))
+                uid=cur.fetchone()['id']
+            else:
+                cur=c.execute('INSERT INTO users(provider,provider_user_id,email,name,avatar_url,password_hash,credits,created_at) VALUES(?,?,?,?,?,NULL,50,?)',(provider,pid,email,name,avatar,now()))
+                uid=cur.lastrowid
         c.commit();return uid
 
 oauth=OAuth(app)
@@ -231,6 +330,39 @@ def submit_vouch():
         c.commit()
     return jsonify({'ok':True,'message':'Your vouch was submitted for review.'})
 
+@app.route('/admin')
+@login_required
+def admin_dashboard():
+    if not is_admin():return ('Forbidden',403)
+    with db() as c:
+        stats={
+            'users':c.execute('SELECT COUNT(*) AS n FROM users').fetchone()['n'],
+            'projects':c.execute('SELECT COUNT(*) AS n FROM projects').fetchone()['n'],
+            'pending_vouches':c.execute("SELECT COUNT(*) AS n FROM vouches WHERE status='pending'").fetchone()['n'],
+            'support':c.execute('SELECT COUNT(*) AS n FROM support_threads').fetchone()['n'],
+        }
+        users=[dict(r) for r in c.execute('SELECT * FROM users ORDER BY id DESC LIMIT 50').fetchall()]
+        projects=[dict(r) for r in c.execute('SELECT * FROM projects ORDER BY updated_at DESC LIMIT 15').fetchall()]
+        vouches=[dict(r) for r in c.execute("SELECT * FROM vouches WHERE status='pending' ORDER BY created_at DESC LIMIT 15").fetchall()]
+        support=[dict(r) for r in c.execute('SELECT * FROM support_threads ORDER BY id DESC LIMIT 15').fetchall()]
+    return render_template('admin_dashboard.html',user=current_user(),stats=stats,users=users,projects=projects,vouches=vouches,support=support,database_mode='Postgres' if USE_POSTGRES else 'Local SQLite')
+
+@app.post('/admin/users/<int:uid>/update')
+@login_required
+def admin_update_user(uid):
+    admin=current_user()
+    if not is_admin(admin):return ('Forbidden',403)
+    try:credits=max(0,min(1000000,int(request.form.get('credits','0'))))
+    except Exception:return ('Invalid credits',400)
+    plan=(request.form.get('plan') or 'free').strip().lower()
+    if plan not in {'free','pro','max'}:return ('Invalid plan',400)
+    with db() as c:
+        c.execute('UPDATE users SET credits=?,plan=? WHERE id=?',(credits,plan,uid))
+        c.execute('INSERT INTO admin_audit(admin_user_id,action,target_type,target_id,details,created_at) VALUES(?,?,?,?,?,?)',
+                  (admin['id'],'update_user','user',uid,json.dumps({'credits':credits,'plan':plan}),now()))
+        c.commit()
+    return redirect('/admin')
+
 @app.route('/admin/vouches')
 @login_required
 def admin_vouches():
@@ -328,7 +460,14 @@ def signup_email():
     with db() as c:
         if c.execute("SELECT id FROM users WHERE provider='local' AND lower(email)=?",(email,)).fetchone():
             flash('An account with that email already exists.','error');return redirect(url_for('signup'))
-        cur=c.execute("INSERT INTO users(provider,provider_user_id,email,name,password_hash,credits,created_at) VALUES('local',?,?,?,?,50,?)",(email,email,name,generate_password_hash(pw),now()));c.commit();session.clear();session['user_id']=cur.lastrowid
+        if USE_POSTGRES:
+            cur=c.execute("INSERT INTO users(provider,provider_user_id,email,name,password_hash,credits,created_at) VALUES('local',?,?,?,?,50,?) RETURNING id",(email,email,name,generate_password_hash(pw),now()))
+            uid=cur.fetchone()['id']
+        else:
+            cur=c.execute("INSERT INTO users(provider,provider_user_id,email,name,password_hash,credits,created_at) VALUES('local',?,?,?,?,50,?)",(email,email,name,generate_password_hash(pw),now()))
+            uid=cur.lastrowid
+        c.commit()
+        start_user_session(uid)
     return redirect(url_for('dashboard'))
 @app.post('/login/email')
 def login_email():
@@ -336,7 +475,7 @@ def login_email():
     with db() as c:r=c.execute("SELECT * FROM users WHERE provider='local' AND lower(email)=?",(email,)).fetchone()
     if not r or not r['password_hash'] or not check_password_hash(r['password_hash'],pw):
         flash('Incorrect email or password.','error');return redirect(url_for('login'))
-    session.clear();session['user_id']=r['id'];return redirect(url_for('dashboard'))
+    start_user_session(r['id']);return redirect(url_for('dashboard'))
 @app.route('/logout')
 def logout():session.clear();return redirect(url_for('home'))
 
@@ -347,7 +486,7 @@ def auth_google():
 @app.route('/auth/google/callback')
 def google_callback():
     token=google.authorize_access_token();info=token.get('userinfo') or google.parse_id_token(token)
-    uid=upsert_oauth('google',str(info.get('sub')),info.get('email'),info.get('name') or info.get('email') or 'Veyra User',info.get('picture'));session.clear();session['user_id']=uid;return redirect(url_for('dashboard'))
+    uid=upsert_oauth('google',str(info.get('sub')),info.get('email'),info.get('name') or info.get('email') or 'Veyra User',info.get('picture'));start_user_session(uid);return redirect(url_for('dashboard'))
 @app.route('/auth/github')
 def auth_github():
     if not os.getenv('GITHUB_CLIENT_ID') or not os.getenv('GITHUB_CLIENT_SECRET'):return render_template('oauth_missing.html',provider='GitHub'),503
@@ -359,7 +498,7 @@ def github_callback():
         e=github.get('user/emails')
         if e.status_code==200:
             rows=e.json();x=next((v for v in rows if v.get('primary') and v.get('verified')),None) or next((v for v in rows if v.get('verified')),None);email=x.get('email') if x else None
-    uid=upsert_oauth('github',str(p.get('id')),email,p.get('name') or p.get('login') or 'Veyra User',p.get('avatar_url'));session.clear();session['user_id']=uid;return redirect(url_for('dashboard'))
+    uid=upsert_oauth('github',str(p.get('id')),email,p.get('name') or p.get('login') or 'Veyra User',p.get('avatar_url'));start_user_session(uid);return redirect(url_for('dashboard'))
 
 @app.route('/studio')
 @login_required
@@ -546,11 +685,18 @@ def save_project():
             )
             saved_id=int(project_id)
         else:
-            cur=c.execute(
-                'INSERT INTO projects(user_id,name,description,html,css,js,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',
-                (uid,title,description,html,css,js,now(),now())
-            )
-            saved_id=cur.lastrowid
+            if USE_POSTGRES:
+                cur=c.execute(
+                    'INSERT INTO projects(user_id,name,description,html,css,js,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id',
+                    (uid,title,description,html,css,js,now(),now())
+                )
+                saved_id=cur.fetchone()['id']
+            else:
+                cur=c.execute(
+                    'INSERT INTO projects(user_id,name,description,html,css,js,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',
+                    (uid,title,description,html,css,js,now(),now())
+                )
+                saved_id=cur.lastrowid
         c.commit()
     return jsonify({'ok':True,'project_id':saved_id,'saved_at':now()})
 
