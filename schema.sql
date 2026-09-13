@@ -1,0 +1,2 @@
+-- Reference only. app.py creates these automatically using DATABASE_URL.
+-- Tables: users, projects, vouches, support_threads, admin_audit.
