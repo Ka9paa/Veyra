@@ -38,6 +38,7 @@
     </a>
   </nav>
 
+    {% if is_admin_user %}<a class="{{'active' if active=='admin' else ''}}" href="/admin"><svg viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.2c0 4.4 2.9 8.3 7.5 9.8 4.6-1.5 7.5-5.4 7.5-9.8V6z"/><path d="M9 12.2 11 14l4-4"/></svg><span>Admin</span></a>{% endif %}
   <div class="v22-side-spacer"></div>
 
   <div class="v22-user">
