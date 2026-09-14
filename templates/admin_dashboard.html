@@ -93,10 +93,69 @@
 
     <section class="a31-panel" id="audit">
       <div class="a31-panel-head"><div><small>SECURITY</small><h2>Admin audit log</h2></div><span class="a31-muted">Latest 20 actions</span></div>
-      <div class="a31-audit">
+      <div class="a31-audit a311-audit">
         {% for a in audit %}
-          <div><span class="a31-action">{{a.action|replace('_',' ')|title}}</span><b>{% if a.target_id %}User #{{a.target_id}}{% else %}System{% endif %}</b><small>{{a.created_at}}</small></div>
-        {% else %}<div class="a31-empty">No admin actions recorded yet.</div>{% endfor %}
+          <article class="a311-audit-row">
+            <div class="a311-action-col">
+              <span class="a31-action">{{a.action|replace('_',' ')|title}}</span>
+              <small>{{a.source}}</small>
+            </div>
+
+            <div class="a311-target">
+              {% if a.target_user %}
+                <b>{{a.target_user.name or 'Veyra User'}}</b>
+                <small>{{a.target_user.email or ('User #' ~ a.target_user.id)}}</small>
+              {% elif a.target_id %}
+                <b>User #{{a.target_id}}</b>
+                <small>Account no longer available</small>
+              {% else %}
+                <b>System</b>
+                <small>No user target</small>
+              {% endif %}
+            </div>
+
+            <div class="a311-change">
+              {% set d=a.details_obj %}
+              {% if a.action in ['adjust_credits','discord_add_credits','discord_remove_credits'] %}
+                <b>{% if d.amount is defined and d.amount|int > 0 %}+{% endif %}{{d.amount or 0}} credits</b>
+                {% if d.before is defined and d.after is defined %}<small>{{d.before}} → {{d.after}}</small>{% endif %}
+              {% elif a.action in ['update_user','discord_set_credits'] %}
+                {% if d.after is mapping and d.after.credits is defined %}
+                  <b>{{d.before.credits if d.before is mapping else '—'}} → {{d.after.credits}} credits</b>
+                  <small>{{(d.before.plan if d.before is mapping else '—')|upper}} → {{d.after.plan|upper}}</small>
+                {% elif d.after is defined %}
+                  <b>Credits set to {{d.after}}</b>
+                  {% if d.before is defined %}<small>{{d.before}} → {{d.after}}</small>{% endif %}
+                {% else %}<b>Account updated</b>{% endif %}
+              {% elif a.action in ['blacklist_user','discord_blacklist'] %}
+                <b>Account restricted</b><small>{{d.reason or 'No reason provided'}}</small>
+              {% elif a.action in ['unblacklist_user','discord_unblacklist'] %}
+                <b>Restriction removed</b><small>Account access restored</small>
+              {% elif a.action == 'discord_set_plan' %}
+                <b>{{(d.before or '—')|upper}} → {{(d.after or '—')|upper}}</b><small>Plan changed</small>
+              {% else %}
+                <b>Administrative action</b><small>{{a.target_type or 'system'}}</small>
+              {% endif %}
+            </div>
+
+            <div class="a311-actor">
+              {% if a.actor_user %}
+                <b>{{a.actor_user.name or a.actor_user.email}}</b>
+                <small>Web admin</small>
+              {% elif a.discord_admin_id %}
+                <b>Discord Admin</b>
+                <small>ID {{a.discord_admin_id}}</small>
+              {% else %}
+                <b>System</b>
+                <small>Automated / unknown</small>
+              {% endif %}
+            </div>
+
+            <time>{{a.created_at}}</time>
+          </article>
+        {% else %}
+          <div class="a31-empty">No admin actions recorded yet.</div>
+        {% endfor %}
       </div>
     </section>
   </main>

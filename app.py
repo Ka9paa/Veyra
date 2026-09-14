@@ -380,7 +380,30 @@ def admin_dashboard():
         projects=[dict(r) for r in c.execute('SELECT * FROM projects ORDER BY updated_at DESC LIMIT 10').fetchall()]
         vouches=[dict(r) for r in c.execute("SELECT * FROM vouches WHERE status='pending' ORDER BY created_at DESC LIMIT 8").fetchall()]
         support=[dict(r) for r in c.execute('SELECT * FROM support_threads ORDER BY id DESC LIMIT 8').fetchall()]
-        audit=[dict(r) for r in c.execute('SELECT * FROM admin_audit ORDER BY id DESC LIMIT 20').fetchall()]
+        audit_raw=[dict(r) for r in c.execute('SELECT * FROM admin_audit ORDER BY id DESC LIMIT 20').fetchall()]
+        audit=[]
+        for item in audit_raw:
+            details={}
+            raw=item.get('details')
+            if raw:
+                try:
+                    details=json.loads(raw) if isinstance(raw,str) else dict(raw)
+                except Exception:
+                    details={}
+            target=None
+            if item.get('target_type')=='user' and item.get('target_id'):
+                target_row=c.execute('SELECT id,name,email FROM users WHERE id=?',(item['target_id'],)).fetchone()
+                if target_row:target=dict(target_row)
+            actor=None
+            if item.get('admin_user_id'):
+                actor_row=c.execute('SELECT id,name,email FROM users WHERE id=?',(item['admin_user_id'],)).fetchone()
+                if actor_row:actor=dict(actor_row)
+            item['details_obj']=details
+            item['target_user']=target
+            item['actor_user']=actor
+            item['source']='Discord' if details.get('source')=='discord' else 'Web'
+            item['discord_admin_id']=details.get('discord_admin_id')
+            audit.append(item)
     return render_template('admin_dashboard.html',user=admin,stats=stats,users=users,projects=projects,vouches=vouches,support=support,audit=audit,q=q,status=status,database_mode='Postgres' if USE_POSTGRES else 'Local SQLite')
 
 @app.post('/admin/users/<int:uid>/update')
