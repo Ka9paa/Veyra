@@ -1,40 +1,26 @@
-VEYRA V31 — ADMIN CONTROL CENTER + DISCORD ADMIN BOT
+VEYRA SOCIAL PREVIEW GIF PATCH
 
-Fixes the giant admin shield and gives Admin its own clean control-center UI.
+WHAT IT ADDS
+- static/veyra-social-card.gif  -> animated Discord/Open Graph preview
+- static/veyra-social-card.png  -> static fallback for X/Twitter and platforms that do not animate OG GIFs
+- templates/social_meta_snippet.html -> exact meta tags to put in your base <head>
 
-Admin features:
-- user search by name/email/ID
-- Free/Pro/Max plan editing
-- exact credits + quick +100/+1000
-- restrict/unrestrict users with reason
-- paid/restricted filters
-- admin audit log
-- support/vouch summaries
-- restricted account screen
+HOW TO APPLY
+1. Copy the static files into your real Veyra repo's static folder.
+2. Open templates/base.html.
+3. Inside the <head> section, add:
+   {% include 'social_meta_snippet.html' %}
+4. Copy templates/social_meta_snippet.html into your real repo's templates folder.
 
-Discord slash commands:
-- /addcredits
-- /removecredits
-- /setcredits
-- /setplan
-- /blacklist
-- /unblacklist
-- /veyrauser
+GIT
+git add .
+git commit -m "Add animated Veyra social preview"
+git pull --rebase origin main
+git push origin main
 
-Discord architecture:
-Keep the website on Vercel and Neon. Run discord_admin_bot.py on an always-on Python host
-(VPS/PebbleHost/Railway/Render worker). It uses the SAME Neon DATABASE_URL as Veyra.
+IMPORTANT
+Discord caches link previews. After deployment, if the old preview still appears, try sharing:
+https://buildveyra.xyz/?v=2
+Then later normal links should refresh as Discord recrawls the page.
 
-Bot env vars:
-DISCORD_BOT_TOKEN=...
-DISCORD_ADMIN_USER_IDS=your_discord_user_id,another_admin_id
-DISCORD_GUILD_ID=your_server_id
-DATABASE_URL=your Neon connection string
-
-Never put the bot token or DATABASE_URL in GitHub.
-
-Install bot:
-pip install -r requirements-bot.txt
-python discord_admin_bot.py
-
-This bundle includes the V30 profile/account changes too.
+The GIF loops through Veyra build / preview / QA states to make the embed feel alive like the Figma-style preview you showed.
