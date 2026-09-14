@@ -98,11 +98,7 @@ def init_db():
                 name TEXT,
                 avatar_url TEXT,
                 password_hash TEXT,
-<<<<<<< HEAD
-                credits INTEGER NOT NULL DEFAULT 50,
-=======
                 credits INTEGER NOT NULL DEFAULT 150,
->>>>>>> e8444cf (V29 simple homepage and credit usage)
                 plan TEXT NOT NULL DEFAULT 'free',
                 stripe_customer_id TEXT,
                 stripe_subscription_id TEXT,
@@ -133,11 +129,7 @@ def init_db():
             c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT")
             c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status TEXT NOT NULL DEFAULT 'inactive'")
         else:
-<<<<<<< HEAD
-            c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 50,plan TEXT NOT NULL DEFAULT 'free',stripe_customer_id TEXT,stripe_subscription_id TEXT,subscription_status TEXT NOT NULL DEFAULT 'inactive',created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
-=======
             c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 150,plan TEXT NOT NULL DEFAULT 'free',stripe_customer_id TEXT,stripe_subscription_id TEXT,subscription_status TEXT NOT NULL DEFAULT 'inactive',created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
->>>>>>> e8444cf (V29 simple homepage and credit usage)
             c.execute('''CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)''')
             c.execute('''CREATE TABLE IF NOT EXISTS vouches(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,role TEXT DEFAULT '',rating INTEGER NOT NULL DEFAULT 5,message TEXT NOT NULL,project_name TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL,reviewed_at TEXT)''')
             c.execute('''CREATE TABLE IF NOT EXISTS support_threads(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,question TEXT NOT NULL,answer TEXT NOT NULL,created_at TEXT NOT NULL)''')
@@ -187,17 +179,10 @@ def upsert_oauth(provider,pid,email,name,avatar):
             c.execute('UPDATE users SET email=?,name=?,avatar_url=? WHERE id=?',(email,name,avatar,r['id']));uid=r['id']
         else:
             if USE_POSTGRES:
-<<<<<<< HEAD
-                cur=c.execute('INSERT INTO users(provider,provider_user_id,email,name,avatar_url,password_hash,credits,created_at) VALUES(?,?,?,?,?,NULL,50,?) RETURNING id',(provider,pid,email,name,avatar,now()))
-                uid=cur.fetchone()['id']
-            else:
-                cur=c.execute('INSERT INTO users(provider,provider_user_id,email,name,avatar_url,password_hash,credits,created_at) VALUES(?,?,?,?,?,NULL,50,?)',(provider,pid,email,name,avatar,now()))
-=======
                 cur=c.execute('INSERT INTO users(provider,provider_user_id,email,name,avatar_url,password_hash,credits,created_at) VALUES(?,?,?,?,?,NULL,150,?) RETURNING id',(provider,pid,email,name,avatar,now()))
                 uid=cur.fetchone()['id']
             else:
                 cur=c.execute('INSERT INTO users(provider,provider_user_id,email,name,avatar_url,password_hash,credits,created_at) VALUES(?,?,?,?,?,NULL,150,?)',(provider,pid,email,name,avatar,now()))
->>>>>>> e8444cf (V29 simple homepage and credit usage)
                 uid=cur.lastrowid
         c.commit();return uid
 
@@ -476,17 +461,10 @@ def signup_email():
         if c.execute("SELECT id FROM users WHERE provider='local' AND lower(email)=?",(email,)).fetchone():
             flash('An account with that email already exists.','error');return redirect(url_for('signup'))
         if USE_POSTGRES:
-<<<<<<< HEAD
-            cur=c.execute("INSERT INTO users(provider,provider_user_id,email,name,password_hash,credits,created_at) VALUES('local',?,?,?,?,50,?) RETURNING id",(email,email,name,generate_password_hash(pw),now()))
-            uid=cur.fetchone()['id']
-        else:
-            cur=c.execute("INSERT INTO users(provider,provider_user_id,email,name,password_hash,credits,created_at) VALUES('local',?,?,?,?,50,?)",(email,email,name,generate_password_hash(pw),now()))
-=======
             cur=c.execute("INSERT INTO users(provider,provider_user_id,email,name,password_hash,credits,created_at) VALUES('local',?,?,?,?,150,?) RETURNING id",(email,email,name,generate_password_hash(pw),now()))
             uid=cur.fetchone()['id']
         else:
             cur=c.execute("INSERT INTO users(provider,provider_user_id,email,name,password_hash,credits,created_at) VALUES('local',?,?,?,?,150,?)",(email,email,name,generate_password_hash(pw),now()))
->>>>>>> e8444cf (V29 simple homepage and credit usage)
             uid=cur.lastrowid
         c.commit()
         start_user_session(uid)
