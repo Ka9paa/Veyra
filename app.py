@@ -98,7 +98,11 @@ def init_db():
                 name TEXT,
                 avatar_url TEXT,
                 password_hash TEXT,
+<<<<<<< HEAD
                 credits INTEGER NOT NULL DEFAULT 50,
+=======
+                credits INTEGER NOT NULL DEFAULT 150,
+>>>>>>> e8444cf (V29 simple homepage and credit usage)
                 plan TEXT NOT NULL DEFAULT 'free',
                 stripe_customer_id TEXT,
                 stripe_subscription_id TEXT,
@@ -129,7 +133,11 @@ def init_db():
             c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT")
             c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status TEXT NOT NULL DEFAULT 'inactive'")
         else:
+<<<<<<< HEAD
             c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 50,plan TEXT NOT NULL DEFAULT 'free',stripe_customer_id TEXT,stripe_subscription_id TEXT,subscription_status TEXT NOT NULL DEFAULT 'inactive',created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
+=======
+            c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 150,plan TEXT NOT NULL DEFAULT 'free',stripe_customer_id TEXT,stripe_subscription_id TEXT,subscription_status TEXT NOT NULL DEFAULT 'inactive',created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
+>>>>>>> e8444cf (V29 simple homepage and credit usage)
             c.execute('''CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)''')
             c.execute('''CREATE TABLE IF NOT EXISTS vouches(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,role TEXT DEFAULT '',rating INTEGER NOT NULL DEFAULT 5,message TEXT NOT NULL,project_name TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL,reviewed_at TEXT)''')
             c.execute('''CREATE TABLE IF NOT EXISTS support_threads(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,question TEXT NOT NULL,answer TEXT NOT NULL,created_at TEXT NOT NULL)''')
@@ -179,10 +187,17 @@ def upsert_oauth(provider,pid,email,name,avatar):
             c.execute('UPDATE users SET email=?,name=?,avatar_url=? WHERE id=?',(email,name,avatar,r['id']));uid=r['id']
         else:
             if USE_POSTGRES:
+<<<<<<< HEAD
                 cur=c.execute('INSERT INTO users(provider,provider_user_id,email,name,avatar_url,password_hash,credits,created_at) VALUES(?,?,?,?,?,NULL,50,?) RETURNING id',(provider,pid,email,name,avatar,now()))
                 uid=cur.fetchone()['id']
             else:
                 cur=c.execute('INSERT INTO users(provider,provider_user_id,email,name,avatar_url,password_hash,credits,created_at) VALUES(?,?,?,?,?,NULL,50,?)',(provider,pid,email,name,avatar,now()))
+=======
+                cur=c.execute('INSERT INTO users(provider,provider_user_id,email,name,avatar_url,password_hash,credits,created_at) VALUES(?,?,?,?,?,NULL,150,?) RETURNING id',(provider,pid,email,name,avatar,now()))
+                uid=cur.fetchone()['id']
+            else:
+                cur=c.execute('INSERT INTO users(provider,provider_user_id,email,name,avatar_url,password_hash,credits,created_at) VALUES(?,?,?,?,?,NULL,150,?)',(provider,pid,email,name,avatar,now()))
+>>>>>>> e8444cf (V29 simple homepage and credit usage)
                 uid=cur.lastrowid
         c.commit();return uid
 
@@ -207,7 +222,7 @@ PUBLIC_PAGES={
    'sections':[
       ('What is Veyra?','Veyra is an AI software-building workspace that turns prompts into working front-end projects and helps you refine, inspect, test, save, and export them.'),
       ('Is Veyra still in beta?','Yes. The public beta is where we are testing the product with real builders before the full Veyra 1.0 release.'),
-      ('What are credits?','Credits represent usage inside Veyra. Builds, major edits, repair actions, and agent work may use credits depending on the plan.'),
+      ('What are credits?','Credits power Veyra AI. A new AI build uses 25 credits and a follow-up AI edit uses 10 credits. Local fallback previews do not consume credits.'),
       ('Can I export my project?','Yes. Studio can export the generated HTML, CSS, and JavaScript as a ZIP so you can keep or deploy your project elsewhere.'),
       ('Does Deploy work yet?','Direct hosting integrations are still beta. Veyra clearly labels unfinished deployment integrations instead of pretending a deployment happened.'),
       ('How do I get support?','Use the support bot in the bottom-right corner, visit the Support page, or contact the Veyra team if the bot cannot solve your issue.'),
@@ -461,10 +476,17 @@ def signup_email():
         if c.execute("SELECT id FROM users WHERE provider='local' AND lower(email)=?",(email,)).fetchone():
             flash('An account with that email already exists.','error');return redirect(url_for('signup'))
         if USE_POSTGRES:
+<<<<<<< HEAD
             cur=c.execute("INSERT INTO users(provider,provider_user_id,email,name,password_hash,credits,created_at) VALUES('local',?,?,?,?,50,?) RETURNING id",(email,email,name,generate_password_hash(pw),now()))
             uid=cur.fetchone()['id']
         else:
             cur=c.execute("INSERT INTO users(provider,provider_user_id,email,name,password_hash,credits,created_at) VALUES('local',?,?,?,?,50,?)",(email,email,name,generate_password_hash(pw),now()))
+=======
+            cur=c.execute("INSERT INTO users(provider,provider_user_id,email,name,password_hash,credits,created_at) VALUES('local',?,?,?,?,150,?) RETURNING id",(email,email,name,generate_password_hash(pw),now()))
+            uid=cur.fetchone()['id']
+        else:
+            cur=c.execute("INSERT INTO users(provider,provider_user_id,email,name,password_hash,credits,created_at) VALUES('local',?,?,?,?,150,?)",(email,email,name,generate_password_hash(pw),now()))
+>>>>>>> e8444cf (V29 simple homepage and credit usage)
             uid=cur.lastrowid
         c.commit()
         start_user_session(uid)
@@ -610,12 +632,40 @@ def local_preview(prompt):
         title='Veyra Launch';html='''<main class="site"><nav><b><i></i> VEYRA</b><div><a>Product</a><a>Solutions</a><a>Pricing</a><a>Resources</a></div><button>Start free</button></nav><section class="hero"><span>✦ BUILT WITH VEYRA</span><h1>Turn your idea into<br><em>working software.</em></h1><p>Describe what you want and Veyra designs, codes, tests, and previews the product while you keep refining it.</p><div><button>Build with Veyra</button><button class="ghost">Explore examples</button></div></section><section class="cards"><article><b>Design + code together</b><p>Move from visual intent to working front-end without losing context.</p></article><article><b>Auto QA</b><p>Check responsiveness, accessibility, and interaction quality before launch.</p></article><article><b>Project memory</b><p>Keep decisions, files, and earlier versions available while you iterate.</p></article></section></main>''';css='''*{box-sizing:border-box}body{margin:0;background:#070914;color:#f8f8ff;font-family:Inter,Arial}.site{min-height:100vh;padding:0 46px;background:radial-gradient(circle at 50% 28%,#7e42df35,transparent 28%),radial-gradient(circle at 85% 5%,#286cff22,transparent 25%),#070914}.site nav{height:76px;display:flex;align-items:center;border-bottom:1px solid #1d2337}.site nav b i{display:inline-block;width:10px;height:10px;border-radius:4px;background:linear-gradient(135deg,#a958fa,#4f87ff)}.site nav div{display:flex;gap:25px;margin:auto;color:#919bb4}.site nav button,.hero button{height:42px;padding:0 17px;border:0;border-radius:12px;background:linear-gradient(135deg,#8249ef,#4f86ff);color:#fff;font-weight:700}.hero{text-align:center;padding:110px 20px 85px}.hero>span{display:inline-block;padding:8px 11px;border:1px solid #313859;border-radius:999px;color:#b39af4;font-size:10px;letter-spacing:.14em}.hero h1{font-size:78px;line-height:.94;letter-spacing:-.06em;margin:20px 0}.hero h1 em{font-style:normal;background:linear-gradient(90deg,#bc61ff,#5c8cff,#58defd);-webkit-background-clip:text;color:transparent}.hero p{max-width:680px;margin:auto;color:#a0a9c0;font-size:17px;line-height:1.65}.hero>div{display:flex;justify-content:center;gap:10px;margin-top:26px}.hero .ghost{background:#14192b;border:1px solid #2b334e}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding-bottom:45px}.cards article{padding:23px;border:1px solid #222a44;border-radius:18px;background:#0f1427}.cards b{font-size:17px}.cards p{color:#8d97b0;line-height:1.55}@media(max-width:700px){.site{padding:0 20px}.site nav div{display:none}.hero h1{font-size:50px}.cards{grid-template-columns:1fr}}'''
     return {'ok':True,'title':title,'assistant_message':'Done — I created a working local preview and updated the core project files. I also refreshed the layout, styling, and responsive behavior so you can see the result immediately.','html':html,'css':css,'js':'','files':['index.html','styles.css','app.js'],'changed_files':[{'file':'index.html','action':'Updated','details':'Rebuilt the page structure and visible content for the requested design.'},{'file':'styles.css','action':'Updated','details':'Applied the visual system, spacing, colors, typography, and responsive states.'},{'file':'app.js','action':'Reviewed','details':'Kept the interaction layer browser-safe and ready for follow-up behavior.'}],'next_steps':['Ask Veyra to refine any section','Open Code to inspect the generated files','Run Auto QA before deployment'],'quality':{'accessibility':96,'performance':93,'responsive':'Ready','security':'Sandboxed'},'engine':'Veyra Local'}
 
+CREDIT_COST_NEW_BUILD=25
+CREDIT_COST_EDIT=10
+
+def get_credit_balance(uid):
+    with db() as c:
+        row=c.execute('SELECT credits FROM users WHERE id=?',(uid,)).fetchone()
+    return int(row['credits']) if row else 0
+
+def deduct_credits(uid,amount):
+    with db() as c:
+        cur=c.execute('UPDATE users SET credits=credits-? WHERE id=? AND credits>=?',(amount,uid,amount))
+        if getattr(cur,'rowcount',0) != 1:
+            c.rollback()
+            return False
+        c.commit()
+    return True
+
 @app.post('/api/build')
 @login_required
 def api_build():
     p=request.get_json(silent=True) or {}
     prompt=(p.get('prompt') or '').strip();cur=p.get('current') or {}
     if not prompt:return jsonify({'ok':False,'error':'Tell Veyra what you want to build.'}),400
+    uid=current_user()['id']
+    is_edit=any((cur.get(k) or '').strip() for k in ('html','css','js'))
+    credit_cost=CREDIT_COST_EDIT if is_edit else CREDIT_COST_NEW_BUILD
+    balance=get_credit_balance(uid)
+    if balance < credit_cost:
+        return jsonify({
+            'ok':False,
+            'error':f'You need {credit_cost} credits for this AI request. You have {balance}.',
+            'credits_required':credit_cost,
+            'remaining_credits':balance
+        }),402
     key=os.getenv('OPENAI_API_KEY','').strip();model=os.getenv('VEYRA_MODEL','gpt-5.6-sol').strip() or 'gpt-5.6-sol'
     if not key:
         d=local_preview(prompt);d['assistant_message']='Done — I updated the project with Veyra Local Engine and listed exactly what changed below. Connect Veyra AI in Settings when you want fully unique live generations and deeper project-aware edits.';d['engine']='Veyra Local Engine';return jsonify(d)
@@ -654,7 +704,13 @@ def api_build():
         if not isinstance(data.get('next_steps'), list):
             data['next_steps']=['Review the live preview','Open Code to inspect the changed files','Run Auto QA']
         data.setdefault('quality',{'accessibility':98,'performance':95,'responsive':'Ready','security':'Sandboxed'})
-        data['ok']=True;data['engine']='Veyra AI';return jsonify(data)
+        if not deduct_credits(uid,credit_cost):
+            return jsonify({'ok':False,'error':'Your credit balance changed before this build completed. Please try again.','remaining_credits':get_credit_balance(uid)}),409
+        data['ok']=True
+        data['engine']='Veyra AI'
+        data['credits_used']=credit_cost
+        data['remaining_credits']=get_credit_balance(uid)
+        return jsonify(data)
     except Exception as exc:
         app.logger.exception('Veyra AI live build failed')
         d=local_preview(prompt);d['assistant_message']='The live Veyra build was unavailable, so I kept the project moving with a local build. I listed the files touched below so you can still see exactly what changed. Open Settings → Veyra AI Diagnostics if you want to check the live connection.';d['engine']='Veyra Local Engine';d['diagnostic_code']=type(exc).__name__;return jsonify(d)
