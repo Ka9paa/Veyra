@@ -33,18 +33,20 @@
     <a class="{{'active' if active=='team' else ''}}" href="/app/team">
       <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c.4-4 2.4-6 6-6s5.6 2 6 6"/><path d="M14 15c3.5-.4 6 1.2 7 4"/></svg><span>Team</span>
     </a>
+    <a class="{{'active' if active=='profile' else ''}}" href="/account">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21c.6-4.5 3.1-7 7.5-7s6.9 2.5 7.5 7"/></svg><span>Profile</span>
+    </a>
     <a class="{{'active' if active=='settings' else ''}}" href="/app/settings">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21H10v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3.1 14H3v-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3.1V3h4v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.1v4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Settings</span>
     </a>
+    {% if is_admin_user %}<a class="v31-admin-link {{'active' if active=='admin' else ''}}" href="/admin"><svg viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.2c0 4.4 2.9 8.3 7.5 9.8 4.6-1.5 7.5-5.4 7.5-9.8V6z"/><path d="M9 12.2 11 14l4-4"/></svg><span>Admin</span></a>{% endif %}
   </nav>
-
-    {% if is_admin_user %}<a class="{{'active' if active=='admin' else ''}}" href="/admin"><svg viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.2c0 4.4 2.9 8.3 7.5 9.8 4.6-1.5 7.5-5.4 7.5-9.8V6z"/><path d="M9 12.2 11 14l4-4"/></svg><span>Admin</span></a>{% endif %}
   <div class="v22-side-spacer"></div>
 
   <div class="v22-user">
     {% if user.avatar_url %}<img src="{{user.avatar_url}}" alt="">{% else %}<i>{{(user.name or 'V')[:1]}}</i>{% endif %}
-    <div><b>{{user.name}}</b><small>{{user.email or user.provider}}</small></div>
-    <a href="/logout">›</a>
+    <a class="v30-user-meta" href="/account"><b>{{user.name}}</b><small>{{user.email or user.provider}}</small></a>
+    <a href="/logout" title="Sign out">›</a>
   </div>
 </aside>
 <button class="v23-sidebar-toggle" id="sidebarToggle" title="Hide sidebar" aria-label="Toggle sidebar">

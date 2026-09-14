@@ -103,6 +103,9 @@ def init_db():
                 stripe_customer_id TEXT,
                 stripe_subscription_id TEXT,
                 subscription_status TEXT NOT NULL DEFAULT 'inactive',
+                session_version INTEGER NOT NULL DEFAULT 0,
+                is_blacklisted INTEGER NOT NULL DEFAULT 0,
+                blacklist_reason TEXT DEFAULT '',
                 created_at TEXT NOT NULL,
                 UNIQUE(provider,provider_user_id)
             )''')
@@ -128,14 +131,17 @@ def init_db():
             c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT")
             c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT")
             c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status TEXT NOT NULL DEFAULT 'inactive'")
+            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 0")
+            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blacklisted INTEGER NOT NULL DEFAULT 0")
+            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS blacklist_reason TEXT DEFAULT ''")
         else:
-            c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 150,plan TEXT NOT NULL DEFAULT 'free',stripe_customer_id TEXT,stripe_subscription_id TEXT,subscription_status TEXT NOT NULL DEFAULT 'inactive',created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
+            c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 150,plan TEXT NOT NULL DEFAULT 'free',stripe_customer_id TEXT,stripe_subscription_id TEXT,subscription_status TEXT NOT NULL DEFAULT 'inactive',session_version INTEGER NOT NULL DEFAULT 0,is_blacklisted INTEGER NOT NULL DEFAULT 0,blacklist_reason TEXT DEFAULT '',created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
             c.execute('''CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)''')
             c.execute('''CREATE TABLE IF NOT EXISTS vouches(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,role TEXT DEFAULT '',rating INTEGER NOT NULL DEFAULT 5,message TEXT NOT NULL,project_name TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL,reviewed_at TEXT)''')
             c.execute('''CREATE TABLE IF NOT EXISTS support_threads(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,question TEXT NOT NULL,answer TEXT NOT NULL,created_at TEXT NOT NULL)''')
             c.execute('''CREATE TABLE IF NOT EXISTS admin_audit(id INTEGER PRIMARY KEY AUTOINCREMENT,admin_user_id INTEGER,action TEXT NOT NULL,target_type TEXT,target_id INTEGER,details TEXT DEFAULT '',created_at TEXT NOT NULL)''')
             cols={r['name'] for r in c.execute('PRAGMA table_info(users)').fetchall()}
-            additions={'password_hash':'TEXT','plan':"TEXT NOT NULL DEFAULT 'free'",'stripe_customer_id':'TEXT','stripe_subscription_id':'TEXT','subscription_status':"TEXT NOT NULL DEFAULT 'inactive'"}
+            additions={'password_hash':'TEXT','plan':"TEXT NOT NULL DEFAULT 'free'",'stripe_customer_id':'TEXT','stripe_subscription_id':'TEXT','subscription_status':"TEXT NOT NULL DEFAULT 'inactive'",'session_version':'INTEGER NOT NULL DEFAULT 0','is_blacklisted':'INTEGER NOT NULL DEFAULT 0','blacklist_reason':"TEXT DEFAULT ''"}
             for name,sql_type in additions.items():
                 if name not in cols:c.execute(f'ALTER TABLE users ADD COLUMN {name} {sql_type}')
         c.commit()
@@ -143,16 +149,28 @@ def init_db():
 def current_user():
     uid=session.get('user_id')
     if not uid:return None
-    with db() as c:r=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
+    with db() as c:
+        r=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
     if not r:
         session.clear()
         return None
-    return dict(r)
+    user=dict(r)
+    db_version=int(user.get('session_version') or 0)
+    cookie_version=session.get('session_version')
+    if cookie_version is None:
+        session['session_version']=db_version
+    elif int(cookie_version) != db_version:
+        session.clear()
+        return None
+    return user
 
 def start_user_session(uid):
+    with db() as c:
+        r=c.execute('SELECT session_version FROM users WHERE id=?',(uid,)).fetchone()
     session.clear()
     session.permanent=True
     session['user_id']=int(uid)
+    session['session_version']=int(r['session_version'] if r else 0)
 
 def is_admin(user=None):
     user=user or current_user()
@@ -333,35 +351,101 @@ def submit_vouch():
 @app.route('/admin')
 @login_required
 def admin_dashboard():
-    if not is_admin():return ('Forbidden',403)
+    admin=current_user()
+    if not is_admin(admin):return ('Forbidden',403)
+    q=(request.args.get('q') or '').strip()
+    status=(request.args.get('status') or 'all').strip().lower()
     with db() as c:
         stats={
             'users':c.execute('SELECT COUNT(*) AS n FROM users').fetchone()['n'],
             'projects':c.execute('SELECT COUNT(*) AS n FROM projects').fetchone()['n'],
             'pending_vouches':c.execute("SELECT COUNT(*) AS n FROM vouches WHERE status='pending'").fetchone()['n'],
             'support':c.execute('SELECT COUNT(*) AS n FROM support_threads').fetchone()['n'],
+            'blacklisted':c.execute('SELECT COUNT(*) AS n FROM users WHERE is_blacklisted=1').fetchone()['n'],
+            'paid':c.execute("SELECT COUNT(*) AS n FROM users WHERE plan IN ('pro','max')").fetchone()['n'],
         }
-        users=[dict(r) for r in c.execute('SELECT * FROM users ORDER BY id DESC LIMIT 50').fetchall()]
-        projects=[dict(r) for r in c.execute('SELECT * FROM projects ORDER BY updated_at DESC LIMIT 15').fetchall()]
-        vouches=[dict(r) for r in c.execute("SELECT * FROM vouches WHERE status='pending' ORDER BY created_at DESC LIMIT 15").fetchall()]
-        support=[dict(r) for r in c.execute('SELECT * FROM support_threads ORDER BY id DESC LIMIT 15').fetchall()]
-    return render_template('admin_dashboard.html',user=current_user(),stats=stats,users=users,projects=projects,vouches=vouches,support=support,database_mode='Postgres' if USE_POSTGRES else 'Local SQLite')
+        where=[];params=[]
+        if q:
+            where.append("(LOWER(COALESCE(email,'')) LIKE ? OR LOWER(COALESCE(name,'')) LIKE ? OR CAST(id AS TEXT)=?)")
+            needle=f"%{q.lower()}%"
+            params.extend([needle,needle,q])
+        if status=='blacklisted':
+            where.append("is_blacklisted=1")
+        elif status=='paid':
+            where.append("plan IN ('pro','max')")
+        sql='SELECT * FROM users'
+        if where:sql+=' WHERE '+' AND '.join(where)
+        sql+=' ORDER BY id DESC LIMIT 100'
+        users=[dict(r) for r in c.execute(sql,tuple(params)).fetchall()]
+        projects=[dict(r) for r in c.execute('SELECT * FROM projects ORDER BY updated_at DESC LIMIT 10').fetchall()]
+        vouches=[dict(r) for r in c.execute("SELECT * FROM vouches WHERE status='pending' ORDER BY created_at DESC LIMIT 8").fetchall()]
+        support=[dict(r) for r in c.execute('SELECT * FROM support_threads ORDER BY id DESC LIMIT 8').fetchall()]
+        audit=[dict(r) for r in c.execute('SELECT * FROM admin_audit ORDER BY id DESC LIMIT 20').fetchall()]
+    return render_template('admin_dashboard.html',user=admin,stats=stats,users=users,projects=projects,vouches=vouches,support=support,audit=audit,q=q,status=status,database_mode='Postgres' if USE_POSTGRES else 'Local SQLite')
 
 @app.post('/admin/users/<int:uid>/update')
 @login_required
 def admin_update_user(uid):
     admin=current_user()
     if not is_admin(admin):return ('Forbidden',403)
-    try:credits=max(0,min(1000000,int(request.form.get('credits','0'))))
+    try:credits=max(0,min(10000000,int(request.form.get('credits','0'))))
     except Exception:return ('Invalid credits',400)
     plan=(request.form.get('plan') or 'free').strip().lower()
     if plan not in {'free','pro','max'}:return ('Invalid plan',400)
     with db() as c:
+        before=c.execute('SELECT credits,plan FROM users WHERE id=?',(uid,)).fetchone()
+        if not before:return ('User not found',404)
         c.execute('UPDATE users SET credits=?,plan=? WHERE id=?',(credits,plan,uid))
         c.execute('INSERT INTO admin_audit(admin_user_id,action,target_type,target_id,details,created_at) VALUES(?,?,?,?,?,?)',
-                  (admin['id'],'update_user','user',uid,json.dumps({'credits':credits,'plan':plan}),now()))
+                  (admin['id'],'update_user','user',uid,json.dumps({'before':dict(before),'after':{'credits':credits,'plan':plan}}),now()))
         c.commit()
-    return redirect('/admin')
+    return redirect(request.referrer or '/admin')
+
+@app.post('/admin/users/<int:uid>/credits')
+@login_required
+def admin_adjust_credits(uid):
+    admin=current_user()
+    if not is_admin(admin):return ('Forbidden',403)
+    try:amount=int(request.form.get('amount','0'))
+    except Exception:return ('Invalid amount',400)
+    amount=max(-1000000,min(1000000,amount))
+    with db() as c:
+        row=c.execute('SELECT credits FROM users WHERE id=?',(uid,)).fetchone()
+        if not row:return ('User not found',404)
+        new=max(0,int(row['credits'])+amount)
+        c.execute('UPDATE users SET credits=? WHERE id=?',(new,uid))
+        c.execute('INSERT INTO admin_audit(admin_user_id,action,target_type,target_id,details,created_at) VALUES(?,?,?,?,?,?)',
+                  (admin['id'],'adjust_credits','user',uid,json.dumps({'amount':amount,'before':int(row['credits']),'after':new}),now()))
+        c.commit()
+    return redirect(request.referrer or '/admin')
+
+@app.post('/admin/users/<int:uid>/blacklist')
+@login_required
+def admin_blacklist_user(uid):
+    admin=current_user()
+    if not is_admin(admin):return ('Forbidden',403)
+    reason=(request.form.get('reason') or 'Administrative action').strip()[:300]
+    with db() as c:
+        target=c.execute('SELECT email FROM users WHERE id=?',(uid,)).fetchone()
+        if not target:return ('User not found',404)
+        if admin['id']==uid:return ('You cannot blacklist your own admin account.',400)
+        c.execute('UPDATE users SET is_blacklisted=1,blacklist_reason=? WHERE id=?',(reason,uid))
+        c.execute('INSERT INTO admin_audit(admin_user_id,action,target_type,target_id,details,created_at) VALUES(?,?,?,?,?,?)',
+                  (admin['id'],'blacklist_user','user',uid,json.dumps({'reason':reason,'email':target['email']}),now()))
+        c.commit()
+    return redirect(request.referrer or '/admin')
+
+@app.post('/admin/users/<int:uid>/unblacklist')
+@login_required
+def admin_unblacklist_user(uid):
+    admin=current_user()
+    if not is_admin(admin):return ('Forbidden',403)
+    with db() as c:
+        c.execute("UPDATE users SET is_blacklisted=0,blacklist_reason='' WHERE id=?",(uid,))
+        c.execute('INSERT INTO admin_audit(admin_user_id,action,target_type,target_id,details,created_at) VALUES(?,?,?,?,?,?)',
+                  (admin['id'],'unblacklist_user','user',uid,'{}',now()))
+        c.commit()
+    return redirect(request.referrer or '/admin')
 
 @app.route('/admin/vouches')
 @login_required
@@ -500,6 +584,69 @@ def github_callback():
             rows=e.json();x=next((v for v in rows if v.get('primary') and v.get('verified')),None) or next((v for v in rows if v.get('verified')),None);email=x.get('email') if x else None
     uid=upsert_oauth('github',str(p.get('id')),email,p.get('name') or p.get('login') or 'Veyra User',p.get('avatar_url'));start_user_session(uid);return redirect(url_for('dashboard'))
 
+
+@app.route('/account')
+@login_required
+def account_page():
+    u=current_user()
+    with db() as c:
+        project_count=c.execute('SELECT COUNT(*) AS n FROM projects WHERE user_id=?',(u['id'],)).fetchone()['n']
+    provider_labels={'local':'Email & password','google':'Google','github':'GitHub'}
+    plan_labels={'free':'Free','pro':'Pro','max':'Max'}
+    return render_template(
+        'account.html',
+        user=u,
+        project_count=project_count,
+        provider_label=provider_labels.get((u.get('provider') or '').lower(),(u.get('provider') or 'Account').title()),
+        plan_label=plan_labels.get((u.get('plan') or 'free').lower(),(u.get('plan') or 'free').title()),
+        is_local=(u.get('provider')=='local'),
+        is_admin_account=is_admin(u),
+    )
+
+@app.post('/account/profile')
+@login_required
+def account_update_profile():
+    u=current_user()
+    name=(request.form.get('name') or '').strip()
+    if len(name)<2 or len(name)>80:
+        return redirect(url_for('account_page',error='name'))
+    with db() as c:
+        c.execute('UPDATE users SET name=? WHERE id=?',(name,u['id']))
+        c.commit()
+    return redirect(url_for('account_page',saved='profile'))
+
+@app.post('/account/password')
+@login_required
+def account_change_password():
+    u=current_user()
+    if u.get('provider')!='local':
+        return redirect(url_for('account_page',error='oauth-password'))
+    current=request.form.get('current_password') or ''
+    new=request.form.get('new_password') or ''
+    confirm=request.form.get('confirm_password') or ''
+    if len(new)<8:
+        return redirect(url_for('account_page',error='password-length'))
+    if new!=confirm:
+        return redirect(url_for('account_page',error='password-match'))
+    if not u.get('password_hash') or not check_password_hash(u['password_hash'],current):
+        return redirect(url_for('account_page',error='current-password'))
+    with db() as c:
+        c.execute('UPDATE users SET password_hash=?,session_version=session_version+1 WHERE id=?',
+                  (generate_password_hash(new),u['id']))
+        c.commit()
+    start_user_session(u['id'])
+    return redirect(url_for('account_page',saved='password'))
+
+@app.post('/account/sessions/reset')
+@login_required
+def account_reset_sessions():
+    u=current_user()
+    with db() as c:
+        c.execute('UPDATE users SET session_version=session_version+1 WHERE id=?',(u['id'],))
+        c.commit()
+    start_user_session(u['id'])
+    return redirect(url_for('account_page',saved='sessions'))
+
 @app.route('/studio')
 @login_required
 def studio():return render_template('studio.html',user=current_user())
@@ -630,6 +777,8 @@ def deduct_credits(uid,amount):
 @app.post('/api/build')
 @login_required
 def api_build():
+    u=current_user()
+    if u and int(u.get('is_blacklisted') or 0):return jsonify({'ok':False,'error':'This account is restricted.'}),403
     p=request.get_json(silent=True) or {}
     prompt=(p.get('prompt') or '').strip();cur=p.get('current') or {}
     if not prompt:return jsonify({'ok':False,'error':'Tell Veyra what you want to build.'}),400

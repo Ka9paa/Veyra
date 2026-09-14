@@ -1,0 +1,3 @@
+{% extends "base.html" %}{% block title %}Account restricted — Veyra{% endblock %}{% block body %}
+<div class="a31-blocked"><div class="a31-blocked-card"><div class="a31-lock">!</div><small>ACCOUNT STATUS</small><h1>Your Veyra account is restricted.</h1><p>{{user.blacklist_reason or 'Access to this account has been restricted by Veyra administration.'}}</p><div><a href="/support">Contact support</a><a class="ghost" href="/logout">Sign out</a></div></div></div>
+{% endblock %}

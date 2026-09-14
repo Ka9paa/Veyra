@@ -1,10 +1,104 @@
-{% extends "base.html" %}{% block title %}Admin — Veyra{% endblock %}{% block body %}
-<div class="vadmin"><header class="vadmin-head"><div><small>VEYRA CONTROL CENTER</small><h1>Admin</h1><p>Accounts, credits, projects, support, and vouch moderation.</p></div><div class="vadmin-actions"><span class="vadmin-db">{{database_mode}}</span><a href="/dashboard">Back to app</a><a href="/admin/vouches">Vouch review</a></div></header>
-<section class="vadmin-stats"><article><small>USERS</small><b>{{stats.users}}</b></article><article><small>PROJECTS</small><b>{{stats.projects}}</b></article><article><small>PENDING VOUCHES</small><b>{{stats.pending_vouches}}</b></article><article><small>SUPPORT THREADS</small><b>{{stats.support}}</b></article></section>
-<section class="vadmin-panel"><div class="vadmin-title"><div><small>ACCOUNT CONTROL</small><h2>Users</h2></div></div><div class="vadmin-table-wrap"><table class="vadmin-table"><thead><tr><th>User</th><th>Provider</th><th>Plan</th><th>Credits</th><th>Created</th><th>Update</th></tr></thead><tbody>
-{% for u in users %}<tr><td><b>{{u.name or 'Veyra User'}}</b><small>{{u.email or 'No email'}}</small></td><td>{{u.provider}}</td><form method="post" action="/admin/users/{{u.id}}/update"><td><select name="plan">{% for p in ['free','pro','max'] %}<option value="{{p}}" {% if (u.plan or 'free')==p %}selected{% endif %}>{{p|upper}}</option>{% endfor %}</select></td><td><input name="credits" type="number" min="0" max="1000000" value="{{u.credits}}"></td><td><small>{{u.created_at}}</small></td><td><button>Save</button></td></form></tr>{% endfor %}
-</tbody></table></div></section>
-<div class="vadmin-grid"><section class="vadmin-panel"><div class="vadmin-title"><div><small>MODERATION</small><h2>Pending vouches</h2></div><a href="/admin/vouches">Open review →</a></div>{% for v in vouches %}<article class="vadmin-item"><b>{{v.name}}</b><small>{{'★'*v.rating}} · {{v.created_at}}</small><p>{{v.message}}</p></article>{% else %}<p class="vadmin-empty">No pending vouches.</p>{% endfor %}</section>
-<section class="vadmin-panel"><div class="vadmin-title"><div><small>SUPPORT</small><h2>Recent questions</h2></div></div>{% for s in support %}<article class="vadmin-item"><b>{{s.question}}</b><small>{{s.created_at}}</small><p>{{s.answer[:220]}}{{'…' if s.answer|length>220 else ''}}</p></article>{% else %}<p class="vadmin-empty">No support threads yet.</p>{% endfor %}</section></div>
-<section class="vadmin-panel"><div class="vadmin-title"><div><small>BUILDS</small><h2>Recent projects</h2></div></div><div class="vadmin-table-wrap"><table class="vadmin-table"><thead><tr><th>ID</th><th>Name</th><th>User ID</th><th>Updated</th></tr></thead><tbody>{% for p in projects %}<tr><td>#{{p.id}}</td><td><b>{{p.name}}</b></td><td>{{p.user_id}}</td><td><small>{{p.updated_at}}</small></td></tr>{% endfor %}</tbody></table></div></section></div>
+{% extends "base.html" %}{% block title %}Control Center — Veyra{% endblock %}{% block body %}
+<div class="a31-shell">
+  <aside class="a31-side">
+    <a class="a31-brand" href="/admin"><span>V</span><div><b>Veyra</b><small>Control Center</small></div></a>
+    <nav>
+      <a class="active" href="/admin"><span>⌂</span>Overview</a>
+      <a href="/admin#users"><span>◎</span>Users</a>
+      <a href="/admin/vouches"><span>◇</span>Vouches</a>
+      <a href="/admin#audit"><span>↻</span>Audit log</a>
+      <a href="/support"><span>?</span>Support</a>
+    </nav>
+    <div class="a31-side-bottom">
+      <div class="a31-db"><i></i><span>{{database_mode}}</span></div>
+      <a href="/dashboard">← Back to Veyra</a>
+    </div>
+  </aside>
+  <main class="a31-main">
+    <header class="a31-top">
+      <div><small>ADMINISTRATION</small><h1>Control Center</h1><p>Manage users, credits, plans, moderation, and platform activity.</p></div>
+      <div class="a31-me">
+        {% if user.avatar_url %}<img src="{{user.avatar_url}}" alt="">{% else %}<i>{{(user.name or 'A')[:1]}}</i>{% endif %}
+        <div><b>{{user.name or 'Admin'}}</b><span>{{user.email}}</span></div>
+      </div>
+    </header>
+
+    <section class="a31-stats">
+      <article><div><small>TOTAL USERS</small><strong>{{stats.users}}</strong></div><span>◎</span></article>
+      <article><div><small>PAID USERS</small><strong>{{stats.paid}}</strong></div><span>◇</span></article>
+      <article><div><small>PROJECTS</small><strong>{{stats.projects}}</strong></div><span>▣</span></article>
+      <article><div><small>RESTRICTED</small><strong>{{stats.blacklisted}}</strong></div><span>!</span></article>
+    </section>
+
+    <section class="a31-panel" id="users">
+      <div class="a31-panel-head">
+        <div><small>ACCOUNT MANAGEMENT</small><h2>Users</h2></div>
+        <form class="a31-search" method="get">
+          <input name="q" value="{{q}}" placeholder="Search name, email, or ID">
+          <select name="status">
+            <option value="all" {% if status=='all' %}selected{% endif %}>All users</option>
+            <option value="paid" {% if status=='paid' %}selected{% endif %}>Paid users</option>
+            <option value="blacklisted" {% if status=='blacklisted' %}selected{% endif %}>Restricted</option>
+          </select>
+          <button>Search</button>
+        </form>
+      </div>
+      <div class="a31-user-list">
+      {% for u in users %}
+        <article class="a31-user {% if u.is_blacklisted %}restricted{% endif %}">
+          <div class="a31-ident">
+            {% if u.avatar_url %}<img src="{{u.avatar_url}}" alt="">{% else %}<i>{{(u.name or 'V')[:1]}}</i>{% endif %}
+            <div>
+              <div class="a31-user-name"><b>{{u.name or 'Veyra User'}}</b>{% if u.is_blacklisted %}<span>RESTRICTED</span>{% endif %}</div>
+              <small>{{u.email or 'No email'}} · ID {{u.id}} · {{u.provider|title}}</small>
+            </div>
+          </div>
+
+          <form class="a31-inline-form" method="post" action="/admin/users/{{u.id}}/update">
+            <label><span>Plan</span><select name="plan">{% for p in ['free','pro','max'] %}<option value="{{p}}" {% if (u.plan or 'free')==p %}selected{% endif %}>{{p|upper}}</option>{% endfor %}</select></label>
+            <label><span>Credits</span><input name="credits" type="number" min="0" max="10000000" value="{{u.credits}}"></label>
+            <button class="a31-save">Save</button>
+          </form>
+
+          <div class="a31-quick">
+            <form method="post" action="/admin/users/{{u.id}}/credits"><input type="hidden" name="amount" value="100"><button>+100</button></form>
+            <form method="post" action="/admin/users/{{u.id}}/credits"><input type="hidden" name="amount" value="1000"><button>+1K</button></form>
+            {% if u.is_blacklisted %}
+              <form method="post" action="/admin/users/{{u.id}}/unblacklist"><button class="good">Unrestrict</button></form>
+            {% else %}
+              <form class="a31-blacklist" method="post" action="/admin/users/{{u.id}}/blacklist">
+                <input name="reason" placeholder="Reason">
+                <button class="danger">Restrict</button>
+              </form>
+            {% endif %}
+          </div>
+          {% if u.is_blacklisted and u.blacklist_reason %}<p class="a31-reason">Reason: {{u.blacklist_reason}}</p>{% endif %}
+        </article>
+      {% else %}
+        <div class="a31-empty">No users matched your search.</div>
+      {% endfor %}
+      </div>
+    </section>
+
+    <div class="a31-two">
+      <section class="a31-panel">
+        <div class="a31-panel-head"><div><small>MODERATION</small><h2>Pending vouches</h2></div><a href="/admin/vouches">Review all →</a></div>
+        {% for v in vouches %}<div class="a31-row"><div><b>{{v.name}}</b><small>{{'★'*v.rating}} · {{v.created_at[:10]}}</small></div><p>{{v.message[:120]}}{{'…' if v.message|length>120 else ''}}</p></div>{% else %}<div class="a31-empty">Nothing waiting for review.</div>{% endfor %}
+      </section>
+      <section class="a31-panel">
+        <div class="a31-panel-head"><div><small>SUPPORT</small><h2>Recent support</h2></div></div>
+        {% for s in support %}<div class="a31-row"><div><b>{{s.question[:70]}}</b><small>{{s.created_at[:10]}}</small></div><p>{{s.answer[:120]}}{{'…' if s.answer|length>120 else ''}}</p></div>{% else %}<div class="a31-empty">No support threads yet.</div>{% endfor %}
+      </section>
+    </div>
+
+    <section class="a31-panel" id="audit">
+      <div class="a31-panel-head"><div><small>SECURITY</small><h2>Admin audit log</h2></div><span class="a31-muted">Latest 20 actions</span></div>
+      <div class="a31-audit">
+        {% for a in audit %}
+          <div><span class="a31-action">{{a.action|replace('_',' ')|title}}</span><b>{% if a.target_id %}User #{{a.target_id}}{% else %}System{% endif %}</b><small>{{a.created_at}}</small></div>
+        {% else %}<div class="a31-empty">No admin actions recorded yet.</div>{% endfor %}
+      </div>
+    </section>
+  </main>
+</div>
 {% endblock %}

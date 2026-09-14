@@ -1,0 +1,172 @@
+{% extends "base.html" %}{% set active='profile' %}
+{% block title %}Profile & Account — Veyra{% endblock %}
+{% block body %}
+<div class="v22-app">
+  {% include '_sidebar.html' %}
+  <main class="v22-main v30-account-main">
+    <header class="v22-pagehead v30-account-head">
+      <div>
+        <small>ACCOUNT</small>
+        <h1>Profile & account</h1>
+        <p>Manage your identity, plan, credits, login method, and security.</p>
+      </div>
+      <a class="v30-outline-btn" href="/pricing">View plans</a>
+    </header>
+
+    <section class="v30-account-wrap">
+      {% if request.args.get('saved') %}
+      <div class="v30-alert success">
+        {% if request.args.get('saved')=='profile' %}Profile updated.
+        {% elif request.args.get('saved')=='password' %}Password changed successfully.
+        {% elif request.args.get('saved')=='sessions' %}Other signed-in sessions were reset.
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% if request.args.get('error') %}
+      <div class="v30-alert error">
+        {% set e=request.args.get('error') %}
+        {% if e=='name' %}Your display name must be between 2 and 80 characters.
+        {% elif e=='oauth-password' %}This account signs in with {{ provider_label }}. Password changes are handled by that provider.
+        {% elif e=='password-length' %}Your new password must be at least 8 characters.
+        {% elif e=='password-match' %}The new passwords do not match.
+        {% elif e=='current-password' %}Your current password is incorrect.
+        {% else %}We could not save that change.
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div class="v30-account-grid">
+        <section class="v30-profile-card">
+          <div class="v30-profile-top">
+            {% if user.avatar_url %}
+              <img src="{{ user.avatar_url }}" alt="">
+            {% else %}
+              <div class="v30-avatar">{{ (user.name or 'V')[:1]|upper }}</div>
+            {% endif %}
+            <div>
+              <div class="v30-name-line">
+                <h2>{{ user.name or 'Veyra User' }}</h2>
+                {% if is_admin_account %}<span class="v30-admin-badge">ADMIN</span>{% endif %}
+              </div>
+              <p>{{ user.email or 'No email available' }}</p>
+              <span class="v30-provider-pill">{{ provider_label }}</span>
+            </div>
+          </div>
+
+          <div class="v30-account-stats">
+            <article><small>PLAN</small><b>{{ plan_label }}</b></article>
+            <article><small>CREDITS</small><b>{{ user.credits }}</b></article>
+            <article><small>PROJECTS</small><b>{{ project_count }}</b></article>
+          </div>
+        </section>
+
+        <section class="v30-plan-card">
+          <div class="v30-section-title">
+            <div><small>SUBSCRIPTION</small><h3>Your plan</h3></div>
+            <span class="v30-plan-pill {{ (user.plan or 'free')|lower }}">{{ plan_label }}</span>
+          </div>
+          <p class="v30-muted">
+            {% if (user.plan or 'free') == 'free' %}
+              You are currently on Veyra Free. Upgrade when you need more monthly credits.
+            {% elif user.plan == 'pro' %}
+              Your account has Veyra Pro access.
+            {% else %}
+              Your account has Veyra Max access.
+            {% endif %}
+          </p>
+          <div class="v30-credit-balance">
+            <div><small>AVAILABLE CREDITS</small><strong>{{ user.credits }}</strong></div>
+            <a href="/pricing">Manage plan & credits →</a>
+          </div>
+          <div class="v30-cost-note">
+            <span>25 credits</span> new AI build
+            <i></i>
+            <span>10 credits</span> follow-up edit
+          </div>
+        </section>
+      </div>
+
+      <div class="v30-settings-grid">
+        <section class="v30-panel">
+          <div class="v30-section-title">
+            <div><small>PROFILE</small><h3>Personal information</h3></div>
+          </div>
+          <form method="post" action="/account/profile" class="v30-form">
+            <label>
+              <span>Display name</span>
+              <input name="name" maxlength="80" value="{{ user.name or '' }}" required>
+              <small>This is the name shown across your Veyra workspace.</small>
+            </label>
+            <label>
+              <span>Email address</span>
+              <input value="{{ user.email or 'No email available' }}" disabled>
+              <small>
+                {% if user.provider == 'local' %}
+                  This is the email you use to sign in.
+                {% else %}
+                  This email comes from your {{ provider_label }} account.
+                {% endif %}
+              </small>
+            </label>
+            <button class="v30-primary-btn" type="submit">Save profile</button>
+          </form>
+        </section>
+
+        <section class="v30-panel">
+          <div class="v30-section-title">
+            <div><small>ACCOUNT</small><h3>Account details</h3></div>
+          </div>
+          <div class="v30-detail-list">
+            <div><span>Sign-in method</span><b>{{ provider_label }}</b></div>
+            <div><span>Account ID</span><b>#{{ user.id }}</b></div>
+            <div><span>Member since</span><b>{{ (user.created_at or '')[:10] }}</b></div>
+            <div><span>Subscription status</span><b>{{ (user.subscription_status or 'inactive')|replace('_',' ')|title }}</b></div>
+            {% if user.stripe_customer_id %}<div><span>Billing connected</span><b>Yes</b></div>{% endif %}
+          </div>
+        </section>
+      </div>
+
+      <section class="v30-panel v30-security">
+        <div class="v30-section-title">
+          <div><small>SECURITY</small><h3>Password & sessions</h3></div>
+        </div>
+
+        <div class="v30-security-grid">
+          <div>
+            <h4>Password</h4>
+            {% if is_local %}
+            <p>Change the password used to sign in to Veyra.</p>
+            <form method="post" action="/account/password" class="v30-form compact">
+              <label><span>Current password</span><input type="password" name="current_password" autocomplete="current-password" required></label>
+              <label><span>New password</span><input type="password" name="new_password" minlength="8" autocomplete="new-password" required></label>
+              <label><span>Confirm new password</span><input type="password" name="confirm_password" minlength="8" autocomplete="new-password" required></label>
+              <button class="v30-primary-btn" type="submit">Change password</button>
+            </form>
+            {% else %}
+            <div class="v30-oauth-note">
+              <b>Password managed by {{ provider_label }}</b>
+              <p>You sign in through {{ provider_label }}, so there is no Veyra password to change here.</p>
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="v30-session-card">
+            <h4>Signed-in sessions</h4>
+            <p>Your Veyra login can stay active for up to 30 days. Resetting sessions signs out other browsers and devices while keeping this one signed in.</p>
+            <form method="post" action="/account/sessions/reset">
+              <button class="v30-outline-btn danger-lite" type="submit">Sign out other sessions</button>
+            </form>
+            <a class="v30-text-link" href="/logout">Sign out this device</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="v30-help-row">
+        <div><small>NEED HELP?</small><h3>Account or billing issue?</h3><p>Use Veyra Support if something looks wrong with your credits, plan, login, or payment.</p></div>
+        <a class="v30-outline-btn" href="/support">Open support</a>
+      </section>
+    </section>
+  </main>
+</div>
+{% endblock %}
