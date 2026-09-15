@@ -1,83 +1,315 @@
-{% extends "base.html" %}
-{% block title %}{{'Create account' if mode=='signup' else 'Log in'}} — Veyra{% endblock %}
-{% block body %}
-<div class="v21-auth-page">
-  <div class="v21-auth-shell">
-    <header class="v21-auth-brand">
-      <img src="{{url_for('static',filename='veyra-mark.svg')}}" alt="Veyra">
-      <b>VEYRA</b><span class="v26-auth-beta">BETA</span>
-    </header>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sign in to Veyra</title>
+  <meta name="theme-color" content="#0a0d15">
 
-    <section class="v21-auth-left">
-      <div class="v21-auth-card">
-        <small>{{'WELCOME TO VEYRA' if mode=='signup' else 'WELCOME BACK'}}</small>
-        <h1>{{'Create your Veyra account' if mode=='signup' else 'Sign in to'}} {% if mode!='signup' %}<em>Veyra</em>{% endif %}</h1>
-        <p>{{'Start building products from one connected workspace.' if mode=='signup' else 'Continue building, creating, and shipping your ideas from one connected workspace.'}}</p>
+  <style>
+    :root{
+      --bg:#080b12;
+      --panel:#0d111b;
+      --panel2:#101522;
+      --border:#252c3d;
+      --text:#f5f7ff;
+      --muted:#8ea0c3;
+      --muted2:#6f7d99;
+      --purple:#9a39ff;
+      --violet:#7658ff;
+      --blue:#3e7bff;
+      --danger:#ff5c72;
+    }
 
-        {% with msgs=get_flashed_messages(with_categories=true) %}
-          {% for c,m in msgs %}<div class="v21-flash {{c}}"><span>!</span>{{m}}</div>{% endfor %}
-        {% endwith %}
+    *{box-sizing:border-box}
+    html,body{min-height:100%}
+    body{
+      margin:0;
+      min-height:100vh;
+      display:grid;
+      place-items:center;
+      padding:28px;
+      color:var(--text);
+      background:
+        radial-gradient(circle at 50% 0%, rgba(93,72,255,.10), transparent 28%),
+        linear-gradient(180deg,#070a11 0%,#090d15 100%);
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    }
 
-        {% if mode=='signup' %}
-        <form method="post" action="/signup/email">
-          <label>Full name<div class="v21-input"><span>◇</span><input name="name" placeholder="Enter your full name" required minlength="2"></div></label>
-          <label>Email address<div class="v21-input"><span>✉</span><input name="email" type="email" placeholder="name@company.com" required></div></label>
-          <label>Password<div class="v21-input"><span>▢</span><input name="password" type="password" placeholder="8+ characters" required minlength="8"></div></label>
-          <button class="v21-submit">Create account <span>→</span></button>
-        </form>
-        {% else %}
-        <form method="post" action="/login/email">
-          <label>Email address<div class="v21-input"><span>✉</span><input name="email" type="email" placeholder="name@company.com" required></div></label>
-          <label>Password<div class="v21-input"><span>▢</span><input name="password" type="password" placeholder="Your password" required><button type="button" class="v21-eye" tabindex="-1">◉</button></div></label>
-          <div class="v21-login-row"><label class="v21-check"><input type="checkbox" checked><span></span>Remember me</label><a href="#">Forgot password?</a></div>
-          <button class="v21-submit">Sign in <span>→</span></button>
-        </form>
-        {% endif %}
+    .shell{
+      width:min(100%,620px);
+      background:linear-gradient(180deg,rgba(15,19,30,.98),rgba(12,16,25,.98));
+      border:1px solid var(--border);
+      border-radius:24px;
+      padding:44px 38px 38px;
+      box-shadow:0 28px 80px rgba(0,0,0,.38);
+    }
 
-        <div class="v21-or"><span>or continue with</span></div>
+    .eyebrow{
+      margin:0 0 18px;
+      font-size:12px;
+      font-weight:800;
+      letter-spacing:.22em;
+      color:#b45cff;
+      text-transform:uppercase;
+    }
 
-        <div class="v21-oauth">
-          <a href="/auth/google" aria-label="Continue with Google">
-            <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3A12 12 0 1 1 31.9 15l5.7-5.7A20 20 0 1 0 44 24c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8A12 12 0 0 1 31.9 15l5.7-5.7A20 20 0 0 0 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.5-5.2l-6.2-5.2A12 12 0 0 1 12.9 28l-6.5 5A20 20 0 0 0 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3a12 12 0 0 1-4 5.6l6.2 5.2C41.2 35.4 44 30.2 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>
-            <span>Continue with Google</span>
-          </a>
-          <a href="/auth/github" aria-label="Continue with GitHub">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .7a11.5 11.5 0 0 0-3.6 22.4c.6.1.8-.2.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.5-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0C16.2 4.4 17.2 4.7 17.2 4.7c.6 1.6.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6A11.5 11.5 0 0 0 12 .7z"/></svg>
-            <span>Continue with GitHub</span>
-          </a>
+    h1{
+      margin:0;
+      font-size:clamp(40px,6vw,58px);
+      line-height:.96;
+      letter-spacing:-.045em;
+      font-weight:800;
+    }
+
+    .brand{
+      background:linear-gradient(90deg,#9c3cff,#5d6cff,#3e8aff);
+      -webkit-background-clip:text;
+      background-clip:text;
+      color:transparent;
+    }
+
+    .sub{
+      margin:18px 0 28px;
+      color:#9eb0d0;
+      font-size:17px;
+      line-height:1.65;
+      font-family:Georgia,"Times New Roman",serif;
+    }
+
+    .flash-stack{display:grid;gap:10px;margin-bottom:18px}
+    .flash{
+      border:1px solid rgba(255,92,114,.35);
+      background:rgba(255,92,114,.08);
+      color:#ffc0ca;
+      padding:12px 14px;
+      border-radius:12px;
+      font-size:14px;
+    }
+
+    .field{margin-top:18px}
+    label{
+      display:block;
+      margin-bottom:9px;
+      color:#dce5ff;
+      font-size:13px;
+    }
+
+    .input-wrap{
+      position:relative;
+      display:flex;
+      align-items:center;
+    }
+
+    input{
+      width:100%;
+      height:54px;
+      border-radius:13px;
+      border:1px solid #2a3449;
+      background:#0b101a;
+      color:#fff;
+      outline:none;
+      padding:0 15px;
+      font-size:15px;
+      transition:.18s ease;
+    }
+
+    input:focus{
+      border-color:#6e5cff;
+      box-shadow:0 0 0 3px rgba(110,92,255,.12);
+    }
+
+    .row{
+      margin-top:16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      color:#c5d0e8;
+      font-size:13px;
+    }
+
+    .remember{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      cursor:pointer;
+    }
+
+    .remember input{
+      width:18px;
+      height:18px;
+      accent-color:#7658ff;
+    }
+
+    a{color:#7c7cff;text-decoration:none}
+    a:hover{color:#a88cff}
+
+    .submit{
+      margin-top:18px;
+      width:100%;
+      height:54px;
+      border:0;
+      border-radius:12px;
+      color:#fff;
+      font-size:16px;
+      font-weight:800;
+      cursor:pointer;
+      background:linear-gradient(90deg,#9a37ff 0%,#7358ff 48%,#3e7cff 100%);
+      box-shadow:0 10px 30px rgba(101,82,255,.22);
+      transition:transform .15s ease,filter .15s ease;
+    }
+
+    .submit:hover{transform:translateY(-1px);filter:brightness(1.07)}
+
+    .divider{
+      margin:24px 0;
+      display:flex;
+      align-items:center;
+      gap:12px;
+      color:#8190ad;
+      font-size:12px;
+    }
+
+    .divider::before,.divider::after{
+      content:"";
+      height:1px;
+      flex:1;
+      background:#293044;
+    }
+
+    .oauth-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+    }
+
+    .oauth{
+      height:54px;
+      border-radius:13px;
+      border:1px solid #34405a;
+      background:#0c111c;
+      color:#fff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:11px;
+      font-size:14px;
+      font-weight:600;
+      transition:.15s ease;
+    }
+
+    .oauth:hover{
+      color:#fff;
+      border-color:#5a67ff;
+      background:#101726;
+      transform:translateY(-1px);
+    }
+
+    .oauth svg{width:20px;height:20px;flex:none}
+
+    .bottom{
+      margin:26px 0 2px;
+      text-align:center;
+      color:#8da0c3;
+      font-size:13px;
+    }
+
+    @media(max-width:600px){
+      body{padding:16px}
+      .shell{padding:32px 22px}
+      .oauth-grid{grid-template-columns:1fr}
+      .row{align-items:flex-start}
+    }
+  </style>
+</head>
+
+<body>
+  <main class="shell">
+    <p class="eyebrow">Welcome back</p>
+
+    <h1>Sign in to <span class="brand">Veyra</span></h1>
+
+    <p class="sub">
+      Continue building, creating, and shipping your ideas from one connected workspace.
+    </p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-stack">
+          {% for category, message in messages %}
+            <div class="flash">{{ message }}</div>
+          {% endfor %}
         </div>
+      {% endif %}
+    {% endwith %}
 
-        <div class="v21-switch">
-          {{'Already have an account?' if mode=='signup' else "Don't have an account?"}}
-          <a href="{{'/login' if mode=='signup' else '/signup'}}">{{'Log in' if mode=='signup' else 'Create one'}}</a>
+    <form method="post" action="{{ url_for('login') }}">
+      <div class="field">
+        <label for="email">Email address</label>
+        <div class="input-wrap">
+          <input
+            id="email"
+            name="email"
+            type="email"
+            autocomplete="email"
+            placeholder="you@example.com"
+            required
+          >
         </div>
       </div>
-    </section>
 
-    <aside class="v21-auth-right">
-      <div class="v21-auth-stars"></div>
-      <img class="v21-hero-logo" src="{{url_for('static',filename='veyra-mark.svg')}}" alt="Veyra">
-      <h2>Ideas to real<br>products <em>in minutes.</em></h2>
-      <p>Design, code, test, and deploy from<br>one connected workspace.</p>
-
-      <div class="v21-product-ghost">
-        <div class="ghost-window">
-          <div class="ghost-top"><i></i><i></i><i></i><span></span></div>
-          <div class="ghost-body">
-            <aside></aside>
-            <main><span></span><span></span><b></b><b></b><b></b></main>
-          </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <div class="input-wrap">
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="••••••••••"
+            required
+          >
         </div>
-        <div class="ghost-card deploy"><span>✓</span><div><b>Deploy Preview</b><small>Production ready</small></div></div>
-        <div class="ghost-card activity"><b>Activity</b><div class="spark"><i></i><i></i><i></i><i></i><i></i></div></div>
-        <div class="ghost-card success"><span>✓</span><div><b>Build successful</b><small>All checks passed</small></div></div>
       </div>
-    </aside>
 
-    <footer class="v21-auth-footer">
-      <div><a href="#">Privacy</a><span>•</span><a href="#">Terms</a><span>•</span><a href="#">Status</a><span>•</span><a href="#">Docs</a></div>
-      <span>© 2026 Veyra. All rights reserved.</span>
-    </footer>
-  </div>
-</div>
-{% endblock %}
+      <div class="row">
+        <label class="remember">
+          <input type="checkbox" name="remember" value="1" checked>
+          <span>Remember me</span>
+        </label>
+
+        <a href="/forgot-password">Forgot password?</a>
+      </div>
+
+      <button class="submit" type="submit">Sign in&nbsp;&nbsp; →</button>
+    </form>
+
+    <div class="divider">or continue with</div>
+
+    <div class="oauth-grid">
+      <a class="oauth" href="{{ url_for('auth_google') }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.05H12v3.88h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.24c1.9-1.75 2.98-4.33 2.98-7.36z"/>
+          <path fill="#34A853" d="M12 22c2.7 0 4.98-.9 6.64-2.41l-3.24-2.51c-.9.6-2.05.96-3.4.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.59A10 10 0 0 0 12 22z"/>
+          <path fill="#FBBC05" d="M6.39 13.91A6 6 0 0 1 6.08 12c0-.66.11-1.3.31-1.91V7.5H3.04A10 10 0 0 0 2 12c0 1.61.38 3.13 1.04 4.5l3.35-2.59z"/>
+          <path fill="#EA4335" d="M12 5.96c1.47 0 2.79.51 3.83 1.5l2.87-2.87C16.97 2.98 14.7 2 12 2a10 10 0 0 0-8.96 5.5l3.35 2.59C7.18 7.72 9.39 5.96 12 5.96z"/>
+        </svg>
+        Continue with Google
+      </a>
+
+      <a class="oauth" href="{{ url_for('auth_discord') }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#5865F2" d="M19.5 5.3A18 18 0 0 0 15.1 4l-.55 1.14a16.2 16.2 0 0 0-5.1 0L8.9 4a18 18 0 0 0-4.4 1.3C1.7 9.5.9 13.6 1.3 17.6a17.8 17.8 0 0 0 5.4 2.7l1.3-1.8a11.7 11.7 0 0 1-2.1-1c.18-.13.36-.27.53-.41 4.05 1.88 8.43 1.88 12.44 0 .18.15.36.28.53.41-.67.4-1.38.74-2.12 1l1.3 1.8a17.7 17.7 0 0 0 5.4-2.7c.48-4.64-.82-8.7-4.48-12.3ZM8.8 15.2c-1.22 0-2.22-1.13-2.22-2.52s.98-2.52 2.22-2.52c1.25 0 2.25 1.14 2.23 2.52 0 1.39-.98 2.52-2.23 2.52Zm6.4 0c-1.22 0-2.22-1.13-2.22-2.52s.98-2.52 2.22-2.52c1.25 0 2.25 1.14 2.23 2.52 0 1.39-.98 2.52-2.23 2.52Z"/>
+        </svg>
+        Continue with Discord
+      </a>
+    </div>
+
+    <p class="bottom">
+      Don't have an account?
+      <a href="{{ url_for('signup') }}">Create one</a>
+    </p>
+  </main>
+</body>
+</html>
