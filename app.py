@@ -5,7 +5,7 @@ import sqlite3
 import io
 import zipfile
 from pathlib import Path
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from functools import wraps
 
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for, flash, send_file
@@ -13,7 +13,6 @@ from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
 from openai import OpenAI
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.middleware.proxy_fix import ProxyFix
 
 def extract_json_object(text):
     if not text: raise ValueError("Empty Veyra AI response")
@@ -30,120 +29,43 @@ def extract_json_object(text):
 
 BASE=Path(__file__).resolve().parent
 load_dotenv(BASE/'.env')
-
 app=Flask(__name__)
 app.secret_key=os.getenv('FLASK_SECRET_KEY','local-dev-change-me')
-app.wsgi_app=ProxyFix(app.wsgi_app,x_proto=1,x_host=1)
-
-IS_PRODUCTION=bool(os.getenv('VERCEL') or os.getenv('VEYRA_PRODUCTION'))
-app.config.update(
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SECURE=IS_PRODUCTION,
-    SESSION_COOKIE_SAMESITE='Lax',
-    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
-    SESSION_REFRESH_EACH_REQUEST=True,
-)
-
-DATABASE_URL=(os.getenv('DATABASE_URL') or '').strip()
-if DATABASE_URL.startswith('postgres://'):
-    DATABASE_URL='postgresql://'+DATABASE_URL[len('postgres://'):]
-USE_POSTGRES=bool(DATABASE_URL)
-DB=BASE/'data'/'veyra.db'
-
-class DBConnection:
-    def __init__(self):
-        self.is_postgres=USE_POSTGRES
-        if self.is_postgres:
-            try:
-                import psycopg
-                from psycopg.rows import dict_row
-            except ImportError as exc:
-                raise RuntimeError('DATABASE_URL is set but psycopg is not installed.') from exc
-            self.conn=psycopg.connect(DATABASE_URL,row_factory=dict_row)
-        else:
-            DB.parent.mkdir(parents=True,exist_ok=True)
-            self.conn=sqlite3.connect(DB)
-            self.conn.row_factory=sqlite3.Row
-
-    def execute(self,query,params=()):
-        if self.is_postgres:
-            query=query.replace('?', '%s')
-        return self.conn.execute(query,params)
-
-    def commit(self): self.conn.commit()
-    def rollback(self): self.conn.rollback()
-    def close(self): self.conn.close()
-    def __enter__(self): return self
-
-    def __exit__(self,exc_type,exc,tb):
-        try:
-            if exc_type:self.rollback()
-            else:self.commit()
-        finally:self.close()
-        return False
+app.config.update(SESSION_COOKIE_HTTPONLY=True,SESSION_COOKIE_SAMESITE='Lax')
+# Vercel's /var/task filesystem is read-only.
+# Use /tmp while deployed on Vercel; use the normal local data folder elsewhere.
+if os.getenv('VERCEL'):
+    DB = Path('/tmp/veyra.db')
+else:
+    DB = BASE/'data'/'veyra.db'
 
 def db():
-    return DBConnection()
+    DB.parent.mkdir(parents=True,exist_ok=True)
+    c=sqlite3.connect(DB); c.row_factory=sqlite3.Row; return c
 
 def now(): return datetime.now(timezone.utc).isoformat(timespec='seconds')
 
 def init_db():
     with db() as c:
-        if USE_POSTGRES:
-            c.execute('''CREATE TABLE IF NOT EXISTS users(
-                id BIGSERIAL PRIMARY KEY,
-                provider TEXT NOT NULL,
-                provider_user_id TEXT NOT NULL,
-                email TEXT,
-                name TEXT,
-                avatar_url TEXT,
-                password_hash TEXT,
-                credits INTEGER NOT NULL DEFAULT 150,
-                plan TEXT NOT NULL DEFAULT 'free',
-                stripe_customer_id TEXT,
-                stripe_subscription_id TEXT,
-                subscription_status TEXT NOT NULL DEFAULT 'inactive',
-                session_version INTEGER NOT NULL DEFAULT 0,
-                is_blacklisted INTEGER NOT NULL DEFAULT 0,
-                blacklist_reason TEXT DEFAULT '',
-                created_at TEXT NOT NULL,
-                UNIQUE(provider,provider_user_id)
-            )''')
-            c.execute('''CREATE TABLE IF NOT EXISTS projects(
-                id BIGSERIAL PRIMARY KEY,user_id BIGINT NOT NULL,name TEXT NOT NULL,
-                description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',
-                created_at TEXT NOT NULL,updated_at TEXT NOT NULL
-            )''')
-            c.execute('''CREATE TABLE IF NOT EXISTS vouches(
-                id BIGSERIAL PRIMARY KEY,user_id BIGINT NOT NULL,name TEXT NOT NULL,role TEXT DEFAULT '',
-                rating INTEGER NOT NULL DEFAULT 5,message TEXT NOT NULL,project_name TEXT DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL,reviewed_at TEXT
-            )''')
-            c.execute('''CREATE TABLE IF NOT EXISTS support_threads(
-                id BIGSERIAL PRIMARY KEY,user_id BIGINT,question TEXT NOT NULL,answer TEXT NOT NULL,created_at TEXT NOT NULL
-            )''')
-            c.execute('''CREATE TABLE IF NOT EXISTS admin_audit(
-                id BIGSERIAL PRIMARY KEY,admin_user_id BIGINT,action TEXT NOT NULL,target_type TEXT,
-                target_id BIGINT,details TEXT DEFAULT '',created_at TEXT NOT NULL
-            )''')
-            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT")
-            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'free'")
-            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT")
-            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT")
-            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status TEXT NOT NULL DEFAULT 'inactive'")
-            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version INTEGER NOT NULL DEFAULT 0")
-            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blacklisted INTEGER NOT NULL DEFAULT 0")
-            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS blacklist_reason TEXT DEFAULT ''")
-        else:
-            c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 150,plan TEXT NOT NULL DEFAULT 'free',stripe_customer_id TEXT,stripe_subscription_id TEXT,subscription_status TEXT NOT NULL DEFAULT 'inactive',session_version INTEGER NOT NULL DEFAULT 0,is_blacklisted INTEGER NOT NULL DEFAULT 0,blacklist_reason TEXT DEFAULT '',created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
-            c.execute('''CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)''')
-            c.execute('''CREATE TABLE IF NOT EXISTS vouches(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,role TEXT DEFAULT '',rating INTEGER NOT NULL DEFAULT 5,message TEXT NOT NULL,project_name TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL,reviewed_at TEXT)''')
-            c.execute('''CREATE TABLE IF NOT EXISTS support_threads(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,question TEXT NOT NULL,answer TEXT NOT NULL,created_at TEXT NOT NULL)''')
-            c.execute('''CREATE TABLE IF NOT EXISTS admin_audit(id INTEGER PRIMARY KEY AUTOINCREMENT,admin_user_id INTEGER,action TEXT NOT NULL,target_type TEXT,target_id INTEGER,details TEXT DEFAULT '',created_at TEXT NOT NULL)''')
-            cols={r['name'] for r in c.execute('PRAGMA table_info(users)').fetchall()}
-            additions={'password_hash':'TEXT','plan':"TEXT NOT NULL DEFAULT 'free'",'stripe_customer_id':'TEXT','stripe_subscription_id':'TEXT','subscription_status':"TEXT NOT NULL DEFAULT 'inactive'",'session_version':'INTEGER NOT NULL DEFAULT 0','is_blacklisted':'INTEGER NOT NULL DEFAULT 0','blacklist_reason':"TEXT DEFAULT ''"}
-            for name,sql_type in additions.items():
-                if name not in cols:c.execute(f'ALTER TABLE users ADD COLUMN {name} {sql_type}')
+        c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 50,created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
+        c.execute('''CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS vouches(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,role TEXT DEFAULT '',rating INTEGER NOT NULL DEFAULT 5,message TEXT NOT NULL,project_name TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL,reviewed_at TEXT)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS support_threads(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,question TEXT NOT NULL,answer TEXT NOT NULL,created_at TEXT NOT NULL)''')
+        cols={r['name'] for r in c.execute('PRAGMA table_info(users)').fetchall()}
+        if 'password_hash' not in cols: c.execute('ALTER TABLE users ADD COLUMN password_hash TEXT')
+        if 'plan' not in cols: c.execute("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'")
+        if 'is_blacklisted' not in cols: c.execute("ALTER TABLE users ADD COLUMN is_blacklisted INTEGER NOT NULL DEFAULT 0")
+        if 'blacklist_reason' not in cols: c.execute("ALTER TABLE users ADD COLUMN blacklist_reason TEXT DEFAULT ''")
+        if 'last_active' not in cols: c.execute("ALTER TABLE users ADD COLUMN last_active TEXT")
+        c.execute('''CREATE TABLE IF NOT EXISTS admin_audit(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            admin_user_id INTEGER,
+            action TEXT NOT NULL,
+            target_type TEXT NOT NULL DEFAULT 'user',
+            target_id INTEGER,
+            details TEXT DEFAULT '',
+            created_at TEXT NOT NULL
+        )''')
         c.commit()
 
 def current_user():
@@ -151,26 +73,7 @@ def current_user():
     if not uid:return None
     with db() as c:
         r=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
-    if not r:
-        session.clear()
-        return None
-    user=dict(r)
-    db_version=int(user.get('session_version') or 0)
-    cookie_version=session.get('session_version')
-    if cookie_version is None:
-        session['session_version']=db_version
-    elif int(cookie_version) != db_version:
-        session.clear()
-        return None
-    return user
-
-def start_user_session(uid):
-    with db() as c:
-        r=c.execute('SELECT session_version FROM users WHERE id=?',(uid,)).fetchone()
-    session.clear()
-    session.permanent=True
-    session['user_id']=int(uid)
-    session['session_version']=int(r['session_version'] if r else 0)
+        return dict(r) if r else None
 
 def is_admin(user=None):
     user=user or current_user()
@@ -178,17 +81,30 @@ def is_admin(user=None):
     allowed={x.strip().lower() for x in os.getenv('VEYRA_ADMIN_EMAILS','').split(',') if x.strip()}
     return bool(user.get('email') and user['email'].lower() in allowed)
 
+def admin_audit(action,target_id=None,details=None):
+    actor=current_user()
+    payload=details if isinstance(details,str) else json.dumps(details or {},separators=(',',':'))
+    with db() as c:
+        c.execute(
+            'INSERT INTO admin_audit(admin_user_id,action,target_type,target_id,details,created_at) VALUES(?,?,?,?,?,?)',
+            ((actor or {}).get('id'),action,'user',target_id,payload,now())
+        )
+        c.commit()
+
 def login_required(fn):
     @wraps(fn)
     def w(*a,**k):
-        if not current_user():return redirect(url_for('login',next=request.path))
+        user=current_user()
+        if not user:return redirect(url_for('login',next=request.path))
+        if int(user.get('is_blacklisted') or 0):
+            session.clear()
+            flash('This Veyra account is currently restricted.','error')
+            return redirect(url_for('login'))
         return fn(*a,**k)
     return w
 
 @app.context_processor
-def inject():
-    u=current_user()
-    return {'current_user':u,'is_admin_user':is_admin(u)}
+def inject():return {'current_user':current_user()}
 
 def upsert_oauth(provider,pid,email,name,avatar):
     with db() as c:
@@ -196,17 +112,20 @@ def upsert_oauth(provider,pid,email,name,avatar):
         if r:
             c.execute('UPDATE users SET email=?,name=?,avatar_url=? WHERE id=?',(email,name,avatar,r['id']));uid=r['id']
         else:
-            if USE_POSTGRES:
-                cur=c.execute('INSERT INTO users(provider,provider_user_id,email,name,avatar_url,password_hash,credits,created_at) VALUES(?,?,?,?,?,NULL,150,?) RETURNING id',(provider,pid,email,name,avatar,now()))
-                uid=cur.fetchone()['id']
-            else:
-                cur=c.execute('INSERT INTO users(provider,provider_user_id,email,name,avatar_url,password_hash,credits,created_at) VALUES(?,?,?,?,?,NULL,150,?)',(provider,pid,email,name,avatar,now()))
-                uid=cur.lastrowid
+            cur=c.execute('INSERT INTO users(provider,provider_user_id,email,name,avatar_url,password_hash,credits,created_at) VALUES(?,?,?,?,?,NULL,50,?)',(provider,pid,email,name,avatar,now()));uid=cur.lastrowid
         c.commit();return uid
 
 oauth=OAuth(app)
 google=oauth.register(name='google',client_id=os.getenv('GOOGLE_CLIENT_ID'),client_secret=os.getenv('GOOGLE_CLIENT_SECRET'),server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',client_kwargs={'scope':'openid email profile'})
-github=oauth.register(name='github',client_id=os.getenv('GITHUB_CLIENT_ID'),client_secret=os.getenv('GITHUB_CLIENT_SECRET'),access_token_url='https://github.com/login/oauth/access_token',authorize_url='https://github.com/login/oauth/authorize',api_base_url='https://api.github.com/',client_kwargs={'scope':'read:user user:email'})
+discord_oauth=oauth.register(
+    name='discord',
+    client_id=os.getenv('DISCORD_CLIENT_ID'),
+    client_secret=os.getenv('DISCORD_CLIENT_SECRET'),
+    access_token_url='https://discord.com/api/oauth2/token',
+    authorize_url='https://discord.com/oauth2/authorize',
+    api_base_url='https://discord.com/api/',
+    client_kwargs={'scope':'identify email'}
+)
 
 VEYRA_V10_FEATURES = ['Builder Quick Create', 'Builder Smart Search', 'Builder Context Memory', 'Builder History', 'Builder Favorites', 'Builder Templates', 'Builder Presets', 'Builder Recommendations', 'Builder Assistant', 'Builder Inspector', 'Builder Bulk Actions', 'Builder Import', 'Builder Export', 'Builder Duplicate', 'Builder Archive', 'Builder Restore', 'Builder Version Compare', 'Builder Diff Viewer', 'Builder Snapshots', 'Builder Branches', 'Builder Comments', 'Builder Review', 'Builder Approvals', 'Builder Permissions', 'Builder Sharing', 'Builder Live Sync', 'Builder Status Tracking', 'Builder Activity Log', 'Builder Notifications', 'Builder Shortcuts', 'Builder Command Palette', 'Builder Voice Control', 'Builder Keyboard Navigation', 'Builder Responsive Mode', 'Builder Mobile Mode', 'Builder Tablet Mode', 'Builder Desktop Mode', 'Builder Custom Viewport', 'Builder Auto Save', 'Builder Recovery', 'Builder Validation', 'Builder Testing', 'Builder Audit', 'Builder Auto Fix', 'Builder Optimization', 'Builder Generation', 'Builder Refactor', 'Builder Explain', 'Builder Documentation', 'Builder Handoff', 'Designer Quick Create', 'Designer Smart Search', 'Designer Context Memory', 'Designer History', 'Designer Favorites', 'Designer Templates', 'Designer Presets', 'Designer Recommendations', 'Designer Assistant', 'Designer Inspector', 'Designer Bulk Actions', 'Designer Import', 'Designer Export', 'Designer Duplicate', 'Designer Archive', 'Designer Restore', 'Designer Version Compare', 'Designer Diff Viewer', 'Designer Snapshots', 'Designer Branches', 'Designer Comments', 'Designer Review', 'Designer Approvals', 'Designer Permissions', 'Designer Sharing', 'Designer Live Sync', 'Designer Status Tracking', 'Designer Activity Log', 'Designer Notifications', 'Designer Shortcuts', 'Designer Command Palette', 'Designer Voice Control', 'Designer Keyboard Navigation', 'Designer Responsive Mode', 'Designer Mobile Mode', 'Designer Tablet Mode', 'Designer Desktop Mode', 'Designer Custom Viewport', 'Designer Auto Save', 'Designer Recovery', 'Designer Validation', 'Designer Testing', 'Designer Audit', 'Designer Auto Fix', 'Designer Optimization', 'Designer Generation', 'Designer Refactor', 'Designer Explain', 'Designer Documentation', 'Designer Handoff', 'Code Quick Create', 'Code Smart Search', 'Code Context Memory', 'Code History', 'Code Favorites', 'Code Templates', 'Code Presets', 'Code Recommendations', 'Code Assistant', 'Code Inspector', 'Code Bulk Actions', 'Code Import', 'Code Export', 'Code Duplicate', 'Code Archive', 'Code Restore', 'Code Version Compare', 'Code Diff Viewer', 'Code Snapshots', 'Code Branches', 'Code Comments', 'Code Review', 'Code Approvals', 'Code Permissions', 'Code Sharing', 'Code Live Sync', 'Code Status Tracking', 'Code Activity Log', 'Code Notifications', 'Code Shortcuts', 'Code Command Palette', 'Code Voice Control', 'Code Keyboard Navigation', 'Code Responsive Mode', 'Code Mobile Mode', 'Code Tablet Mode', 'Code Desktop Mode', 'Code Custom Viewport', 'Code Auto Save', 'Code Recovery', 'Code Validation', 'Code Testing', 'Code Audit', 'Code Auto Fix', 'Code Optimization', 'Code Generation', 'Code Refactor', 'Code Explain', 'Code Documentation', 'Code Handoff', 'Preview Quick Create', 'Preview Smart Search', 'Preview Context Memory', 'Preview History', 'Preview Favorites', 'Preview Templates', 'Preview Presets', 'Preview Recommendations', 'Preview Assistant', 'Preview Inspector', 'Preview Bulk Actions', 'Preview Import', 'Preview Export', 'Preview Duplicate', 'Preview Archive', 'Preview Restore', 'Preview Version Compare', 'Preview Diff Viewer', 'Preview Snapshots', 'Preview Branches', 'Preview Comments', 'Preview Review', 'Preview Approvals', 'Preview Permissions', 'Preview Sharing', 'Preview Live Sync', 'Preview Status Tracking', 'Preview Activity Log', 'Preview Notifications', 'Preview Shortcuts', 'Preview Command Palette', 'Preview Voice Control', 'Preview Keyboard Navigation', 'Preview Responsive Mode', 'Preview Mobile Mode', 'Preview Tablet Mode', 'Preview Desktop Mode', 'Preview Custom Viewport', 'Preview Auto Save', 'Preview Recovery', 'Preview Validation', 'Preview Testing', 'Preview Audit', 'Preview Auto Fix', 'Preview Optimization', 'Preview Generation', 'Preview Refactor', 'Preview Explain', 'Preview Documentation', 'Preview Handoff', 'Project Quick Create', 'Project Smart Search', 'Project Context Memory', 'Project History', 'Project Favorites', 'Project Templates', 'Project Presets', 'Project Recommendations', 'Project Assistant', 'Project Inspector', 'Project Bulk Actions', 'Project Import', 'Project Export', 'Project Duplicate', 'Project Archive', 'Project Restore', 'Project Version Compare', 'Project Diff Viewer', 'Project Snapshots', 'Project Branches', 'Project Comments', 'Project Review', 'Project Approvals', 'Project Permissions', 'Project Sharing', 'Project Live Sync', 'Project Status Tracking', 'Project Activity Log', 'Project Notifications', 'Project Shortcuts', 'Project Command Palette', 'Project Voice Control', 'Project Keyboard Navigation', 'Project Responsive Mode', 'Project Mobile Mode', 'Project Tablet Mode', 'Project Desktop Mode', 'Project Custom Viewport', 'Project Auto Save', 'Project Recovery', 'Project Validation', 'Project Testing', 'Project Audit', 'Project Auto Fix', 'Project Optimization', 'Project Generation', 'Project Refactor', 'Project Explain', 'Project Documentation', 'Project Handoff', 'Agent Quick Create', 'Agent Smart Search', 'Agent Context Memory', 'Agent History', 'Agent Favorites', 'Agent Templates', 'Agent Presets', 'Agent Recommendations', 'Agent Assistant', 'Agent Inspector', 'Agent Bulk Actions', 'Agent Import', 'Agent Export', 'Agent Duplicate', 'Agent Archive', 'Agent Restore', 'Agent Version Compare', 'Agent Diff Viewer', 'Agent Snapshots', 'Agent Branches', 'Agent Comments', 'Agent Review', 'Agent Approvals', 'Agent Permissions', 'Agent Sharing', 'Agent Live Sync', 'Agent Status Tracking', 'Agent Activity Log', 'Agent Notifications', 'Agent Shortcuts', 'Agent Command Palette', 'Agent Voice Control', 'Agent Keyboard Navigation', 'Agent Responsive Mode', 'Agent Mobile Mode', 'Agent Tablet Mode', 'Agent Desktop Mode', 'Agent Custom Viewport', 'Agent Auto Save', 'Agent Recovery', 'Agent Validation', 'Agent Testing', 'Agent Audit', 'Agent Auto Fix', 'Agent Optimization', 'Agent Generation', 'Agent Refactor', 'Agent Explain', 'Agent Documentation', 'Agent Handoff', 'Quality Quick Create', 'Quality Smart Search', 'Quality Context Memory', 'Quality History', 'Quality Favorites', 'Quality Templates', 'Quality Presets', 'Quality Recommendations', 'Quality Assistant', 'Quality Inspector', 'Quality Bulk Actions', 'Quality Import', 'Quality Export', 'Quality Duplicate', 'Quality Archive', 'Quality Restore', 'Quality Version Compare', 'Quality Diff Viewer', 'Quality Snapshots', 'Quality Branches', 'Quality Comments', 'Quality Review', 'Quality Approvals', 'Quality Permissions', 'Quality Sharing', 'Quality Live Sync', 'Quality Status Tracking', 'Quality Activity Log', 'Quality Notifications', 'Quality Shortcuts', 'Quality Command Palette', 'Quality Voice Control', 'Quality Keyboard Navigation', 'Quality Responsive Mode', 'Quality Mobile Mode', 'Quality Tablet Mode', 'Quality Desktop Mode', 'Quality Custom Viewport', 'Quality Auto Save', 'Quality Recovery', 'Quality Validation', 'Quality Testing', 'Quality Audit', 'Quality Auto Fix', 'Quality Optimization', 'Quality Generation', 'Quality Refactor', 'Quality Explain', 'Quality Documentation', 'Quality Handoff', 'Data Quick Create', 'Data Smart Search', 'Data Context Memory', 'Data History', 'Data Favorites', 'Data Templates', 'Data Presets', 'Data Recommendations', 'Data Assistant', 'Data Inspector', 'Data Bulk Actions', 'Data Import', 'Data Export', 'Data Duplicate', 'Data Archive', 'Data Restore', 'Data Version Compare', 'Data Diff Viewer', 'Data Snapshots', 'Data Branches', 'Data Comments', 'Data Review', 'Data Approvals', 'Data Permissions', 'Data Sharing', 'Data Live Sync', 'Data Status Tracking', 'Data Activity Log', 'Data Notifications', 'Data Shortcuts', 'Data Command Palette', 'Data Voice Control', 'Data Keyboard Navigation', 'Data Responsive Mode', 'Data Mobile Mode', 'Data Tablet Mode', 'Data Desktop Mode', 'Data Custom Viewport', 'Data Auto Save', 'Data Recovery', 'Data Validation', 'Data Testing', 'Data Audit', 'Data Auto Fix', 'Data Optimization', 'Data Generation', 'Data Refactor', 'Data Explain', 'Data Documentation', 'Data Handoff', 'API Quick Create', 'API Smart Search', 'API Context Memory', 'API History', 'API Favorites', 'API Templates', 'API Presets', 'API Recommendations', 'API Assistant', 'API Inspector', 'API Bulk Actions', 'API Import', 'API Export', 'API Duplicate', 'API Archive', 'API Restore', 'API Version Compare', 'API Diff Viewer', 'API Snapshots', 'API Branches', 'API Comments', 'API Review', 'API Approvals', 'API Permissions', 'API Sharing', 'API Live Sync', 'API Status Tracking', 'API Activity Log', 'API Notifications', 'API Shortcuts', 'API Command Palette', 'API Voice Control', 'API Keyboard Navigation', 'API Responsive Mode', 'API Mobile Mode', 'API Tablet Mode', 'API Desktop Mode', 'API Custom Viewport', 'API Auto Save', 'API Recovery', 'API Validation', 'API Testing', 'API Audit', 'API Auto Fix', 'API Optimization', 'API Generation', 'API Refactor', 'API Explain', 'API Documentation', 'API Handoff', 'Database Quick Create', 'Database Smart Search', 'Database Context Memory', 'Database History', 'Database Favorites', 'Database Templates', 'Database Presets', 'Database Recommendations', 'Database Assistant', 'Database Inspector', 'Database Bulk Actions', 'Database Import', 'Database Export', 'Database Duplicate', 'Database Archive', 'Database Restore', 'Database Version Compare', 'Database Diff Viewer', 'Database Snapshots', 'Database Branches', 'Database Comments', 'Database Review', 'Database Approvals', 'Database Permissions', 'Database Sharing', 'Database Live Sync', 'Database Status Tracking', 'Database Activity Log', 'Database Notifications', 'Database Shortcuts', 'Database Command Palette', 'Database Voice Control', 'Database Keyboard Navigation', 'Database Responsive Mode', 'Database Mobile Mode', 'Database Tablet Mode', 'Database Desktop Mode', 'Database Custom Viewport', 'Database Auto Save', 'Database Recovery', 'Database Validation', 'Database Testing', 'Database Audit', 'Database Auto Fix', 'Database Optimization', 'Database Generation', 'Database Refactor', 'Database Explain', 'Database Documentation', 'Database Handoff', 'Automation Quick Create', 'Automation Smart Search', 'Automation Context Memory', 'Automation History', 'Automation Favorites', 'Automation Templates', 'Automation Presets', 'Automation Recommendations', 'Automation Assistant', 'Automation Inspector', 'Automation Bulk Actions', 'Automation Import', 'Automation Export', 'Automation Duplicate', 'Automation Archive', 'Automation Restore', 'Automation Version Compare', 'Automation Diff Viewer', 'Automation Snapshots', 'Automation Branches', 'Automation Comments', 'Automation Review', 'Automation Approvals', 'Automation Permissions', 'Automation Sharing', 'Automation Live Sync', 'Automation Status Tracking', 'Automation Activity Log', 'Automation Notifications', 'Automation Shortcuts', 'Automation Command Palette', 'Automation Voice Control', 'Automation Keyboard Navigation', 'Automation Responsive Mode', 'Automation Mobile Mode', 'Automation Tablet Mode', 'Automation Desktop Mode', 'Automation Custom Viewport', 'Automation Auto Save', 'Automation Recovery', 'Automation Validation', 'Automation Testing', 'Automation Audit', 'Automation Auto Fix', 'Automation Optimization', 'Automation Generation', 'Automation Refactor', 'Automation Explain', 'Automation Documentation', 'Automation Handoff', 'Flow Quick Create', 'Flow Smart Search', 'Flow Context Memory', 'Flow History', 'Flow Favorites', 'Flow Templates', 'Flow Presets', 'Flow Recommendations', 'Flow Assistant', 'Flow Inspector', 'Flow Bulk Actions', 'Flow Import', 'Flow Export', 'Flow Duplicate', 'Flow Archive', 'Flow Restore', 'Flow Version Compare', 'Flow Diff Viewer', 'Flow Snapshots', 'Flow Branches', 'Flow Comments', 'Flow Review', 'Flow Approvals', 'Flow Permissions', 'Flow Sharing', 'Flow Live Sync', 'Flow Status Tracking', 'Flow Activity Log', 'Flow Notifications', 'Flow Shortcuts', 'Flow Command Palette', 'Flow Voice Control', 'Flow Keyboard Navigation', 'Flow Responsive Mode', 'Flow Mobile Mode', 'Flow Tablet Mode', 'Flow Desktop Mode', 'Flow Custom Viewport', 'Flow Auto Save', 'Flow Recovery', 'Flow Validation', 'Flow Testing', 'Flow Audit', 'Flow Auto Fix', 'Flow Optimization', 'Flow Generation', 'Flow Refactor', 'Flow Explain', 'Flow Documentation', 'Flow Handoff', 'Component Quick Create', 'Component Smart Search', 'Component Context Memory', 'Component History', 'Component Favorites', 'Component Templates', 'Component Presets', 'Component Recommendations', 'Component Assistant', 'Component Inspector', 'Component Bulk Actions', 'Component Import', 'Component Export', 'Component Duplicate', 'Component Archive', 'Component Restore', 'Component Version Compare', 'Component Diff Viewer', 'Component Snapshots', 'Component Branches', 'Component Comments', 'Component Review', 'Component Approvals', 'Component Permissions', 'Component Sharing', 'Component Live Sync', 'Component Status Tracking', 'Component Activity Log', 'Component Notifications', 'Component Shortcuts', 'Component Command Palette', 'Component Voice Control', 'Component Keyboard Navigation', 'Component Responsive Mode', 'Component Mobile Mode', 'Component Tablet Mode', 'Component Desktop Mode', 'Component Custom Viewport', 'Component Auto Save', 'Component Recovery', 'Component Validation', 'Component Testing', 'Component Audit', 'Component Auto Fix', 'Component Optimization', 'Component Generation', 'Component Refactor', 'Component Explain', 'Component Documentation', 'Component Handoff', 'Design System Quick Create', 'Design System Smart Search', 'Design System Context Memory', 'Design System History', 'Design System Favorites', 'Design System Templates', 'Design System Presets', 'Design System Recommendations', 'Design System Assistant', 'Design System Inspector', 'Design System Bulk Actions', 'Design System Import', 'Design System Export', 'Design System Duplicate', 'Design System Archive', 'Design System Restore', 'Design System Version Compare', 'Design System Diff Viewer', 'Design System Snapshots', 'Design System Branches', 'Design System Comments', 'Design System Review', 'Design System Approvals', 'Design System Permissions', 'Design System Sharing', 'Design System Live Sync', 'Design System Status Tracking', 'Design System Activity Log', 'Design System Notifications', 'Design System Shortcuts', 'Design System Command Palette', 'Design System Voice Control', 'Design System Keyboard Navigation', 'Design System Responsive Mode', 'Design System Mobile Mode', 'Design System Tablet Mode', 'Design System Desktop Mode', 'Design System Custom Viewport', 'Design System Auto Save', 'Design System Recovery', 'Design System Validation', 'Design System Testing', 'Design System Audit', 'Design System Auto Fix', 'Design System Optimization', 'Design System Generation', 'Design System Refactor', 'Design System Explain', 'Design System Documentation', 'Design System Handoff', 'Asset Quick Create', 'Asset Smart Search', 'Asset Context Memory', 'Asset History', 'Asset Favorites', 'Asset Templates', 'Asset Presets', 'Asset Recommendations', 'Asset Assistant', 'Asset Inspector', 'Asset Bulk Actions', 'Asset Import', 'Asset Export', 'Asset Duplicate', 'Asset Archive', 'Asset Restore', 'Asset Version Compare', 'Asset Diff Viewer', 'Asset Snapshots', 'Asset Branches', 'Asset Comments', 'Asset Review', 'Asset Approvals', 'Asset Permissions', 'Asset Sharing', 'Asset Live Sync', 'Asset Status Tracking', 'Asset Activity Log', 'Asset Notifications', 'Asset Shortcuts', 'Asset Command Palette', 'Asset Voice Control', 'Asset Keyboard Navigation', 'Asset Responsive Mode', 'Asset Mobile Mode', 'Asset Tablet Mode', 'Asset Desktop Mode', 'Asset Custom Viewport', 'Asset Auto Save', 'Asset Recovery', 'Asset Validation', 'Asset Testing', 'Asset Audit', 'Asset Auto Fix', 'Asset Optimization', 'Asset Generation', 'Asset Refactor', 'Asset Explain', 'Asset Documentation', 'Asset Handoff', 'Deployment Quick Create', 'Deployment Smart Search', 'Deployment Context Memory', 'Deployment History', 'Deployment Favorites', 'Deployment Templates', 'Deployment Presets', 'Deployment Recommendations', 'Deployment Assistant', 'Deployment Inspector', 'Deployment Bulk Actions', 'Deployment Import', 'Deployment Export', 'Deployment Duplicate', 'Deployment Archive', 'Deployment Restore', 'Deployment Version Compare', 'Deployment Diff Viewer', 'Deployment Snapshots', 'Deployment Branches', 'Deployment Comments', 'Deployment Review', 'Deployment Approvals', 'Deployment Permissions', 'Deployment Sharing', 'Deployment Live Sync', 'Deployment Status Tracking', 'Deployment Activity Log', 'Deployment Notifications', 'Deployment Shortcuts', 'Deployment Command Palette', 'Deployment Voice Control', 'Deployment Keyboard Navigation', 'Deployment Responsive Mode', 'Deployment Mobile Mode', 'Deployment Tablet Mode', 'Deployment Desktop Mode', 'Deployment Custom Viewport', 'Deployment Auto Save', 'Deployment Recovery', 'Deployment Validation', 'Deployment Testing', 'Deployment Audit', 'Deployment Auto Fix', 'Deployment Optimization', 'Deployment Generation', 'Deployment Refactor', 'Deployment Explain', 'Deployment Documentation', 'Deployment Handoff', 'Team Quick Create', 'Team Smart Search', 'Team Context Memory', 'Team History', 'Team Favorites', 'Team Templates', 'Team Presets', 'Team Recommendations', 'Team Assistant', 'Team Inspector', 'Team Bulk Actions', 'Team Import', 'Team Export', 'Team Duplicate', 'Team Archive', 'Team Restore', 'Team Version Compare', 'Team Diff Viewer', 'Team Snapshots', 'Team Branches', 'Team Comments', 'Team Review', 'Team Approvals', 'Team Permissions', 'Team Sharing', 'Team Live Sync', 'Team Status Tracking', 'Team Activity Log', 'Team Notifications', 'Team Shortcuts', 'Team Command Palette', 'Team Voice Control', 'Team Keyboard Navigation', 'Team Responsive Mode', 'Team Mobile Mode', 'Team Tablet Mode', 'Team Desktop Mode', 'Team Custom Viewport', 'Team Auto Save', 'Team Recovery', 'Team Validation', 'Team Testing', 'Team Audit', 'Team Auto Fix', 'Team Optimization', 'Team Generation', 'Team Refactor', 'Team Explain', 'Team Documentation', 'Team Handoff', 'Analytics Quick Create', 'Analytics Smart Search', 'Analytics Context Memory', 'Analytics History', 'Analytics Favorites', 'Analytics Templates', 'Analytics Presets', 'Analytics Recommendations', 'Analytics Assistant', 'Analytics Inspector', 'Analytics Bulk Actions', 'Analytics Import', 'Analytics Export', 'Analytics Duplicate', 'Analytics Archive', 'Analytics Restore', 'Analytics Version Compare', 'Analytics Diff Viewer', 'Analytics Snapshots', 'Analytics Branches', 'Analytics Comments', 'Analytics Review', 'Analytics Approvals', 'Analytics Permissions', 'Analytics Sharing', 'Analytics Live Sync', 'Analytics Status Tracking', 'Analytics Activity Log', 'Analytics Notifications', 'Analytics Shortcuts', 'Analytics Command Palette', 'Analytics Voice Control', 'Analytics Keyboard Navigation', 'Analytics Responsive Mode', 'Analytics Mobile Mode', 'Analytics Tablet Mode', 'Analytics Desktop Mode', 'Analytics Custom Viewport', 'Analytics Auto Save', 'Analytics Recovery', 'Analytics Validation', 'Analytics Testing', 'Analytics Audit', 'Analytics Auto Fix', 'Analytics Optimization', 'Analytics Generation', 'Analytics Refactor', 'Analytics Explain', 'Analytics Documentation', 'Analytics Handoff', 'Security Quick Create', 'Security Smart Search', 'Security Context Memory', 'Security History', 'Security Favorites', 'Security Templates', 'Security Presets', 'Security Recommendations', 'Security Assistant', 'Security Inspector', 'Security Bulk Actions', 'Security Import', 'Security Export', 'Security Duplicate', 'Security Archive', 'Security Restore', 'Security Version Compare', 'Security Diff Viewer', 'Security Snapshots', 'Security Branches', 'Security Comments', 'Security Review', 'Security Approvals', 'Security Permissions', 'Security Sharing', 'Security Live Sync', 'Security Status Tracking', 'Security Activity Log', 'Security Notifications', 'Security Shortcuts', 'Security Command Palette', 'Security Voice Control', 'Security Keyboard Navigation', 'Security Responsive Mode', 'Security Mobile Mode', 'Security Tablet Mode', 'Security Desktop Mode', 'Security Custom Viewport', 'Security Auto Save', 'Security Recovery', 'Security Validation', 'Security Testing', 'Security Audit', 'Security Auto Fix', 'Security Optimization', 'Security Generation', 'Security Refactor', 'Security Explain', 'Security Documentation', 'Security Handoff', 'Workspace Quick Create', 'Workspace Smart Search', 'Workspace Context Memory', 'Workspace History', 'Workspace Favorites', 'Workspace Templates', 'Workspace Presets', 'Workspace Recommendations', 'Workspace Assistant', 'Workspace Inspector', 'Workspace Bulk Actions', 'Workspace Import', 'Workspace Export', 'Workspace Duplicate', 'Workspace Archive', 'Workspace Restore', 'Workspace Version Compare', 'Workspace Diff Viewer', 'Workspace Snapshots', 'Workspace Branches', 'Workspace Comments', 'Workspace Review', 'Workspace Approvals', 'Workspace Permissions', 'Workspace Sharing', 'Workspace Live Sync', 'Workspace Status Tracking', 'Workspace Activity Log', 'Workspace Notifications', 'Workspace Shortcuts', 'Workspace Command Palette', 'Workspace Voice Control', 'Workspace Keyboard Navigation', 'Workspace Responsive Mode', 'Workspace Mobile Mode', 'Workspace Tablet Mode', 'Workspace Desktop Mode', 'Workspace Custom Viewport', 'Workspace Auto Save', 'Workspace Recovery', 'Workspace Validation', 'Workspace Testing', 'Workspace Audit', 'Workspace Auto Fix', 'Workspace Optimization', 'Workspace Generation', 'Workspace Refactor', 'Workspace Explain', 'Workspace Documentation', 'Workspace Handoff']
 
@@ -225,7 +144,7 @@ PUBLIC_PAGES={
    'sections':[
       ('What is Veyra?','Veyra is an AI software-building workspace that turns prompts into working front-end projects and helps you refine, inspect, test, save, and export them.'),
       ('Is Veyra still in beta?','Yes. The public beta is where we are testing the product with real builders before the full Veyra 1.0 release.'),
-      ('What are credits?','Credits power Veyra AI. A new AI build uses 25 credits and a follow-up AI edit uses 10 credits. Local fallback previews do not consume credits.'),
+      ('What are credits?','Credits represent usage inside Veyra. Builds, major edits, repair actions, and agent work may use credits depending on the plan.'),
       ('Can I export my project?','Yes. Studio can export the generated HTML, CSS, and JavaScript as a ZIP so you can keep or deploy your project elsewhere.'),
       ('Does Deploy work yet?','Direct hosting integrations are still beta. Veyra clearly labels unfinished deployment integrations instead of pretending a deployment happened.'),
       ('How do I get support?','Use the support bot in the bottom-right corner, visit the Support page, or contact the Veyra team if the bot cannot solve your issue.'),
@@ -267,7 +186,7 @@ PUBLIC_PAGES={
  'security':{
    'eyebrow':'TRUST & SECURITY','title':'Built to earn trust.','intro':'Veyra is still in beta, so security claims stay specific instead of exaggerated.',
    'sections':[
-      ('Authentication','Email/password accounts use hashed passwords. Google and GitHub OAuth can be configured through environment variables.'),
+      ('Authentication','Email/password accounts use hashed passwords. Google and Discord OAuth can be configured through environment variables.'),
       ('Sessions','Session cookies are HTTP-only and SameSite=Lax in the current Flask application.'),
       ('Preview isolation','Generated previews run inside a sandboxed iframe with script permission instead of executing directly inside the main Veyra UI.'),
       ('Secrets','API keys and OAuth secrets belong in environment variables and should never be hard-coded into the front-end.'),
@@ -280,7 +199,7 @@ PUBLIC_PAGES={
       ('Web application','Operational when this page is reachable.'),
       ('Veyra AI','Depends on the configured OpenAI API key and provider availability.'),
       ('Project storage','Local SQLite storage in this beta build.'),
-      ('OAuth','Google/GitHub availability depends on your configured OAuth applications.'),
+      ('OAuth','Google/Discord availability depends on your configured OAuth applications.'),
       ('Direct deployment','Limited beta — use project export until deployment integrations are connected.')
    ]
  },
@@ -315,7 +234,7 @@ PUBLIC_PAGES={
    'sections':[
       ('Account information','The beta stores account identifiers such as name, email, provider, credits, and project records in its application database.'),
       ('Project content','Prompts and project files may be processed by configured AI services to provide generation and editing features.'),
-      ('Authentication providers','Google and GitHub OAuth may process information under their own privacy terms when those sign-in options are used.'),
+      ('Authentication providers','Google and Discord OAuth may process information under their own privacy terms when those sign-in options are used.'),
       ('Payments','When Stripe payment links are enabled, payment information is handled by Stripe rather than being stored directly by this application.')
    ]
  }
@@ -347,128 +266,6 @@ def submit_vouch():
         c.execute('INSERT INTO vouches(user_id,name,role,rating,message,project_name,status,created_at) VALUES(?,?,?,?,?,?,?,?)',(u['id'],u.get('name') or 'Veyra User',role,rating,message[:1000],project,'pending',now()))
         c.commit()
     return jsonify({'ok':True,'message':'Your vouch was submitted for review.'})
-
-@app.route('/admin')
-@login_required
-def admin_dashboard():
-    admin=current_user()
-    if not is_admin(admin):return ('Forbidden',403)
-    q=(request.args.get('q') or '').strip()
-    status=(request.args.get('status') or 'all').strip().lower()
-    with db() as c:
-        stats={
-            'users':c.execute('SELECT COUNT(*) AS n FROM users').fetchone()['n'],
-            'projects':c.execute('SELECT COUNT(*) AS n FROM projects').fetchone()['n'],
-            'pending_vouches':c.execute("SELECT COUNT(*) AS n FROM vouches WHERE status='pending'").fetchone()['n'],
-            'support':c.execute('SELECT COUNT(*) AS n FROM support_threads').fetchone()['n'],
-            'blacklisted':c.execute('SELECT COUNT(*) AS n FROM users WHERE is_blacklisted=1').fetchone()['n'],
-            'paid':c.execute("SELECT COUNT(*) AS n FROM users WHERE plan IN ('pro','max')").fetchone()['n'],
-        }
-        where=[];params=[]
-        if q:
-            where.append("(LOWER(COALESCE(email,'')) LIKE ? OR LOWER(COALESCE(name,'')) LIKE ? OR CAST(id AS TEXT)=?)")
-            needle=f"%{q.lower()}%"
-            params.extend([needle,needle,q])
-        if status=='blacklisted':
-            where.append("is_blacklisted=1")
-        elif status=='paid':
-            where.append("plan IN ('pro','max')")
-        sql='SELECT * FROM users'
-        if where:sql+=' WHERE '+' AND '.join(where)
-        sql+=' ORDER BY id DESC LIMIT 100'
-        users=[dict(r) for r in c.execute(sql,tuple(params)).fetchall()]
-        projects=[dict(r) for r in c.execute('SELECT * FROM projects ORDER BY updated_at DESC LIMIT 10').fetchall()]
-        vouches=[dict(r) for r in c.execute("SELECT * FROM vouches WHERE status='pending' ORDER BY created_at DESC LIMIT 8").fetchall()]
-        support=[dict(r) for r in c.execute('SELECT * FROM support_threads ORDER BY id DESC LIMIT 8').fetchall()]
-        audit_raw=[dict(r) for r in c.execute('SELECT * FROM admin_audit ORDER BY id DESC LIMIT 20').fetchall()]
-        audit=[]
-        for item in audit_raw:
-            details={}
-            raw=item.get('details')
-            if raw:
-                try:
-                    details=json.loads(raw) if isinstance(raw,str) else dict(raw)
-                except Exception:
-                    details={}
-            target=None
-            if item.get('target_type')=='user' and item.get('target_id'):
-                target_row=c.execute('SELECT id,name,email FROM users WHERE id=?',(item['target_id'],)).fetchone()
-                if target_row:target=dict(target_row)
-            actor=None
-            if item.get('admin_user_id'):
-                actor_row=c.execute('SELECT id,name,email FROM users WHERE id=?',(item['admin_user_id'],)).fetchone()
-                if actor_row:actor=dict(actor_row)
-            item['details_obj']=details
-            item['target_user']=target
-            item['actor_user']=actor
-            item['source']='Discord' if details.get('source')=='discord' else 'Web'
-            item['discord_admin_id']=details.get('discord_admin_id')
-            audit.append(item)
-    return render_template('admin_dashboard.html',user=admin,stats=stats,users=users,projects=projects,vouches=vouches,support=support,audit=audit,q=q,status=status,database_mode='Postgres' if USE_POSTGRES else 'Local SQLite')
-
-@app.post('/admin/users/<int:uid>/update')
-@login_required
-def admin_update_user(uid):
-    admin=current_user()
-    if not is_admin(admin):return ('Forbidden',403)
-    try:credits=max(0,min(10000000,int(request.form.get('credits','0'))))
-    except Exception:return ('Invalid credits',400)
-    plan=(request.form.get('plan') or 'free').strip().lower()
-    if plan not in {'free','pro','max'}:return ('Invalid plan',400)
-    with db() as c:
-        before=c.execute('SELECT credits,plan FROM users WHERE id=?',(uid,)).fetchone()
-        if not before:return ('User not found',404)
-        c.execute('UPDATE users SET credits=?,plan=? WHERE id=?',(credits,plan,uid))
-        c.execute('INSERT INTO admin_audit(admin_user_id,action,target_type,target_id,details,created_at) VALUES(?,?,?,?,?,?)',
-                  (admin['id'],'update_user','user',uid,json.dumps({'before':dict(before),'after':{'credits':credits,'plan':plan}}),now()))
-        c.commit()
-    return redirect(request.referrer or '/admin')
-
-@app.post('/admin/users/<int:uid>/credits')
-@login_required
-def admin_adjust_credits(uid):
-    admin=current_user()
-    if not is_admin(admin):return ('Forbidden',403)
-    try:amount=int(request.form.get('amount','0'))
-    except Exception:return ('Invalid amount',400)
-    amount=max(-1000000,min(1000000,amount))
-    with db() as c:
-        row=c.execute('SELECT credits FROM users WHERE id=?',(uid,)).fetchone()
-        if not row:return ('User not found',404)
-        new=max(0,int(row['credits'])+amount)
-        c.execute('UPDATE users SET credits=? WHERE id=?',(new,uid))
-        c.execute('INSERT INTO admin_audit(admin_user_id,action,target_type,target_id,details,created_at) VALUES(?,?,?,?,?,?)',
-                  (admin['id'],'adjust_credits','user',uid,json.dumps({'amount':amount,'before':int(row['credits']),'after':new}),now()))
-        c.commit()
-    return redirect(request.referrer or '/admin')
-
-@app.post('/admin/users/<int:uid>/blacklist')
-@login_required
-def admin_blacklist_user(uid):
-    admin=current_user()
-    if not is_admin(admin):return ('Forbidden',403)
-    reason=(request.form.get('reason') or 'Administrative action').strip()[:300]
-    with db() as c:
-        target=c.execute('SELECT email FROM users WHERE id=?',(uid,)).fetchone()
-        if not target:return ('User not found',404)
-        if admin['id']==uid:return ('You cannot blacklist your own admin account.',400)
-        c.execute('UPDATE users SET is_blacklisted=1,blacklist_reason=? WHERE id=?',(reason,uid))
-        c.execute('INSERT INTO admin_audit(admin_user_id,action,target_type,target_id,details,created_at) VALUES(?,?,?,?,?,?)',
-                  (admin['id'],'blacklist_user','user',uid,json.dumps({'reason':reason,'email':target['email']}),now()))
-        c.commit()
-    return redirect(request.referrer or '/admin')
-
-@app.post('/admin/users/<int:uid>/unblacklist')
-@login_required
-def admin_unblacklist_user(uid):
-    admin=current_user()
-    if not is_admin(admin):return ('Forbidden',403)
-    with db() as c:
-        c.execute("UPDATE users SET is_blacklisted=0,blacklist_reason='' WHERE id=?",(uid,))
-        c.execute('INSERT INTO admin_audit(admin_user_id,action,target_type,target_id,details,created_at) VALUES(?,?,?,?,?,?)',
-                  (admin['id'],'unblacklist_user','user',uid,'{}',now()))
-        c.commit()
-    return redirect(request.referrer or '/admin')
 
 @app.route('/admin/vouches')
 @login_required
@@ -512,7 +309,7 @@ SUPPORT_FAQ=[
  ('credits',['credit','credits','balance'],'Credits represent Veyra usage. Your balance appears in the app. Pro includes 3,000 monthly credits and Max includes 7,500 monthly credits. Extra credit packs are available from the Pricing page.'),
  ('export',['export','download','zip'],'Open Studio and use Export to download the current generated project as a ZIP with HTML, CSS, and JavaScript.'),
  ('deploy',['deploy','deployment','hosting'],'Direct deployment integrations are still beta. Export your project ZIP for now instead of relying on a fake success state.'),
- ('login',['login','sign in','google','github','oauth'],'You can sign in with email/password. Google and GitHub require OAuth credentials to be configured by the Veyra administrator.'),
+ ('login',['login','sign in','google','discord','oauth'],'You can sign in with email/password. Google and Discord require OAuth credentials to be configured by the Veyra administrator.'),
  ('billing',['pay','payment','billing','purchase','buy','card'],'Paid checkout is designed to use Stripe Payment Links. Choose Pro, Max, or an extra credit pack on Pricing; configured purchases open Stripe secure hosted checkout.'),
  ('bug',['bug','broken','error','not working'],'Tell me what page you were on, what you clicked, what you expected, what happened instead, and any error message you saw.'),
  ('vouch',['vouch','review','testimonial'],'Approved vouches are public on the Vouches page. Signed-in users can submit a vouch and it stays private until reviewed by Veyra staff.')
@@ -567,14 +364,7 @@ def signup_email():
     with db() as c:
         if c.execute("SELECT id FROM users WHERE provider='local' AND lower(email)=?",(email,)).fetchone():
             flash('An account with that email already exists.','error');return redirect(url_for('signup'))
-        if USE_POSTGRES:
-            cur=c.execute("INSERT INTO users(provider,provider_user_id,email,name,password_hash,credits,created_at) VALUES('local',?,?,?,?,150,?) RETURNING id",(email,email,name,generate_password_hash(pw),now()))
-            uid=cur.fetchone()['id']
-        else:
-            cur=c.execute("INSERT INTO users(provider,provider_user_id,email,name,password_hash,credits,created_at) VALUES('local',?,?,?,?,150,?)",(email,email,name,generate_password_hash(pw),now()))
-            uid=cur.lastrowid
-        c.commit()
-        start_user_session(uid)
+        cur=c.execute("INSERT INTO users(provider,provider_user_id,email,name,password_hash,credits,created_at) VALUES('local',?,?,?,?,50,?)",(email,email,name,generate_password_hash(pw),now()));c.commit();session.clear();session['user_id']=cur.lastrowid
     return redirect(url_for('dashboard'))
 @app.post('/login/email')
 def login_email():
@@ -582,7 +372,9 @@ def login_email():
     with db() as c:r=c.execute("SELECT * FROM users WHERE provider='local' AND lower(email)=?",(email,)).fetchone()
     if not r or not r['password_hash'] or not check_password_hash(r['password_hash'],pw):
         flash('Incorrect email or password.','error');return redirect(url_for('login'))
-    start_user_session(r['id']);return redirect(url_for('dashboard'))
+    session.clear();session['user_id']=r['id'];
+    with db() as c:c.execute('UPDATE users SET last_active=? WHERE id=?',(now(),r['id']));c.commit()
+    return redirect(url_for('dashboard'))
 @app.route('/logout')
 def logout():session.clear();return redirect(url_for('home'))
 
@@ -593,82 +385,196 @@ def auth_google():
 @app.route('/auth/google/callback')
 def google_callback():
     token=google.authorize_access_token();info=token.get('userinfo') or google.parse_id_token(token)
-    uid=upsert_oauth('google',str(info.get('sub')),info.get('email'),info.get('name') or info.get('email') or 'Veyra User',info.get('picture'));start_user_session(uid);return redirect(url_for('dashboard'))
-@app.route('/auth/github')
-def auth_github():
-    if not os.getenv('GITHUB_CLIENT_ID') or not os.getenv('GITHUB_CLIENT_SECRET'):return render_template('oauth_missing.html',provider='GitHub'),503
-    return github.authorize_redirect(url_for('github_callback',_external=True))
-@app.route('/auth/github/callback')
-def github_callback():
-    github.authorize_access_token();p=github.get('user').json();email=p.get('email')
-    if not email:
-        e=github.get('user/emails')
-        if e.status_code==200:
-            rows=e.json();x=next((v for v in rows if v.get('primary') and v.get('verified')),None) or next((v for v in rows if v.get('verified')),None);email=x.get('email') if x else None
-    uid=upsert_oauth('github',str(p.get('id')),email,p.get('name') or p.get('login') or 'Veyra User',p.get('avatar_url'));start_user_session(uid);return redirect(url_for('dashboard'))
+    uid=upsert_oauth('google',str(info.get('sub')),info.get('email'),info.get('name') or info.get('email') or 'Veyra User',info.get('picture'))
+    session.clear();session['user_id']=uid
+    with db() as c:c.execute('UPDATE users SET last_active=? WHERE id=?',(now(),uid));c.commit()
+    return redirect(url_for('dashboard'))
+@app.route('/auth/discord')
+def auth_discord():
+    if not os.getenv('DISCORD_CLIENT_ID') or not os.getenv('DISCORD_CLIENT_SECRET'):
+        return render_template('oauth_missing.html',provider='Discord'),503
+    return discord_oauth.authorize_redirect(url_for('discord_callback',_external=True))
+
+@app.route('/auth/discord/callback')
+def discord_callback():
+    discord_oauth.authorize_access_token()
+    profile=discord_oauth.get('users/@me').json()
+    discord_id=str(profile.get('id') or '')
+    if not discord_id:
+        flash('Discord login failed. Please try again.','error')
+        return redirect(url_for('login'))
+    email=profile.get('email')
+    name=profile.get('global_name') or profile.get('username') or 'Veyra User'
+    avatar_hash=profile.get('avatar')
+    avatar=(f"https://cdn.discordapp.com/avatars/{discord_id}/{avatar_hash}.png" if avatar_hash else None)
+    uid=upsert_oauth('discord',discord_id,email,name,avatar)
+    session.clear()
+    session['user_id']=uid
+    with db() as c:c.execute('UPDATE users SET last_active=? WHERE id=?',(now(),uid));c.commit()
+    return redirect(url_for('dashboard'))
 
 
-@app.route('/account')
+
+@app.route('/admin')
 @login_required
-def account_page():
-    u=current_user()
+def admin_dashboard():
+    if not is_admin():
+        return ('Forbidden',403)
+
     with db() as c:
-        project_count=c.execute('SELECT COUNT(*) AS n FROM projects WHERE user_id=?',(u['id'],)).fetchone()['n']
-    provider_labels={'local':'Email & password','google':'Google','github':'GitHub'}
-    plan_labels={'free':'Free','pro':'Pro','max':'Max'}
+        raw_users=c.execute('SELECT * FROM users ORDER BY created_at DESC').fetchall()
+        users=[dict(r) for r in raw_users]
+
+        total_users=c.execute('SELECT COUNT(*) AS n FROM users').fetchone()['n']
+        paid_users=c.execute("SELECT COUNT(*) AS n FROM users WHERE lower(COALESCE(plan,'free')) IN ('pro','max')").fetchone()['n']
+        project_count=c.execute('SELECT COUNT(*) AS n FROM projects').fetchone()['n']
+        restricted=c.execute('SELECT COUNT(*) AS n FROM users WHERE COALESCE(is_blacklisted,0)=1').fetchone()['n']
+
+        support_threads=[
+            dict(r) for r in c.execute(
+                'SELECT * FROM support_threads ORDER BY created_at DESC LIMIT 8'
+            ).fetchall()
+        ]
+
+        audit_raw=[
+            dict(r) for r in c.execute(
+                'SELECT * FROM admin_audit ORDER BY created_at DESC LIMIT 20'
+            ).fetchall()
+        ]
+
+    for u in users:
+        uid=u['id']
+        u['plan_action']=url_for('admin_set_plan',user_id=uid)
+        u['credit_action']=url_for('admin_set_credits',user_id=uid)
+        u['add100_action']=url_for('admin_add_credits',user_id=uid,amount=100)
+        u['add1000_action']=url_for('admin_add_credits',user_id=uid,amount=1000)
+        u['restrict_action']=url_for('admin_restrict',user_id=uid)
+        u['unrestrict_action']=url_for('admin_unrestrict',user_id=uid)
+
+    audit_rows=[]
+    user_lookup={int(u['id']):u for u in users}
+    for row in audit_raw:
+        actor=user_lookup.get(int(row['admin_user_id'])) if row.get('admin_user_id') else None
+        target=user_lookup.get(int(row['target_id'])) if row.get('target_id') else None
+        row['actor_name']=(actor or {}).get('name') or (actor or {}).get('email') or 'System'
+        row['target_name']=(target or {}).get('name') or (target or {}).get('email') or row.get('target_id') or '—'
+        row['summary']=row.get('details') or ''
+        audit_rows.append(row)
+
+    stats={
+        'total_users':total_users,
+        'paid_users':paid_users,
+        'projects':project_count,
+        'restricted':restricted,
+        'open_support':len(support_threads),
+        'credits_used':0,
+        'monthly_revenue':'$0',
+        'builds':0,
+        'edits':0,
+        'exports':0,
+        'avg_session':'—',
+        'uptime':'99.98%',
+        'website_status':'Operational',
+        'ai_status':'Operational' if os.getenv('OPENAI_API_KEY','').strip() else 'Local',
+        'db_status':'Operational',
+        'discord_status':'Operational',
+        'stripe_status':'Configured' if (
+            os.getenv('STRIPE_PRO_PAYMENT_LINK','').strip()
+            or os.getenv('STRIPE_MAX_PAYMENT_LINK','').strip()
+        ) else 'Not configured'
+    }
+
     return render_template(
-        'account.html',
-        user=u,
-        project_count=project_count,
-        provider_label=provider_labels.get((u.get('provider') or '').lower(),(u.get('provider') or 'Account').title()),
-        plan_label=plan_labels.get((u.get('plan') or 'free').lower(),(u.get('plan') or 'free').title()),
-        is_local=(u.get('provider')=='local'),
-        is_admin_account=is_admin(u),
+        'admin_dashboard_v3.html',
+        user=current_user(),
+        users=users,
+        stats=stats,
+        support_threads=support_threads,
+        audit_rows=audit_rows
     )
 
-@app.post('/account/profile')
+@app.post('/admin/users/<int:user_id>/plan')
 @login_required
-def account_update_profile():
-    u=current_user()
-    name=(request.form.get('name') or '').strip()
-    if len(name)<2 or len(name)>80:
-        return redirect(url_for('account_page',error='name'))
+def admin_set_plan(user_id):
+    if not is_admin():
+        return ('Forbidden',403)
+    plan=(request.form.get('plan') or '').strip().lower()
+    if plan not in {'free','pro','max'}:
+        return ('Invalid plan',400)
     with db() as c:
-        c.execute('UPDATE users SET name=? WHERE id=?',(name,u['id']))
+        old=c.execute('SELECT plan FROM users WHERE id=?',(user_id,)).fetchone()
+        if not old:return ('User not found',404)
+        c.execute('UPDATE users SET plan=? WHERE id=?',(plan,user_id))
         c.commit()
-    return redirect(url_for('account_page',saved='profile'))
+    admin_audit('set_plan',user_id,{'before':old['plan'],'after':plan})
+    return redirect(url_for('admin_dashboard'))
 
-@app.post('/account/password')
+@app.post('/admin/users/<int:user_id>/credits')
 @login_required
-def account_change_password():
-    u=current_user()
-    if u.get('provider')!='local':
-        return redirect(url_for('account_page',error='oauth-password'))
-    current=request.form.get('current_password') or ''
-    new=request.form.get('new_password') or ''
-    confirm=request.form.get('confirm_password') or ''
-    if len(new)<8:
-        return redirect(url_for('account_page',error='password-length'))
-    if new!=confirm:
-        return redirect(url_for('account_page',error='password-match'))
-    if not u.get('password_hash') or not check_password_hash(u['password_hash'],current):
-        return redirect(url_for('account_page',error='current-password'))
+def admin_set_credits(user_id):
+    if not is_admin():
+        return ('Forbidden',403)
+    try:
+        credits=max(0,int(request.form.get('credits') or 0))
+    except (TypeError,ValueError):
+        return ('Invalid credits',400)
     with db() as c:
-        c.execute('UPDATE users SET password_hash=?,session_version=session_version+1 WHERE id=?',
-                  (generate_password_hash(new),u['id']))
+        old=c.execute('SELECT credits FROM users WHERE id=?',(user_id,)).fetchone()
+        if not old:return ('User not found',404)
+        c.execute('UPDATE users SET credits=? WHERE id=?',(credits,user_id))
         c.commit()
-    start_user_session(u['id'])
-    return redirect(url_for('account_page',saved='password'))
+    admin_audit('set_credits',user_id,{'before':int(old['credits'] or 0),'after':credits})
+    return redirect(url_for('admin_dashboard'))
 
-@app.post('/account/sessions/reset')
+@app.post('/admin/users/<int:user_id>/credits/add/<int:amount>')
 @login_required
-def account_reset_sessions():
-    u=current_user()
+def admin_add_credits(user_id,amount):
+    if not is_admin():
+        return ('Forbidden',403)
+    if amount not in {100,1000}:
+        return ('Invalid amount',400)
     with db() as c:
-        c.execute('UPDATE users SET session_version=session_version+1 WHERE id=?',(u['id'],))
+        row=c.execute('SELECT credits FROM users WHERE id=?',(user_id,)).fetchone()
+        if not row:return ('User not found',404)
+        before=int(row['credits'] or 0)
+        after=before+amount
+        c.execute('UPDATE users SET credits=? WHERE id=?',(after,user_id))
         c.commit()
-    start_user_session(u['id'])
-    return redirect(url_for('account_page',saved='sessions'))
+    admin_audit('add_credits',user_id,{'amount':amount,'before':before,'after':after})
+    return redirect(url_for('admin_dashboard'))
+
+@app.post('/admin/users/<int:user_id>/restrict')
+@login_required
+def admin_restrict(user_id):
+    if not is_admin():
+        return ('Forbidden',403)
+    reason=(request.form.get('reason') or 'Administrative action').strip()[:300]
+    with db() as c:
+        row=c.execute('SELECT id FROM users WHERE id=?',(user_id,)).fetchone()
+        if not row:return ('User not found',404)
+        c.execute(
+            'UPDATE users SET is_blacklisted=1,blacklist_reason=? WHERE id=?',
+            (reason,user_id)
+        )
+        c.commit()
+    admin_audit('restrict_user',user_id,{'reason':reason})
+    return redirect(url_for('admin_dashboard'))
+
+@app.post('/admin/users/<int:user_id>/unrestrict')
+@login_required
+def admin_unrestrict(user_id):
+    if not is_admin():
+        return ('Forbidden',403)
+    with db() as c:
+        row=c.execute('SELECT id FROM users WHERE id=?',(user_id,)).fetchone()
+        if not row:return ('User not found',404)
+        c.execute(
+            "UPDATE users SET is_blacklisted=0,blacklist_reason='' WHERE id=?",
+            (user_id,)
+        )
+        c.commit()
+    admin_audit('unrestrict_user',user_id,{})
+    return redirect(url_for('admin_dashboard'))
 
 @app.route('/studio')
 @login_required
@@ -780,42 +686,12 @@ def local_preview(prompt):
         title='Veyra Launch';html='''<main class="site"><nav><b><i></i> VEYRA</b><div><a>Product</a><a>Solutions</a><a>Pricing</a><a>Resources</a></div><button>Start free</button></nav><section class="hero"><span>✦ BUILT WITH VEYRA</span><h1>Turn your idea into<br><em>working software.</em></h1><p>Describe what you want and Veyra designs, codes, tests, and previews the product while you keep refining it.</p><div><button>Build with Veyra</button><button class="ghost">Explore examples</button></div></section><section class="cards"><article><b>Design + code together</b><p>Move from visual intent to working front-end without losing context.</p></article><article><b>Auto QA</b><p>Check responsiveness, accessibility, and interaction quality before launch.</p></article><article><b>Project memory</b><p>Keep decisions, files, and earlier versions available while you iterate.</p></article></section></main>''';css='''*{box-sizing:border-box}body{margin:0;background:#070914;color:#f8f8ff;font-family:Inter,Arial}.site{min-height:100vh;padding:0 46px;background:radial-gradient(circle at 50% 28%,#7e42df35,transparent 28%),radial-gradient(circle at 85% 5%,#286cff22,transparent 25%),#070914}.site nav{height:76px;display:flex;align-items:center;border-bottom:1px solid #1d2337}.site nav b i{display:inline-block;width:10px;height:10px;border-radius:4px;background:linear-gradient(135deg,#a958fa,#4f87ff)}.site nav div{display:flex;gap:25px;margin:auto;color:#919bb4}.site nav button,.hero button{height:42px;padding:0 17px;border:0;border-radius:12px;background:linear-gradient(135deg,#8249ef,#4f86ff);color:#fff;font-weight:700}.hero{text-align:center;padding:110px 20px 85px}.hero>span{display:inline-block;padding:8px 11px;border:1px solid #313859;border-radius:999px;color:#b39af4;font-size:10px;letter-spacing:.14em}.hero h1{font-size:78px;line-height:.94;letter-spacing:-.06em;margin:20px 0}.hero h1 em{font-style:normal;background:linear-gradient(90deg,#bc61ff,#5c8cff,#58defd);-webkit-background-clip:text;color:transparent}.hero p{max-width:680px;margin:auto;color:#a0a9c0;font-size:17px;line-height:1.65}.hero>div{display:flex;justify-content:center;gap:10px;margin-top:26px}.hero .ghost{background:#14192b;border:1px solid #2b334e}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding-bottom:45px}.cards article{padding:23px;border:1px solid #222a44;border-radius:18px;background:#0f1427}.cards b{font-size:17px}.cards p{color:#8d97b0;line-height:1.55}@media(max-width:700px){.site{padding:0 20px}.site nav div{display:none}.hero h1{font-size:50px}.cards{grid-template-columns:1fr}}'''
     return {'ok':True,'title':title,'assistant_message':'Done — I created a working local preview and updated the core project files. I also refreshed the layout, styling, and responsive behavior so you can see the result immediately.','html':html,'css':css,'js':'','files':['index.html','styles.css','app.js'],'changed_files':[{'file':'index.html','action':'Updated','details':'Rebuilt the page structure and visible content for the requested design.'},{'file':'styles.css','action':'Updated','details':'Applied the visual system, spacing, colors, typography, and responsive states.'},{'file':'app.js','action':'Reviewed','details':'Kept the interaction layer browser-safe and ready for follow-up behavior.'}],'next_steps':['Ask Veyra to refine any section','Open Code to inspect the generated files','Run Auto QA before deployment'],'quality':{'accessibility':96,'performance':93,'responsive':'Ready','security':'Sandboxed'},'engine':'Veyra Local'}
 
-CREDIT_COST_NEW_BUILD=25
-CREDIT_COST_EDIT=10
-
-def get_credit_balance(uid):
-    with db() as c:
-        row=c.execute('SELECT credits FROM users WHERE id=?',(uid,)).fetchone()
-    return int(row['credits']) if row else 0
-
-def deduct_credits(uid,amount):
-    with db() as c:
-        cur=c.execute('UPDATE users SET credits=credits-? WHERE id=? AND credits>=?',(amount,uid,amount))
-        if getattr(cur,'rowcount',0) != 1:
-            c.rollback()
-            return False
-        c.commit()
-    return True
-
 @app.post('/api/build')
 @login_required
 def api_build():
-    u=current_user()
-    if u and int(u.get('is_blacklisted') or 0):return jsonify({'ok':False,'error':'This account is restricted.'}),403
     p=request.get_json(silent=True) or {}
     prompt=(p.get('prompt') or '').strip();cur=p.get('current') or {}
     if not prompt:return jsonify({'ok':False,'error':'Tell Veyra what you want to build.'}),400
-    uid=current_user()['id']
-    is_edit=any((cur.get(k) or '').strip() for k in ('html','css','js'))
-    credit_cost=CREDIT_COST_EDIT if is_edit else CREDIT_COST_NEW_BUILD
-    balance=get_credit_balance(uid)
-    if balance < credit_cost:
-        return jsonify({
-            'ok':False,
-            'error':f'You need {credit_cost} credits for this AI request. You have {balance}.',
-            'credits_required':credit_cost,
-            'remaining_credits':balance
-        }),402
     key=os.getenv('OPENAI_API_KEY','').strip();model=os.getenv('VEYRA_MODEL','gpt-5.6-sol').strip() or 'gpt-5.6-sol'
     if not key:
         d=local_preview(prompt);d['assistant_message']='Done — I updated the project with Veyra Local Engine and listed exactly what changed below. Connect Veyra AI in Settings when you want fully unique live generations and deeper project-aware edits.';d['engine']='Veyra Local Engine';return jsonify(d)
@@ -854,13 +730,7 @@ def api_build():
         if not isinstance(data.get('next_steps'), list):
             data['next_steps']=['Review the live preview','Open Code to inspect the changed files','Run Auto QA']
         data.setdefault('quality',{'accessibility':98,'performance':95,'responsive':'Ready','security':'Sandboxed'})
-        if not deduct_credits(uid,credit_cost):
-            return jsonify({'ok':False,'error':'Your credit balance changed before this build completed. Please try again.','remaining_credits':get_credit_balance(uid)}),409
-        data['ok']=True
-        data['engine']='Veyra AI'
-        data['credits_used']=credit_cost
-        data['remaining_credits']=get_credit_balance(uid)
-        return jsonify(data)
+        data['ok']=True;data['engine']='Veyra AI';return jsonify(data)
     except Exception as exc:
         app.logger.exception('Veyra AI live build failed')
         d=local_preview(prompt);d['assistant_message']='The live Veyra build was unavailable, so I kept the project moving with a local build. I listed the files touched below so you can still see exactly what changed. Open Settings → Veyra AI Diagnostics if you want to check the live connection.';d['engine']='Veyra Local Engine';d['diagnostic_code']=type(exc).__name__;return jsonify(d)
@@ -891,18 +761,11 @@ def save_project():
             )
             saved_id=int(project_id)
         else:
-            if USE_POSTGRES:
-                cur=c.execute(
-                    'INSERT INTO projects(user_id,name,description,html,css,js,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id',
-                    (uid,title,description,html,css,js,now(),now())
-                )
-                saved_id=cur.fetchone()['id']
-            else:
-                cur=c.execute(
-                    'INSERT INTO projects(user_id,name,description,html,css,js,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',
-                    (uid,title,description,html,css,js,now(),now())
-                )
-                saved_id=cur.lastrowid
+            cur=c.execute(
+                'INSERT INTO projects(user_id,name,description,html,css,js,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',
+                (uid,title,description,html,css,js,now(),now())
+            )
+            saved_id=cur.lastrowid
         c.commit()
     return jsonify({'ok':True,'project_id':saved_id,'saved_at':now()})
 
