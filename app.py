@@ -35,7 +35,7 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
     SESSION_COOKIE_SECURE=bool(os.getenv('VERCEL')),
-    SESSION_COOKIE_DOMAIN=os.getenv('SESSION_COOKIE_DOMAIN') or ('.buildveyra.xyz' if os.getenv('VERCEL') else None),
+    SESSION_COOKIE_NAME='veyra_session',
     PERMANENT_SESSION_LIFETIME=60*60*24*30,
 )
 
@@ -90,30 +90,38 @@ def _cache_user(user):
     safe.pop('password_hash',None)
     session['user_cache']=safe
 
-def _finish_login(uid, remember=True):
+def _finish_login(uid, remember=True, user=None):
     session.clear()
     session['user_id']=int(uid)
     session.permanent=bool(remember)
+
+    if user:
+        _cache_user(dict(user))
+    else:
+        try:
+            with db() as c:
+                r=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
+                if r:
+                    _cache_user(dict(r))
+        except Exception:
+            app.logger.exception('Unable to cache user after login')
+
     try:
         with db() as c:
-            r=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
-            if r:
-                _cache_user(dict(r))
-                try:
-                    c.execute('UPDATE users SET last_active=? WHERE id=?',(now(),uid))
-                    c.commit()
-                except Exception:
-                    pass
+            c.execute('UPDATE users SET last_active=? WHERE id=?',(now(),uid))
+            c.commit()
     except Exception:
-        app.logger.exception('Unable to refresh cached user after login')
+        pass
 
 def current_user():
     uid=session.get('user_id')
     if not uid:
         return None
 
-    # Prefer fresh DB state, but do not destroy a valid login merely because
-    # a serverless instance cannot see the same temporary SQLite file.
+    cached=session.get('user_cache')
+    if isinstance(cached,dict) and str(cached.get('id'))==str(uid):
+        return dict(cached)
+
     try:
         with db() as c:
             r=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
@@ -123,10 +131,6 @@ def current_user():
                 return user
     except Exception:
         app.logger.exception('current_user database lookup failed')
-
-    cached=session.get('user_cache')
-    if isinstance(cached,dict) and str(cached.get('id'))==str(uid):
-        return dict(cached)
 
     return None
 
@@ -429,7 +433,7 @@ def login_email():
     if not r or not r['password_hash'] or not check_password_hash(r['password_hash'],pw):
         flash('Incorrect email or password.','error');return redirect(url_for('login'))
     remember=bool(request.form.get('remember'))
-    _finish_login(r['id'], remember=remember)
+    _finish_login(r['id'], remember=remember, user=dict(r))
     return redirect(url_for('dashboard'))
 @app.route('/logout')
 def logout():
