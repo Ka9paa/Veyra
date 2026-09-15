@@ -1,0 +1,24 @@
+<!-- Replace the existing Google/GitHub social button area with this block. -->
+<div class="veyra-social-login">
+  <a class="oauth-btn google" href="{{ url_for('auth_google') }}">
+    <span class="oauth-icon">G</span>
+    <span>Continue with Google</span>
+    <b>›</b>
+  </a>
+
+  <a class="oauth-btn discord" href="{{ url_for('auth_discord') }}">
+    <span class="oauth-icon discord-icon">◉</span>
+    <span>Continue with Discord</span>
+    <b>›</b>
+  </a>
+</div>
+
+<style>
+.veyra-social-login{display:grid;gap:12px;margin-top:16px}
+.oauth-btn{height:54px;border:1px solid #2c3958;border-radius:12px;background:#0b111d;color:#f6f7ff;text-decoration:none;display:grid;grid-template-columns:28px 1fr 20px;align-items:center;gap:10px;padding:0 16px;font-weight:700;transition:.18s}
+.oauth-btn:hover{border-color:#6454d8;background:#0f1626;transform:translateY(-1px)}
+.oauth-icon{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-weight:900}
+.oauth-btn.google .oauth-icon{background:white;color:#4285F4}
+.oauth-btn.discord .oauth-icon{background:#5865F2;color:white}
+.oauth-btn b{color:#7e8eae;font-size:20px}
+</style>

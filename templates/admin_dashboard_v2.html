@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}Veyra — Admin Control Center{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='admin-v2.css') }}">
+
+<div class="va-shell" data-admin-root>
+  <aside class="va-sidebar">
+    <div class="va-brand">
+      <div class="va-logo">V</div>
+      <div><strong>Veyra</strong><span>Admin Control Center</span></div>
+    </div>
+
+    <nav class="va-nav">
+      <a class="active" href="#overview"><span>⌂</span>Overview</a>
+      <a href="#users"><span>◉</span>Users <b>{{ stats.total_users|default(0) }}</b></a>
+      <a href="#vouches"><span>◇</span>Vouches <b>{{ stats.pending_vouches|default(0) }}</b></a>
+      <a href="#support"><span>□</span>Support <b>{{ stats.open_support|default(0) }}</b></a>
+      <a href="#projects"><span>⬡</span>Projects</a>
+      <a href="#billing"><span>▤</span>Billing</a>
+      <a href="#analytics"><span>▥</span>Analytics</a>
+      <a href="#audit"><span>▣</span>Audit Log</a>
+      <a href="#moderation"><span>♢</span>Moderation</a>
+      <a href="#integrations"><span>⌘</span>Integrations</a>
+      <a href="#commands"><span>⌁</span>Bot Commands</a>
+      <a href="#flags"><span>⚑</span>Feature Flags</a>
+      <a href="#system"><span>◫</span>System</a>
+      <a href="#settings"><span>⚙</span>Settings</a>
+    </nav>
+
+    <div class="va-system-card">
+      <div class="va-system-title"><i></i><strong>System Online</strong></div>
+      <span>All systems operational</span>
+      <div class="va-health"><span>API</span><i></i></div>
+      <div class="va-health"><span>Website</span><i></i></div>
+      <div class="va-health"><span>Discord Bot</span><i></i></div>
+      <div class="va-health"><span>Database</span><i></i></div>
+      <div class="va-uptime"><span>Uptime</span><strong>{{ stats.uptime|default('99.98%') }}</strong></div>
+    </div>
+  </aside>
+
+  <main class="va-main">
+    <header class="va-topbar">
+      <div class="va-search-wrap">
+        <span>⌕</span>
+        <input id="globalSearch" type="search" placeholder="Search users, emails, projects, tickets...">
+        <kbd>⌘ K</kbd>
+      </div>
+
+      <div class="va-top-actions">
+        <button class="va-icon-button" aria-label="Notifications">♧<em>3</em></button>
+        <button class="va-admin-chip">
+          <span class="va-avatar">{{ (user.name or user.email or 'A')[0]|upper }}</span>
+          <span><strong>{{ user.name or 'Administrator' }}</strong><small>Administrator</small></span>
+          <span>⌄</span>
+        </button>
+      </div>
+    </header>
+
+    <section id="overview" class="va-section">
+      <div class="va-heading-row">
+        <div>
+          <p class="va-eyebrow">ADMINISTRATION</p>
+          <h1>Control Center</h1>
+          <p>Manage users, credits, plans, moderation, billing, and platform activity from one place.</p>
+        </div>
+        <div class="va-quote-card">
+          <strong>“Creators power a brighter tomorrow.”</strong>
+          <span>— Veyra</span>
+        </div>
+      </div>
+
+      <div class="va-metrics">
+        {% set cards = [
+          ('Total Users', stats.total_users|default(0), 'Registered accounts', '+12%'),
+          ('Paid Users', stats.paid_users|default(0), 'Active subscriptions', '+18%'),
+          ('Active Projects', stats.projects|default(0), 'Projects on platform', '+7%'),
+          ('Monthly Revenue', stats.monthly_revenue|default('$0'), 'Current month', '+24%'),
+          ('Credits Used', stats.credits_used|default(0), 'Current month', '+14%'),
+          ('API Calls', stats.api_calls|default(0), 'Current month', '+26%'),
+          ('Support Tickets', stats.open_support|default(0), 'Open requests', '-32%'),
+          ('Restricted', stats.restricted|default(0), 'Restricted accounts', '-18%')
+        ] %}
+        {% for label, value, sub, delta in cards %}
+        <article class="va-metric-card">
+          <div class="va-metric-icon">{{ loop.index }}</div>
+          <div>
+            <span>{{ label }}</span>
+            <strong>{{ value }}</strong>
+            <small>{{ sub }}</small>
+          </div>
+          <b class="{{ 'down' if '-' in delta else '' }}">{{ delta }}</b>
+        </article>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section id="users" class="va-panel va-users-panel">
+      <div class="va-panel-head">
+        <div>
+          <h2>User Management</h2>
+          <p>Manage plans, credits, permissions, account status, and access.</p>
+        </div>
+        <div class="va-toolbar">
+          <input id="userSearch" type="search" placeholder="Search users, email, or ID...">
+          <div class="va-menu" data-menu>
+            <button type="button" data-menu-trigger>All Plans <span>⌄</span></button>
+            <div class="va-menu-pop">
+              <button data-plan-filter="all">All Plans</button>
+              <button data-plan-filter="free">Free</button>
+              <button data-plan-filter="pro">Pro</button>
+              <button data-plan-filter="max">Max</button>
+            </div>
+          </div>
+          <div class="va-menu" data-menu>
+            <button type="button" data-menu-trigger>All Statuses <span>⌄</span></button>
+            <div class="va-menu-pop">
+              <button data-status-filter="all">All Statuses</button>
+              <button data-status-filter="active">Active</button>
+              <button data-status-filter="restricted">Restricted</button>
+            </div>
+          </div>
+          <button class="va-primary">＋ Add User</button>
+        </div>
+      </div>
+
+      <div class="va-table-wrap">
+        <table class="va-table">
+          <thead>
+            <tr>
+              <th><input type="checkbox" aria-label="Select all"></th>
+              <th>User</th>
+              <th>Plan</th>
+              <th>Credits</th>
+              <th>Status</th>
+              <th>Joined</th>
+              <th>Last Active</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="userRows">
+            {% for u in users|default([]) %}
+            <tr data-user-row data-name="{{ (u.name or '')|lower }}" data-email="{{ (u.email or '')|lower }}" data-plan="{{ (u.plan or 'free')|lower }}" data-status="{{ 'restricted' if u.is_blacklisted else 'active' }}">
+              <td><input type="checkbox" aria-label="Select {{ u.name or u.email }}"></td>
+              <td>
+                <div class="va-user-cell">
+                  <span class="va-avatar">{{ (u.name or u.email or 'U')[0]|upper }}</span>
+                  <div><strong>{{ u.name or 'Veyra User' }}</strong><small>{{ u.email or 'No email' }} · ID {{ u.id }}</small></div>
+                </div>
+              </td>
+              <td>
+                <form method="post" action="{{ u.plan_action|default('#') }}" class="va-inline-form">
+                  <input type="hidden" name="user_id" value="{{ u.id }}">
+                  <input type="hidden" name="plan" value="{{ u.plan or 'free' }}" data-plan-value>
+                  <div class="va-plan-picker" data-plan-picker data-value="{{ (u.plan or 'free')|lower }}">
+                    <button type="button" class="va-plan-current" data-plan-trigger>
+                      <span class="va-plan-badge {{ (u.plan or 'free')|lower }}">{{ (u.plan or 'free')|upper }}</span><span>⌄</span>
+                    </button>
+                    <div class="va-plan-pop">
+                      <button type="button" data-plan="free"><span class="va-plan-badge free">FREE</span><small>Starter access</small></button>
+                      <button type="button" data-plan="pro"><span class="va-plan-badge pro">PRO</span><small>Advanced features</small></button>
+                      <button type="button" data-plan="max"><span class="va-plan-badge max">MAX</span><small>Maximum access</small></button>
+                    </div>
+                  </div>
+                  <button class="va-save" type="submit">Save</button>
+                </form>
+              </td>
+              <td>
+                <form method="post" action="{{ u.credit_action|default('#') }}" class="va-credit-form">
+                  <input type="number" name="credits" value="{{ u.credits|default(0) }}" min="0">
+                  <button class="va-save" type="submit">Save</button>
+                </form>
+              </td>
+              <td>
+                {% if u.is_blacklisted %}
+                <span class="va-status restricted">Restricted</span>
+                {% else %}
+                <span class="va-status active">Active</span>
+                {% endif %}
+              </td>
+              <td>{{ u.created_at|default('—') }}</td>
+              <td>{{ u.last_active|default('—') }}</td>
+              <td>
+                <div class="va-row-actions">
+                  <form method="post" action="{{ u.add100_action|default('#') }}"><button>+100</button></form>
+                  <form method="post" action="{{ u.add1000_action|default('#') }}"><button>+1K</button></form>
+                  <button class="va-more" type="button">•••</button>
+                  {% if u.is_blacklisted %}
+                  <form method="post" action="{{ u.unrestrict_action|default('#') }}"><button class="good">Unrestrict</button></form>
+                  {% else %}
+                  <form method="post" action="{{ u.restrict_action|default('#') }}"><button class="danger">Restrict</button></form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8"><div class="va-empty">No users were supplied to this template.</div></td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="va-grid-3">
+      <section id="vouches" class="va-panel">
+        <div class="va-panel-head compact"><div><h2>Pending Vouches</h2><p>Review community feedback.</p></div><a href="{{ url_for('admin_vouches') if admin_vouches is defined else '#' }}">View all →</a></div>
+        <div class="va-list">
+          {% for v in pending_vouches|default([]) %}
+          <div class="va-list-row">
+            <span class="va-avatar">{{ (v.name or 'V')[0]|upper }}</span>
+            <div><strong>{{ v.name or 'Veyra User' }}</strong><small>{{ v.message|default('')|truncate(70) }}</small></div>
+            <span>{{ v.created_at|default('') }}</span>
+          </div>
+          {% else %}<div class="va-empty">Nothing waiting for review.</div>{% endfor %}
+        </div>
+      </section>
+
+      <section id="support" class="va-panel">
+        <div class="va-panel-head compact"><div><h2>Recent Support</h2><p>Latest tickets and inquiries.</p></div><a href="#">View all →</a></div>
+        <div class="va-list">
+          {% for t in support_threads|default([]) %}
+          <div class="va-list-row">
+            <span class="va-round-icon">?</span>
+            <div><strong>{{ t.question|default('Support request')|truncate(55) }}</strong><small>{{ t.answer|default('')|truncate(75) }}</small></div>
+            <span>{{ t.created_at|default('') }}</span>
+          </div>
+          {% else %}<div class="va-empty">No recent support activity.</div>{% endfor %}
+        </div>
+      </section>
+
+      <section class="va-panel">
+        <div class="va-panel-head compact"><div><h2>Live Activity</h2><p>Real-time platform events.</p></div><span class="va-live">● Live</span></div>
+        <div class="va-timeline">
+          {% for item in live_activity|default([]) %}
+          <div><i></i><p><strong>{{ item.title }}</strong><span>{{ item.meta|default('') }}</span></p><small>{{ item.time|default('') }}</small></div>
+          {% else %}
+          <div><i></i><p><strong>Admin dashboard loaded</strong><span>Monitoring platform activity</span></p><small>now</small></div>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+
+    <div class="va-grid-bottom">
+      <section id="audit" class="va-panel">
+        <div class="va-panel-head compact"><div><h2>Admin Audit Log</h2><p>Track important administrative changes.</p></div><a href="#">View all →</a></div>
+        <div class="va-audit">
+          <div class="head"><span>Time</span><span>Admin</span><span>Action</span><span>Details</span></div>
+          {% for a in audit_rows|default([]) %}
+          <div><span>{{ a.created_at|default('—') }}</span><span>{{ a.actor_name|default(a.discord_admin_id|default('System')) }}</span><span>{{ a.action|default('Action') }}</span><span>{{ a.summary|default(a.details|default('')) }}</span></div>
+          {% else %}
+          <div class="va-empty">No audit activity available.</div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <aside class="va-side-stack">
+        <section id="billing" class="va-panel">
+          <div class="va-panel-head compact"><div><h2>Credits Economy</h2><p>Usage across the platform.</p></div></div>
+          <strong class="va-big-number">{{ stats.credits_used|default(0) }}</strong>
+          <span class="va-muted">Credits used this month</span>
+          <div class="va-bars">
+            {% for h in [26,38,31,47,43,62,56,68,53,72,64,81,74,88,79,91,84,93] %}
+            <i style="height:{{h}}%"></i>
+            {% endfor %}
+          </div>
+          <div class="va-breakdown"><span>Build generation <b>48%</b></span><span>Edits & repair <b>28%</b></span><span>QA & agents <b>16%</b></span><span>Other <b>8%</b></span></div>
+        </section>
+
+        <section class="va-panel">
+          <div class="va-panel-head compact"><div><h2>Quick Actions</h2><p>Common admin tasks.</p></div></div>
+          <div class="va-quick-grid">
+            <button>＋<span>Add Credits</span></button><button>⌘<span>Bulk Actions</span></button><button>⇩<span>Export Users</span></button><button>⇧<span>Import Users</span></button>
+          </div>
+        </section>
+
+        <section id="integrations" class="va-panel">
+          <div class="va-panel-head compact"><div><h2>Discord Integration</h2><p>Account and bot status.</p></div><span class="va-live">● Connected</span></div>
+          <div class="va-discord-card"><span class="va-discord-logo">◉</span><div><strong>Veyra Official</strong><small>Community & admin automation</small></div><button>Manage</button></div>
+        </section>
+      </aside>
+    </div>
+  </main>
+</div>
+
+<script src="{{ url_for('static', filename='admin-v2.js') }}"></script>
+{% endblock %}
