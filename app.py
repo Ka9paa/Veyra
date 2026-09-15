@@ -46,40 +46,209 @@ PUBLIC_BASE_URL=(os.getenv('PUBLIC_BASE_URL') or 'https://buildveyra.xyz').strip
 def public_url(path):
     path='/' + str(path or '').lstrip('/')
     return f"{PUBLIC_BASE_URL}{path}"
-# Vercel's /var/task filesystem is read-only.
-# Use /tmp while deployed on Vercel; use the normal local data folder elsewhere.
+# Production uses the same Neon/Postgres database as the Discord admin bot.
+# SQLite remains only as a local-development fallback.
+DATABASE_URL=(os.getenv('DATABASE_URL') or '').strip()
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL='postgresql://' + DATABASE_URL[len('postgres://'):]
+
+USE_POSTGRES=bool(DATABASE_URL)
+
 if os.getenv('VERCEL'):
-    DB = Path('/tmp/veyra.db')
+    DB=Path('/tmp/veyra.db')
 else:
-    DB = BASE/'data'/'veyra.db'
+    DB=BASE/'data'/'veyra.db'
+
+
+class _PgCursor:
+    _ID_TABLES={'users','projects','vouches','support_threads','admin_audit'}
+
+    def __init__(self, cursor):
+        self._cursor=cursor
+        self.lastrowid=None
+
+    def execute(self, sql, params=None):
+        sql=str(sql)
+        params=() if params is None else params
+
+        # The rest of Veyra uses SQLite-style ? placeholders. Convert them for psycopg.
+        sql=sql.replace('?', '%s')
+
+        # Emulate sqlite cursor.lastrowid for the few INSERTs that need it.
+        match=re.match(r'\s*INSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*)', sql, re.I)
+        wants_id=bool(match and match.group(1).lower() in self._ID_TABLES and 'RETURNING' not in sql.upper())
+        if wants_id:
+            sql=sql.rstrip().rstrip(';') + ' RETURNING id'
+
+        self._cursor.execute(sql, params)
+
+        if wants_id:
+            row=self._cursor.fetchone()
+            if row:
+                self.lastrowid=row.get('id') if isinstance(row,dict) else row[0]
+
+        return self
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+    @property
+    def rowcount(self):
+        return self._cursor.rowcount
+
+
+class _PgConnection:
+    def __init__(self):
+        import psycopg
+        from psycopg.rows import dict_row
+        self._conn=psycopg.connect(DATABASE_URL,row_factory=dict_row)
+
+    def cursor(self):
+        return _PgCursor(self._conn.cursor())
+
+    def execute(self, sql, params=None):
+        cur=self.cursor()
+        return cur.execute(sql,params)
+
+    def commit(self):
+        return self._conn.commit()
+
+    def rollback(self):
+        return self._conn.rollback()
+
+    def close(self):
+        return self._conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if exc_type is None:
+            self._conn.commit()
+        else:
+            self._conn.rollback()
+        self._conn.close()
+        return False
+
 
 def db():
-    DB.parent.mkdir(parents=True,exist_ok=True)
-    c=sqlite3.connect(DB); c.row_factory=sqlite3.Row; return c
+    if USE_POSTGRES:
+        return _PgConnection()
 
-def now(): return datetime.now(timezone.utc).isoformat(timespec='seconds')
+    DB.parent.mkdir(parents=True,exist_ok=True)
+    c=sqlite3.connect(DB)
+    c.row_factory=sqlite3.Row
+    return c
+
+
+def now():
+    return datetime.now(timezone.utc).isoformat(timespec='seconds')
+
 
 def init_db():
     with db() as c:
-        c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 50,created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
-        c.execute('''CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)''')
-        c.execute('''CREATE TABLE IF NOT EXISTS vouches(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,role TEXT DEFAULT '',rating INTEGER NOT NULL DEFAULT 5,message TEXT NOT NULL,project_name TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL,reviewed_at TEXT)''')
-        c.execute('''CREATE TABLE IF NOT EXISTS support_threads(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,question TEXT NOT NULL,answer TEXT NOT NULL,created_at TEXT NOT NULL)''')
-        cols={r['name'] for r in c.execute('PRAGMA table_info(users)').fetchall()}
-        if 'password_hash' not in cols: c.execute('ALTER TABLE users ADD COLUMN password_hash TEXT')
-        if 'plan' not in cols: c.execute("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'")
-        if 'is_blacklisted' not in cols: c.execute("ALTER TABLE users ADD COLUMN is_blacklisted INTEGER NOT NULL DEFAULT 0")
-        if 'blacklist_reason' not in cols: c.execute("ALTER TABLE users ADD COLUMN blacklist_reason TEXT DEFAULT ''")
-        if 'last_active' not in cols: c.execute("ALTER TABLE users ADD COLUMN last_active TEXT")
-        c.execute('''CREATE TABLE IF NOT EXISTS admin_audit(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            admin_user_id INTEGER,
-            action TEXT NOT NULL,
-            target_type TEXT NOT NULL DEFAULT 'user',
-            target_id INTEGER,
-            details TEXT DEFAULT '',
-            created_at TEXT NOT NULL
-        )''')
+        if USE_POSTGRES:
+            c.execute('''CREATE TABLE IF NOT EXISTS users(
+                id BIGSERIAL PRIMARY KEY,
+                provider TEXT NOT NULL,
+                provider_user_id TEXT NOT NULL,
+                discord_id TEXT,
+                email TEXT,
+                name TEXT,
+                avatar_url TEXT,
+                password_hash TEXT,
+                credits INTEGER NOT NULL DEFAULT 50,
+                plan TEXT NOT NULL DEFAULT 'free',
+                is_blacklisted INTEGER NOT NULL DEFAULT 0,
+                blacklist_reason TEXT DEFAULT '',
+                last_active TEXT,
+                created_at TEXT NOT NULL,
+                UNIQUE(provider,provider_user_id)
+            )''')
+            c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS discord_id TEXT')
+            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'free'")
+            c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blacklisted INTEGER NOT NULL DEFAULT 0')
+            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS blacklist_reason TEXT DEFAULT ''")
+            c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active TEXT')
+            c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_users_discord_id ON users(discord_id)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users(LOWER(email))')
+
+            c.execute('''CREATE TABLE IF NOT EXISTS projects(
+                id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                html TEXT DEFAULT '',
+                css TEXT DEFAULT '',
+                js TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS vouches(
+                id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                name TEXT NOT NULL,
+                role TEXT DEFAULT '',
+                rating INTEGER NOT NULL DEFAULT 5,
+                message TEXT NOT NULL,
+                project_name TEXT DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL,
+                reviewed_at TEXT
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS support_threads(
+                id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT,
+                question TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS admin_audit(
+                id BIGSERIAL PRIMARY KEY,
+                admin_user_id BIGINT,
+                action TEXT NOT NULL,
+                target_type TEXT NOT NULL DEFAULT 'user',
+                target_id BIGINT,
+                details TEXT DEFAULT '',
+                created_at TEXT NOT NULL
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS site_admins(
+                discord_id TEXT PRIMARY KEY,
+                discord_username TEXT,
+                granted_by TEXT NOT NULL,
+                granted_at TEXT NOT NULL
+            )''')
+        else:
+            c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 50,created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
+            c.execute('''CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)''')
+            c.execute('''CREATE TABLE IF NOT EXISTS vouches(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,role TEXT DEFAULT '',rating INTEGER NOT NULL DEFAULT 5,message TEXT NOT NULL,project_name TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL,reviewed_at TEXT)''')
+            c.execute('''CREATE TABLE IF NOT EXISTS support_threads(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,question TEXT NOT NULL,answer TEXT NOT NULL,created_at TEXT NOT NULL)''')
+            cols={r['name'] for r in c.execute('PRAGMA table_info(users)').fetchall()}
+            if 'password_hash' not in cols: c.execute('ALTER TABLE users ADD COLUMN password_hash TEXT')
+            if 'plan' not in cols: c.execute("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'")
+            if 'is_blacklisted' not in cols: c.execute("ALTER TABLE users ADD COLUMN is_blacklisted INTEGER NOT NULL DEFAULT 0")
+            if 'blacklist_reason' not in cols: c.execute("ALTER TABLE users ADD COLUMN blacklist_reason TEXT DEFAULT ''")
+            if 'last_active' not in cols: c.execute("ALTER TABLE users ADD COLUMN last_active TEXT")
+            if 'discord_id' not in cols: c.execute("ALTER TABLE users ADD COLUMN discord_id TEXT")
+            c.execute('''CREATE TABLE IF NOT EXISTS admin_audit(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_user_id INTEGER,
+                action TEXT NOT NULL,
+                target_type TEXT NOT NULL DEFAULT 'user',
+                target_id INTEGER,
+                details TEXT DEFAULT '',
+                created_at TEXT NOT NULL
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS site_admins(
+                discord_id TEXT PRIMARY KEY,
+                discord_username TEXT,
+                granted_by TEXT NOT NULL,
+                granted_at TEXT NOT NULL
+            )''')
         c.commit()
 
 def _cache_user(user):
@@ -136,9 +305,33 @@ def current_user():
 
 def is_admin(user=None):
     user=user or current_user()
-    if not user:return False
+    if not user:
+        return False
+
+    # Keep owner-email access as an emergency fallback.
     allowed={x.strip().lower() for x in os.getenv('VEYRA_ADMIN_EMAILS','').split(',') if x.strip()}
-    return bool(user.get('email') and user['email'].lower() in allowed)
+    if user.get('email') and user['email'].lower() in allowed:
+        return True
+
+    discord_id=str(
+        user.get('discord_id')
+        or (user.get('provider_user_id') if user.get('provider')=='discord' else '')
+        or ''
+    ).strip()
+
+    if not discord_id:
+        return False
+
+    try:
+        with db() as c:
+            row=c.execute(
+                'SELECT discord_id FROM site_admins WHERE discord_id=?',
+                (discord_id,)
+            ).fetchone()
+            return bool(row)
+    except Exception:
+        app.logger.exception('Discord admin lookup failed')
+        return False
 
 def admin_audit(action,target_id=None,details=None):
     actor=current_user()
@@ -166,13 +359,54 @@ def login_required(fn):
 def inject():return {'current_user':current_user()}
 
 def upsert_oauth(provider,pid,email,name,avatar):
+    provider=(provider or '').strip().lower()
+    pid=str(pid or '').strip()
+    email=(email or '').strip().lower() or None
+
     with db() as c:
-        r=c.execute('SELECT * FROM users WHERE provider=? AND provider_user_id=?',(provider,pid)).fetchone()
+        r=None
+
+        if provider=='discord':
+            r=c.execute(
+                'SELECT * FROM users WHERE discord_id=? OR (provider=? AND provider_user_id=?) LIMIT 1',
+                (pid,'discord',pid)
+            ).fetchone()
+
+        if not r:
+            r=c.execute(
+                'SELECT * FROM users WHERE provider=? AND provider_user_id=?',
+                (provider,pid)
+            ).fetchone()
+
+        # Same verified OAuth email = same Veyra account.
+        if not r and email:
+            r=c.execute(
+                'SELECT * FROM users WHERE LOWER(email)=LOWER(?) ORDER BY id ASC LIMIT 1',
+                (email,)
+            ).fetchone()
+
         if r:
-            c.execute('UPDATE users SET email=?,name=?,avatar_url=? WHERE id=?',(email,name,avatar,r['id']));uid=r['id']
+            uid=r['id']
+            if provider=='discord':
+                c.execute(
+                    'UPDATE users SET email=COALESCE(?,email),name=?,avatar_url=?,discord_id=? WHERE id=?',
+                    (email,name,avatar,pid,uid)
+                )
+            else:
+                c.execute(
+                    'UPDATE users SET email=COALESCE(?,email),name=?,avatar_url=? WHERE id=?',
+                    (email,name,avatar,uid)
+                )
         else:
-            cur=c.execute('INSERT INTO users(provider,provider_user_id,email,name,avatar_url,password_hash,credits,created_at) VALUES(?,?,?,?,?,NULL,50,?)',(provider,pid,email,name,avatar,now()));uid=cur.lastrowid
-        c.commit();return uid
+            discord_id=pid if provider=='discord' else None
+            cur=c.execute(
+                'INSERT INTO users(provider,provider_user_id,discord_id,email,name,avatar_url,password_hash,credits,created_at) VALUES(?,?,?,?,?,?,NULL,50,?)',
+                (provider,pid,discord_id,email,name,avatar,now())
+            )
+            uid=cur.lastrowid
+
+        c.commit()
+        return uid
 
 oauth=OAuth(app)
 google=oauth.register(name='google',client_id=os.getenv('GOOGLE_CLIENT_ID'),client_secret=os.getenv('GOOGLE_CLIENT_SECRET'),server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',client_kwargs={'scope':'openid email profile'})
@@ -475,19 +709,30 @@ def auth_discord():
 
 @app.route('/auth/discord/callback')
 def discord_callback():
-    discord_oauth.authorize_access_token()
-    profile=discord_oauth.get('users/@me').json()
-    discord_id=str(profile.get('id') or '')
-    if not discord_id:
-        flash('Discord login failed. Please try again.','error')
+    try:
+        discord_oauth.authorize_access_token()
+        profile=discord_oauth.get('users/@me').json()
+
+        discord_id=str(profile.get('id') or '').strip()
+        if not discord_id:
+            raise ValueError('Discord did not return a user ID')
+
+        email=profile.get('email')
+        name=profile.get('global_name') or profile.get('username') or 'Veyra User'
+        avatar_hash=profile.get('avatar')
+        avatar=(
+            f"https://cdn.discordapp.com/avatars/{discord_id}/{avatar_hash}.png"
+            if avatar_hash else None
+        )
+
+        uid=upsert_oauth('discord',discord_id,email,name,avatar)
+        _finish_login(uid,remember=True)
+        return redirect(url_for('dashboard'))
+
+    except Exception:
+        app.logger.exception('Discord OAuth callback failed')
+        flash('Discord sign-in failed. Please try again.','error')
         return redirect(url_for('login'))
-    email=profile.get('email')
-    name=profile.get('global_name') or profile.get('username') or 'Veyra User'
-    avatar_hash=profile.get('avatar')
-    avatar=(f"https://cdn.discordapp.com/avatars/{discord_id}/{avatar_hash}.png" if avatar_hash else None)
-    uid=upsert_oauth('discord',discord_id,email,name,avatar)
-    _finish_login(uid, remember=True)
-    return redirect(url_for('dashboard'))
 
 
 
