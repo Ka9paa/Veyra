@@ -31,7 +31,13 @@ BASE=Path(__file__).resolve().parent
 load_dotenv(BASE/'.env')
 app=Flask(__name__)
 app.secret_key=os.getenv('FLASK_SECRET_KEY','local-dev-change-me')
-app.config.update(SESSION_COOKIE_HTTPONLY=True,SESSION_COOKIE_SAMESITE='Lax')
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=bool(os.getenv('VERCEL')),
+    SESSION_COOKIE_DOMAIN=os.getenv('SESSION_COOKIE_DOMAIN') or ('.buildveyra.xyz' if os.getenv('VERCEL') else None),
+    PERMANENT_SESSION_LIFETIME=60*60*24*30,
+)
 
 # Canonical public URL used by OAuth providers.
 # Keep this stable so Google/Discord callbacks do not change between Vercel hosts.
@@ -76,12 +82,53 @@ def init_db():
         )''')
         c.commit()
 
+def _cache_user(user):
+    if not user:
+        return
+    safe=dict(user)
+    # Never store password hashes in the signed browser session.
+    safe.pop('password_hash',None)
+    session['user_cache']=safe
+
+def _finish_login(uid, remember=True):
+    session.clear()
+    session['user_id']=int(uid)
+    session.permanent=bool(remember)
+    try:
+        with db() as c:
+            r=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
+            if r:
+                _cache_user(dict(r))
+                try:
+                    c.execute('UPDATE users SET last_active=? WHERE id=?',(now(),uid))
+                    c.commit()
+                except Exception:
+                    pass
+    except Exception:
+        app.logger.exception('Unable to refresh cached user after login')
+
 def current_user():
     uid=session.get('user_id')
-    if not uid:return None
-    with db() as c:
-        r=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
-        return dict(r) if r else None
+    if not uid:
+        return None
+
+    # Prefer fresh DB state, but do not destroy a valid login merely because
+    # a serverless instance cannot see the same temporary SQLite file.
+    try:
+        with db() as c:
+            r=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
+            if r:
+                user=dict(r)
+                _cache_user(user)
+                return user
+    except Exception:
+        app.logger.exception('current_user database lookup failed')
+
+    cached=session.get('user_cache')
+    if isinstance(cached,dict) and str(cached.get('id'))==str(uid):
+        return dict(cached)
+
+    return None
 
 def is_admin(user=None):
     user=user or current_user()
@@ -372,7 +419,8 @@ def signup_email():
     with db() as c:
         if c.execute("SELECT id FROM users WHERE provider='local' AND lower(email)=?",(email,)).fetchone():
             flash('An account with that email already exists.','error');return redirect(url_for('signup'))
-        cur=c.execute("INSERT INTO users(provider,provider_user_id,email,name,password_hash,credits,created_at) VALUES('local',?,?,?,?,50,?)",(email,email,name,generate_password_hash(pw),now()));c.commit();session.clear();session['user_id']=cur.lastrowid
+        cur=c.execute("INSERT INTO users(provider,provider_user_id,email,name,password_hash,credits,created_at) VALUES('local',?,?,?,?,50,?)",(email,email,name,generate_password_hash(pw),now()));c.commit();uid=cur.lastrowid
+    _finish_login(uid, remember=True)
     return redirect(url_for('dashboard'))
 @app.post('/login/email')
 def login_email():
@@ -380,11 +428,13 @@ def login_email():
     with db() as c:r=c.execute("SELECT * FROM users WHERE provider='local' AND lower(email)=?",(email,)).fetchone()
     if not r or not r['password_hash'] or not check_password_hash(r['password_hash'],pw):
         flash('Incorrect email or password.','error');return redirect(url_for('login'))
-    session.clear();session['user_id']=r['id'];
-    with db() as c:c.execute('UPDATE users SET last_active=? WHERE id=?',(now(),r['id']));c.commit()
+    remember=bool(request.form.get('remember'))
+    _finish_login(r['id'], remember=remember)
     return redirect(url_for('dashboard'))
 @app.route('/logout')
-def logout():session.clear();return redirect(url_for('home'))
+def logout():
+    session.clear()
+    return redirect(url_for('home'))
 
 @app.route('/auth/google')
 def auth_google():
@@ -411,11 +461,7 @@ def google_callback():
         info.get('name') or info.get('email') or 'Veyra User',
         info.get('picture')
     )
-    session.clear()
-    session['user_id']=uid
-    with db() as c:
-        c.execute('UPDATE users SET last_active=? WHERE id=?',(now(),uid))
-        c.commit()
+    _finish_login(uid, remember=True)
     return redirect(url_for('dashboard'))
 @app.route('/auth/discord')
 def auth_discord():
@@ -436,9 +482,7 @@ def discord_callback():
     avatar_hash=profile.get('avatar')
     avatar=(f"https://cdn.discordapp.com/avatars/{discord_id}/{avatar_hash}.png" if avatar_hash else None)
     uid=upsert_oauth('discord',discord_id,email,name,avatar)
-    session.clear()
-    session['user_id']=uid
-    with db() as c:c.execute('UPDATE users SET last_active=? WHERE id=?',(now(),uid));c.commit()
+    _finish_login(uid, remember=True)
     return redirect(url_for('dashboard'))
 
 
@@ -603,6 +647,38 @@ def admin_unrestrict(user_id):
         c.commit()
     admin_audit('unrestrict_user',user_id,{})
     return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/account')
+@login_required
+def account():
+    u=current_user()
+    if not u:
+        return redirect(url_for('login'))
+
+    project_count=0
+    try:
+        with db() as c:
+            row=c.execute(
+                'SELECT COUNT(*) AS n FROM projects WHERE user_id=?',
+                (u['id'],)
+            ).fetchone()
+            if row:
+                project_count=int(row['n'] or 0)
+    except Exception:
+        app.logger.exception('Account project count lookup failed')
+
+    stats={
+        'projects':project_count,
+        'credits':int(u.get('credits') or 0),
+        'plan':(u.get('plan') or 'free').lower(),
+    }
+
+    return render_template(
+        'account.html',
+        user=u,
+        stats=stats
+    )
 
 @app.route('/studio')
 @login_required
