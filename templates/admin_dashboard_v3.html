@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Veyra — Command Center{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='admin-v3.css') }}">
+<div class="v3-app" data-v3-root>
+  <aside class="v3-sidebar">
+    <div class="v3-brand"><div class="v3-mark">V</div><div><strong>VEYRA</strong><span>Command Center</span></div></div>
+    <div class="v3-org"><div class="v3-org-icon">VS</div><div><strong>Veyra Studios</strong><span>Production</span></div><button>⌄</button></div>
+    <nav class="v3-nav">
+      <p>Workspace</p>
+      <a href="#overview" class="active"><span>◈</span><b>Overview</b></a>
+      <a href="#users"><span>◎</span><b>Users</b><em>{{ stats.total_users|default(0) }}</em></a>
+      <a href="#projects"><span>◇</span><b>Projects</b></a>
+      <a href="#support"><span>◫</span><b>Support</b><em>{{ stats.open_support|default(0) }}</em></a>
+      <p>Operations</p>
+      <a href="#billing"><span>▤</span><b>Billing</b></a>
+      <a href="#credits"><span>◆</span><b>Credits</b></a>
+      <a href="#analytics"><span>▥</span><b>Analytics</b></a>
+      <a href="#moderation"><span>◉</span><b>Moderation</b></a>
+      <p>Platform</p>
+      <a href="#audit"><span>▣</span><b>Audit Log</b></a>
+      <a href="#integrations"><span>⌘</span><b>Integrations</b></a>
+      <a href="#flags"><span>⚑</span><b>Feature Flags</b></a>
+      <a href="#system"><span>◌</span><b>System Health</b></a>
+    </nav>
+    <div class="v3-sidebar-bottom"><div class="v3-online"><i></i>All systems operational</div><div class="v3-profile"><span class="v3-avatar">{{ (user.name or user.email or 'A')[0]|upper }}</span><div><strong>{{ user.name or 'Administrator' }}</strong><small>Super Admin</small></div><button>•••</button></div></div>
+  </aside>
+
+  <main class="v3-main">
+    <header class="v3-topbar"><div class="v3-command" id="commandTrigger"><span>⌕</span><span>Search anything or run a command…</span><kbd>⌘ K</kbd></div><div class="v3-top-actions"><button>＋</button><button class="notify">◔</button><button>☼</button></div></header>
+
+    <section id="overview" class="v3-section">
+      <div class="v3-title-row"><div><p class="kicker">VEYRA ADMINISTRATION</p><h1>Good evening, {{ user.name or 'Admin' }}.</h1><p>Everything happening across Veyra, in one place.</p></div><div class="v3-actions"><button class="ghost">Export report</button><button class="primary">＋ Create action</button></div></div>
+      <div class="v3-kpis">
+        {% set cards=[('Total users',stats.total_users|default(0),'+12.8%','purple'),('Paid users',stats.paid_users|default(0),'+18.2%','blue'),('Projects',stats.projects|default(0),'+7.4%','green'),('Monthly revenue',stats.monthly_revenue|default('$0'),'+24.6%','pink')] %}
+        {% for label,value,delta,color in cards %}<article class="v3-kpi {{color}}"><div><span>{{label}}</span><em>{{delta}}</em></div><strong>{{value}}</strong><small>Current platform total</small><svg viewBox="0 0 160 44" preserveAspectRatio="none"><path d="M0,36 C18,34 28,20 43,26 C60,33 65,11 82,17 C99,24 111,9 129,13 C145,17 151,7 160,5"/></svg></article>{% endfor %}
+      </div>
+    </section>
+
+    <section class="v3-two">
+      <article id="analytics" class="v3-card v3-analytics">
+        <div class="v3-card-head"><div><span class="eyebrow">PLATFORM GROWTH</span><h2>Usage overview</h2></div><div class="v3-segment"><button class="active">7D</button><button>30D</button><button>90D</button><button>1Y</button></div></div>
+        <div class="v3-chart"><div class="v3-y"><span>20K</span><span>15K</span><span>10K</span><span>5K</span><span>0</span></div><div class="v3-chart-inner"><svg viewBox="0 0 800 250" preserveAspectRatio="none"><defs><linearGradient id="fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#8b5cff" stop-opacity=".33"/><stop offset="100%" stop-color="#8b5cff" stop-opacity="0"/></linearGradient></defs><g class="grid"><line x1="0" y1="20" x2="800" y2="20"/><line x1="0" y1="75" x2="800" y2="75"/><line x1="0" y1="130" x2="800" y2="130"/><line x1="0" y1="185" x2="800" y2="185"/><line x1="0" y1="240" x2="800" y2="240"/></g><path class="area" d="M0,210 C70,195 90,202 150,169 C206,138 247,160 300,126 C360,92 405,128 465,89 C520,53 570,75 625,48 C690,17 745,44 800,21 L800,250 L0,250 Z"/><path class="line" d="M0,210 C70,195 90,202 150,169 C206,138 247,160 300,126 C360,92 405,128 465,89 C520,53 570,75 625,48 C690,17 745,44 800,21"/></svg><div class="v3-x"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div></div></div>
+        <div class="v3-mini"><div><span>AI builds</span><strong>{{stats.builds|default(0)}}</strong><small>+14.2%</small></div><div><span>Edits</span><strong>{{stats.edits|default(0)}}</strong><small>+9.8%</small></div><div><span>Exports</span><strong>{{stats.exports|default(0)}}</strong><small>+5.1%</small></div><div><span>Avg. session</span><strong>{{stats.avg_session|default('—')}}</strong><small>+3.4%</small></div></div>
+      </article>
+      <article id="system" class="v3-card"><div class="v3-card-head"><div><span class="eyebrow">LIVE STATUS</span><h2>System health</h2></div><span class="v3-live"><i></i>Live</span></div><div class="v3-health">{% for name,pct in [('Website',99),('Veyra AI',98),('Database',100),('Discord Bot',99),('Stripe',97)] %}<div><div><span>{{name}}</span><b>Operational</b></div><p><i style="width:{{pct}}%"></i></p></div>{% endfor %}</div><div class="v3-health-foot"><span>30-day uptime</span><strong>{{stats.uptime|default('99.98%')}}</strong></div></article>
+    </section>
+
+    <section id="users" class="v3-card v3-users">
+      <div class="v3-card-head users-head"><div><span class="eyebrow">ACCOUNT MANAGEMENT</span><h2>Users</h2><p>Plans, credits, access, and account status.</p></div><div class="v3-user-tools"><div class="v3-search"><span>⌕</span><input id="userSearch" placeholder="Search name, email, or ID…"></div><button class="ghost" data-filter-trigger>Filters ⌄</button><button class="primary">＋ Add user</button></div></div>
+      <div class="v3-filter-panel" data-filter-panel><button class="active" data-plan-filter="all">All plans</button><button data-plan-filter="free">Free</button><button data-plan-filter="pro">Pro</button><button data-plan-filter="max">Max</button><span></span><button class="active" data-status-filter="all">All statuses</button><button data-status-filter="active">Active</button><button data-status-filter="restricted">Restricted</button></div>
+      <div class="v3-table-wrap"><table class="v3-table"><thead><tr><th></th><th>User</th><th>Plan</th><th>Credits</th><th>Status</th><th>Joined</th><th>Last active</th><th></th></tr></thead><tbody>
+      {% for u in users|default([]) %}
+        <tr data-user-row data-plan="{{(u.plan or 'free')|lower}}" data-status="{{'restricted' if u.is_blacklisted else 'active'}}" data-search="{{((u.name or '')~' '~(u.email or '')~' '~u.id)|lower}}"><td><input type="checkbox"></td><td><div class="v3-user"><span class="v3-avatar">{{(u.name or u.email or 'U')[0]|upper}}</span><div><strong>{{u.name or 'Veyra User'}}</strong><small>{{u.email or 'No email'}}</small><em>ID {{u.id}}</em></div></div></td><td><form method="post" action="{{u.plan_action|default('#')}}" class="v3-plan-form"><input type="hidden" name="user_id" value="{{u.id}}"><input type="hidden" name="plan" value="{{u.plan or 'free'}}" data-plan-input><div class="v3-plan-menu" data-plan-menu><button type="button" class="v3-plan-trigger" data-plan-trigger><span class="v3-plan-pill {{(u.plan or 'free')|lower}}">{{(u.plan or 'free')|upper}}</span><span>⌄</span></button><div class="v3-plan-pop"><button type="button" data-plan-value="free"><span class="v3-plan-pill free">FREE</span><div><b>Free</b><small>Starter access</small></div></button><button type="button" data-plan-value="pro"><span class="v3-plan-pill pro">PRO</span><div><b>Pro</b><small>Advanced tools</small></div></button><button type="button" data-plan-value="max"><span class="v3-plan-pill max">MAX</span><div><b>Max</b><small>Highest limits</small></div></button></div></div><button class="mini-save">Save</button></form></td><td><form method="post" action="{{u.credit_action|default('#')}}" class="v3-credit-form"><input type="number" name="credits" value="{{u.credits|default(0)}}" min="0"><button class="mini-save">Save</button></form></td><td><span class="v3-status {{'restricted' if u.is_blacklisted else 'active'}}">{{'Restricted' if u.is_blacklisted else 'Active'}}</span></td><td>{{u.created_at|default('—')}}</td><td>{{u.last_active|default('—')}}</td><td><div class="v3-row-menu" data-row-menu><button type="button" data-row-trigger>•••</button><div class="v3-row-pop"><form method="post" action="{{u.add100_action|default('#')}}"><button>＋ Add 100 credits</button></form><form method="post" action="{{u.add1000_action|default('#')}}"><button>＋ Add 1,000 credits</button></form><button type="button">View account</button><button type="button">View projects</button><span></span>{% if u.is_blacklisted %}<form method="post" action="{{u.unrestrict_action|default('#')}}"><button class="good">Unrestrict account</button></form>{% else %}<form method="post" action="{{u.restrict_action|default('#')}}"><button class="danger">Restrict account</button></form>{% endif %}</div></div></td></tr>
+      {% else %}<tr><td colspan="8"><div class="v3-empty">No users available.</div></td></tr>{% endfor %}
+      </tbody></table></div>
+      <div class="v3-table-footer"><span>{{users|default([])|length}} users shown</span><div><button>←</button><button class="active">1</button><button>2</button><button>3</button><button>→</button></div></div>
+    </section>
+
+    <section class="v3-three">
+      <article id="credits" class="v3-card"><div class="v3-card-head"><div><span class="eyebrow">ECONOMY</span><h2>Credit usage</h2></div><button class="v3-link">View details →</button></div><strong class="v3-big">{{stats.credits_used|default(0)}}</strong><p class="muted">credits used this month</p><div class="v3-bars">{% for h in [28,42,37,55,49,70,63,76,61,83,72,91,78,95] %}<i style="height:{{h}}%"></i>{% endfor %}</div><div class="v3-breakdown"><div><span>Build generation</span><b>48%</b></div><div><span>Follow-up edits</span><b>26%</b></div><div><span>QA & repair</span><b>18%</b></div><div><span>Other</span><b>8%</b></div></div></article>
+      <article id="support" class="v3-card"><div class="v3-card-head"><div><span class="eyebrow">SUPPORT</span><h2>Recent requests</h2></div><button class="v3-link">View all →</button></div><div class="v3-feed">{% for t in support_threads|default([]) %}<div><span class="v3-feed-icon">?</span><div><strong>{{t.question|default('Support request')|truncate(52)}}</strong><small>{{t.answer|default('')|truncate(68)}}</small></div><em>{{t.created_at|default('')}}</em></div>{% else %}<div class="v3-empty">No recent support activity.</div>{% endfor %}</div></article>
+      <article id="integrations" class="v3-card"><div class="v3-card-head"><div><span class="eyebrow">CONNECTED SERVICES</span><h2>Integrations</h2></div></div><div class="v3-integrations">{% for code,name,desc in [('◉','Discord','Community & admin bot'),('S','Stripe','Billing & subscriptions'),('N','Neon','Production database'),('V','Veyra AI','Generation engine')] %}<div><span class="v3-brand-icon">{{code}}</span><div><strong>{{name}}</strong><small>{{desc}}</small></div><b>Connected</b></div>{% endfor %}</div></article>
+    </section>
+
+    <section class="v3-two bottom">
+      <article id="audit" class="v3-card"><div class="v3-card-head"><div><span class="eyebrow">SECURITY & ACCOUNTABILITY</span><h2>Admin audit log</h2></div><button class="v3-link">Export CSV</button></div><div class="v3-audit"><div class="head"><span>Time</span><span>Actor</span><span>Action</span><span>Target</span><span>Details</span></div>{% for a in audit_rows|default([]) %}<div><span>{{a.created_at|default('—')}}</span><span>{{a.actor_name|default(a.discord_admin_id|default('System'))}}</span><span><b>{{a.action|default('Action')}}</b></span><span>{{a.target_name|default(a.target_id|default('—'))}}</span><span>{{a.summary|default(a.details|default(''))}}</span></div>{% else %}<div class="v3-empty">No audit events available.</div>{% endfor %}</div></article>
+      <article id="moderation" class="v3-card"><div class="v3-card-head"><div><span class="eyebrow">SAFETY</span><h2>Moderation center</h2></div><span class="v3-count">{{stats.restricted|default(0)}} restricted</span></div><div class="v3-mod-grid"><button><span>◉</span><strong>Restricted users</strong><small>Review restrictions and reasons</small></button><button><span>⚑</span><strong>Reports</strong><small>Review abuse or misuse reports</small></button><button><span>▣</span><strong>Security events</strong><small>Inspect suspicious activity</small></button><button><span>⌁</span><strong>Rate limits</strong><small>Adjust platform protection</small></button></div></article>
+    </section>
+
+    <section id="flags" class="v3-card v3-flags"><div class="v3-card-head"><div><span class="eyebrow">CONTROL</span><h2>Feature flags</h2><p>Turn beta features on or off without rebuilding the interface.</p></div><button class="primary">＋ New flag</button></div><div class="v3-flag-grid">{% for name,desc,on in [('Discord Login','Allow Discord authentication',true),('Studio Auto QA','Run QA automatically after builds',true),('Direct Deployments','Beta hosting integrations',false),('Team Workspaces','Shared collaboration',false),('Veyra Agents','Experimental agent workflows',true),('Voice Builder','Voice input in Studio',true)] %}<div class="v3-flag"><div><strong>{{name}}</strong><small>{{desc}}</small></div><button type="button" class="v3-switch {{'on' if on else ''}}"><i></i></button></div>{% endfor %}</div></section>
+  </main>
+
+  <div class="v3-command-modal" data-command-modal><div class="v3-command-box"><div class="v3-command-input"><span>⌕</span><input placeholder="Search users, projects, actions, settings…"><kbd>ESC</kbd></div><div class="v3-command-list"><p>QUICK ACTIONS</p><button><span>＋</span><div><strong>Add credits</strong><small>Modify a user credit balance</small></div></button><button><span>◎</span><div><strong>Find user</strong><small>Search by name, email, or ID</small></div></button><button><span>⚑</span><div><strong>Review restricted accounts</strong><small>Open moderation center</small></div></button><button><span>▣</span><div><strong>Open audit log</strong><small>View administrator activity</small></div></button></div></div></div>
+</div>
+<script src="{{ url_for('static', filename='admin-v3.js') }}"></script>
+{% endblock %}
