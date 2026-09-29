@@ -6,197 +6,620 @@
 <title>Veyra Studio</title>
 <style>
 :root{
-  --bg:#07101f; --panel:#0b1426; --panel2:#0e1930; --line:#1f2a43;
-  --text:#f6f8ff; --muted:#8ea0c2; --purple:#8b42ff; --blue:#4f7dff; --green:#22d19b;
+  --bg:#07101f;
+  --bg2:#0a1324;
+  --panel:#0c1628;
+  --panel2:#101b31;
+  --line:#1f2d49;
+  --line2:#314263;
+  --text:#f7f9ff;
+  --muted:#8da0c1;
+  --muted2:#6f82a6;
+  --purple:#8e3cff;
+  --violet:#6e4dff;
+  --blue:#4c7dff;
+  --green:#25d3a0;
+  --shadow:0 20px 60px rgba(0,0,0,.28);
 }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:#050b16;color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-button,input,textarea{font:inherit}
+html,body{margin:0;height:100%;background:#050b15;color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 body{overflow:hidden}
-.app{height:100vh;display:grid;grid-template-columns:74px 455px minmax(0,1fr);grid-template-rows:68px minmax(0,1fr);background:
-radial-gradient(circle at 82% 7%,rgba(92,67,255,.10),transparent 24%),#07101f}
-.topbar{grid-column:1/-1;display:flex;align-items:center;gap:18px;border-bottom:1px solid var(--line);padding:0 18px;background:#07101f}
-.logo{display:flex;align-items:center;gap:10px;font-size:24px;font-weight:800;letter-spacing:-.03em}
-.mark{width:34px;height:26px;position:relative}
-.mark:before,.mark:after{content:"";position:absolute;width:14px;height:28px;border-radius:8px 8px 12px 12px;top:-1px;background:linear-gradient(180deg,#9a39ff,#4e76ff);transform:rotate(-38deg)}
-.mark:before{left:4px}.mark:after{left:16px;transform:rotate(38deg)}
-.top-center{margin:auto;display:flex;align-items:center;gap:10px}
-.tab,.project-select,.top-icon,.action{height:38px;border:1px solid #273353;background:#0d1628;color:#b9c5df;border-radius:10px;padding:0 14px}
-.tab.active{background:linear-gradient(180deg,#252259,#151c3b);border-color:#5c59ff;color:white;box-shadow:0 0 20px rgba(89,70,255,.2)}
-.project-select{min-width:210px;display:flex;align-items:center;justify-content:space-between}
-.top-actions{display:flex;gap:9px;align-items:center}
-.publish{height:40px;border:0;border-radius:11px;padding:0 20px;color:white;font-weight:800;background:linear-gradient(90deg,#8c35ff,#477dff);box-shadow:0 0 24px rgba(80,91,255,.22)}
-.rail{grid-row:2;grid-column:1;border-right:1px solid var(--line);padding:12px 8px;background:#081122;display:flex;flex-direction:column;align-items:center;gap:11px}
-.rail button{width:54px;height:60px;border:0;background:transparent;color:#9aa8c6;border-radius:13px;font-size:11px;display:grid;place-items:center;gap:4px}
-.rail button span{font-size:22px}.rail button.active{background:linear-gradient(180deg,#18255a,#111a38);color:white;box-shadow:inset 3px 0 #8c43ff}
-.rail .user{margin-top:auto;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:#15213e;border:1px solid #2b3b62}
-.chat{grid-row:2;grid-column:2;border-right:1px solid var(--line);background:linear-gradient(180deg,#0a1324,#081120);display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-width:0}
-.chat-head{height:72px;padding:12px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line)}
-.project-avatar{width:42px;height:42px;border-radius:50%;background:radial-gradient(circle at 45% 45%,#0b1230 10%,#5024a5 44%,#8f4aff 62%,#3a74ff 76%,transparent 78%);box-shadow:0 0 18px rgba(132,67,255,.5)}
-.chat-title b{display:block}.chat-title small{color:var(--muted)}
-.chat-menu{margin-left:auto;color:#9caaca}
-.messages{overflow:auto;padding:14px 14px 20px;scrollbar-width:thin}
-.msg{border:1px solid #1c2942;background:#0c1628;border-radius:16px;padding:14px;margin-bottom:10px}
-.msg.assistant{background:#0a1427}
-.msg-head{display:flex;gap:9px;align-items:center;margin-bottom:8px;font-size:13px}.avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#3157ff}.assistant .avatar{border-radius:10px;background:linear-gradient(145deg,#9a37ff,#477dff)}
-.msg time{color:#667897;font-size:11px}.msg p{margin:0;color:#d9e1f2;line-height:1.55;font-size:14px}
-.file-card{margin-top:12px;border:1px solid #2a3858;background:#101b32;border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px}
-.file-icon{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,#8f3cff,#536fff);display:grid;place-items:center}
-.file-meta small{display:block;color:#8091b1}.pill{margin-left:auto;padding:6px 10px;border-radius:999px;background:#0e513f;color:#b9ffe7;font-size:12px}
-.suggestions{padding:0 14px 8px;color:#8798b7;font-size:12px}.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:7px}
-.chip{border:1px solid #39496d;background:#0c1629;color:#dbe5ff;border-radius:999px;padding:7px 10px;font-size:12px}
-.composer{padding:10px 14px 14px}
-.compose-box{border:1px solid #41506f;border-radius:15px;background:#0b1426;box-shadow:0 0 0 1px rgba(90,73,255,.1);padding:11px}
-textarea{width:100%;height:70px;resize:none;border:0;outline:0;background:transparent;color:white}
+button,textarea{font:inherit}
+button{cursor:pointer}
+
+.app{
+  height:100vh;
+  display:grid;
+  grid-template-columns:76px 390px minmax(0,1fr) 315px;
+  grid-template-rows:72px minmax(0,1fr);
+  background:
+    radial-gradient(circle at 80% 0%,rgba(79,65,255,.10),transparent 26%),
+    linear-gradient(180deg,#081120,#07101f);
+}
+
+/* top */
+.topbar{
+  grid-column:1/-1;
+  display:flex;
+  align-items:center;
+  gap:18px;
+  padding:0 18px;
+  border-bottom:1px solid var(--line);
+  background:rgba(7,16,31,.96);
+  backdrop-filter:blur(16px);
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:220px;
+  font-size:24px;
+  font-weight:800;
+  letter-spacing:-.035em;
+}
+.veyra-logo{
+  width:34px;height:30px;position:relative;filter:drop-shadow(0 0 12px rgba(112,73,255,.35))
+}
+.veyra-logo span{
+  position:absolute;
+  top:2px;
+  width:13px;height:27px;
+  border-radius:8px 8px 11px 11px;
+  background:linear-gradient(180deg,#9c42ff 0%,#5c58ff 45%,#3f81ff 100%);
+}
+.veyra-logo .l{left:5px;transform:rotate(-31deg)}
+.veyra-logo .r{right:5px;transform:rotate(31deg)}
+.top-center{
+  margin:auto;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.top-btn,.project-select,.top-action{
+  height:40px;
+  border:1px solid #273654;
+  background:#0d1729;
+  color:#c8d3ea;
+  border-radius:11px;
+  padding:0 15px;
+  transition:.18s ease;
+}
+.top-btn:hover,.project-select:hover,.top-action:hover{border-color:#465b86;background:#111d34;color:#fff}
+.top-btn.active{
+  color:#fff;
+  border-color:#674dff;
+  background:linear-gradient(180deg,#282162,#151d3b);
+  box-shadow:0 0 22px rgba(105,72,255,.2);
+}
+.project-select{
+  width:220px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+.top-actions{display:flex;align-items:center;gap:9px}
+.publish{
+  height:42px;padding:0 22px;border:0;border-radius:12px;color:#fff;font-weight:800;
+  background:linear-gradient(90deg,#9639ff,#4b7fff);
+  box-shadow:0 0 28px rgba(88,83,255,.3);
+}
+
+/* rail */
+.rail{
+  grid-column:1;grid-row:2;
+  border-right:1px solid var(--line);
+  background:#081122;
+  padding:14px 8px;
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+}
+.rail-btn{
+  width:58px;height:62px;border:0;border-radius:14px;background:transparent;color:#8fa1c3;
+  display:grid;place-items:center;gap:4px;font-size:11px;position:relative
+}
+.rail-btn .ico{font-size:21px}
+.rail-btn:hover{background:#0f1a31;color:#fff}
+.rail-btn.active{
+  color:#fff;background:linear-gradient(180deg,#172354,#101933);
+  box-shadow:inset 3px 0 #9147ff;
+}
+.rail-user{
+  margin-top:auto;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;
+  background:#121d38;border:1px solid #2d3d61;color:#e2e9ff;font-weight:700
+}
+
+/* chat */
+.chat{
+  grid-column:2;grid-row:2;
+  min-width:0;
+  display:grid;
+  grid-template-rows:86px minmax(0,1fr) auto;
+  border-right:1px solid var(--line);
+  background:linear-gradient(180deg,#0a1426,#081120);
+}
+.chat-head{
+  display:flex;align-items:center;gap:12px;padding:16px 16px;border-bottom:1px solid var(--line)
+}
+.project-orb{
+  width:46px;height:46px;border-radius:50%;
+  background:radial-gradient(circle,#060916 26%,#32147b 47%,#8d46ff 65%,#477aff 77%,transparent 79%);
+  box-shadow:0 0 24px rgba(123,69,255,.42);
+}
+.chat-head b{display:block;font-size:15px}
+.chat-head small{color:var(--muted);font-size:12px}
+.agents{margin-left:auto;color:#a9b8d5;font-size:13px}
+.messages{overflow:auto;padding:14px;scrollbar-width:thin}
+.msg{
+  border:1px solid #1f2c47;background:#0d1729;border-radius:16px;padding:14px;margin-bottom:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.08)
+}
+.msg.assistant{background:linear-gradient(180deg,#0e1830,#0b1528)}
+.msg-head{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.avatar{
+  width:36px;height:36px;border-radius:50%;display:grid;place-items:center;
+  background:#3259ff;font-size:12px;font-weight:800
+}
+.assistant .avatar{
+  border-radius:11px;
+  background:linear-gradient(135deg,#993aff,#4a7cff);
+}
+.msg-head b{font-size:13px}
+.msg-head time{font-size:11px;color:#687a9c}
+.msg p{margin:0;color:#dde4f4;font-size:14px;line-height:1.55}
+.file-card{
+  margin-top:12px;padding:10px 11px;border:1px solid #2d3c5e;border-radius:12px;
+  display:flex;align-items:center;gap:10px;background:#111c33
+}
+.file-icon{
+  width:34px;height:34px;border-radius:9px;display:grid;place-items:center;
+  background:linear-gradient(135deg,#8e3cff,#5078ff)
+}
+.file-meta b{font-size:12px}.file-meta small{display:block;color:#8394b4;font-size:11px;margin-top:2px}
+.status-pill{
+  margin-left:auto;padding:6px 9px;border-radius:999px;font-size:11px;color:#c5ffe9;background:#0d563f
+}
+.bottom-chat{border-top:1px solid transparent}
+.suggest{padding:0 14px 10px;color:#8396b7;font-size:12px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.chip{
+  border:1px solid #35476d;background:#0b162a;color:#dbe5f8;border-radius:999px;padding:8px 11px;font-size:12px
+}
+.composer{padding:0 14px 14px}
+.compose-box{
+  border:1px solid #43557a;border-radius:16px;background:#0b1527;padding:11px;
+  box-shadow:0 0 0 1px rgba(95,76,255,.08),0 14px 30px rgba(0,0,0,.14)
+}
+textarea{
+  width:100%;height:66px;resize:none;border:0;outline:0;background:transparent;color:#fff;
+  line-height:1.45
+}
+textarea::placeholder{color:#7183a5}
 .compose-actions{display:flex;gap:7px;align-items:center}
-.mini{height:32px;padding:0 10px;border:1px solid #2a395a;border-radius:9px;background:#101a31;color:#c7d2ea;font-size:12px}
-.send{margin-left:auto;width:40px;height:40px;border:0;border-radius:10px;background:linear-gradient(135deg,#8d3cff,#4d7eff);color:white;font-size:20px}
-.workspace{grid-row:2;grid-column:3;min-width:0;display:grid;grid-template-rows:56px minmax(0,1fr);background:#07101f}
-.workspace-head{display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid var(--line)}
-.device{width:38px;height:34px;border:1px solid #293654;border-radius:9px;background:#0c1628;color:#a9b7d6}.device.active{background:linear-gradient(135deg,#6f3cff,#4b74ff);color:white}
-.live{margin:auto;border:1px solid #273657;border-radius:10px;padding:8px 55px;color:#d5dff3;font-size:12px;background:#081221}.live:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#23d39c;margin-right:8px}
-.preview-shell{position:relative;margin:12px;border:1px solid #273758;border-radius:16px;overflow:hidden;background:#08111f}
-.preview-frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#08111f}
-.preview-blur{position:absolute;inset:0;pointer-events:none;backdrop-filter:blur(5px);background:rgba(7,11,30,.22);transition:.25s}
-.preview-shell.ready .preview-blur{backdrop-filter:blur(2px);background:rgba(7,11,30,.08)}
-.preview-empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:40px;z-index:2}
-.preview-shell.ready .preview-empty{display:none}
-.preview-empty .orb{width:74px;height:74px;border-radius:50%;margin:auto;background:radial-gradient(circle,#05091a 35%,#5222a8 48%,#8c48ff 60%,#3d76ff 76%,transparent 78%);box-shadow:0 0 30px rgba(115,67,255,.6)}
-.preview-empty h2{font-size:24px;margin:18px 0 8px}.preview-empty p{color:#8fa1c3;margin:0}
-.status{position:absolute;bottom:14px;left:14px;font-size:11px;color:#71ddb8;z-index:3}
-@media(max-width:1100px){.app{grid-template-columns:64px 390px minmax(0,1fr)}}
-@media(max-width:850px){body{overflow:auto}.app{height:auto;min-height:100vh;grid-template-columns:64px 1fr;grid-template-rows:64px auto 650px}.chat{grid-column:2;grid-row:2}.workspace{grid-column:1/-1;grid-row:3}.top-center{display:none}.rail{grid-row:2}.top-actions .action{display:none}}
+.mini{
+  height:32px;border:1px solid #2b3a5a;border-radius:9px;background:#101a30;color:#cbd5e9;padding:0 9px;font-size:11px
+}
+.send{
+  margin-left:auto;width:41px;height:41px;border:0;border-radius:11px;color:#fff;font-size:20px;
+  background:linear-gradient(135deg,#963bff,#4a7cff);box-shadow:0 0 18px rgba(99,73,255,.3)
+}
+
+/* preview */
+.workspace{
+  grid-column:3;grid-row:2;
+  min-width:0;
+  display:grid;
+  grid-template-rows:62px minmax(0,1fr);
+  background:#07101f;
+}
+.workspace-head{
+  display:flex;align-items:center;gap:9px;padding:0 12px;border-bottom:1px solid var(--line)
+}
+.device{
+  width:39px;height:36px;border:1px solid #293957;border-radius:10px;background:#0c1729;color:#9eaecc
+}
+.device.active{
+  color:#fff;border-color:#6950ff;background:linear-gradient(135deg,#763cff,#5079ff);
+  box-shadow:0 0 18px rgba(94,76,255,.25)
+}
+.live{
+  margin:auto;padding:8px 34px;border:1px solid #2b3a5c;border-radius:10px;background:#091321;color:#d7e1f2;font-size:12px
+}
+.live::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#27d5a0;margin-right:8px}
+.preview-card{
+  margin:12px;border:1px solid #334666;border-radius:17px;overflow:hidden;position:relative;
+  background:
+    radial-gradient(circle at 54% 37%,rgba(136,55,255,.20),transparent 18%),
+    radial-gradient(circle at 92% 8%,rgba(64,82,255,.20),transparent 22%),
+    linear-gradient(180deg,#0b1330,#081120);
+  box-shadow:var(--shadow)
+}
+.preview-card::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(circle at 50% 46%,transparent 0 26%,rgba(104,68,255,.09) 26.3% 26.5%,transparent 26.8% 100%),
+    radial-gradient(circle at 50% 46%,transparent 0 40%,rgba(78,85,255,.07) 40.2% 40.4%,transparent 40.7% 100%);
+}
+.stars{
+  position:absolute;inset:0;opacity:.45;
+  background-image:
+    radial-gradient(circle at 10% 20%,#fff 0 1px,transparent 1.5px),
+    radial-gradient(circle at 25% 47%,#6ea0ff 0 1px,transparent 1.5px),
+    radial-gradient(circle at 70% 18%,#fff 0 1px,transparent 1.5px),
+    radial-gradient(circle at 82% 44%,#916dff 0 1px,transparent 1.5px),
+    radial-gradient(circle at 60% 72%,#fff 0 1px,transparent 1.5px),
+    radial-gradient(circle at 38% 80%,#4e7cff 0 1px,transparent 1.5px);
+}
+.empty{
+  position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:40px;z-index:2
+}
+.orb{
+  width:110px;height:110px;border-radius:50%;margin:auto;
+  background:radial-gradient(circle,#02040d 35%,#25115a 45%,#7d35ff 58%,#5a6fff 67%,#3da0ff 73%,transparent 75%);
+  box-shadow:0 0 34px rgba(126,62,255,.62),0 0 70px rgba(59,86,255,.18);
+  position:relative
+}
+.orb::after{
+  content:"";position:absolute;width:210px;height:80px;border:1px solid rgba(128,77,255,.55);
+  border-radius:50%;left:50%;top:52%;transform:translate(-50%,-50%) rotate(12deg);
+  box-shadow:0 0 16px rgba(104,67,255,.16)
+}
+.empty h1{font-size:31px;letter-spacing:-.03em;margin:25px 0 8px}
+.empty p{color:#9aaccc;font-size:16px;line-height:1.5;margin:0 auto;max-width:520px}
+.features{display:flex;gap:28px;justify-content:center;margin-top:30px;flex-wrap:wrap}
+.feature{display:flex;align-items:center;gap:10px;color:#c6d2e8;font-size:12px;text-align:left}
+.feature-ico{
+  width:42px;height:42px;border-radius:50%;display:grid;place-items:center;border:1px solid #5b45a5;
+  background:#111832;color:#af83ff
+}
+.preview-frame{position:absolute;inset:0;border:0;width:100%;height:100%;background:#07101f;z-index:1}
+.preview-card.ready .empty{display:none}
+.preview-card.ready .stars{display:none}
+.connection{
+  position:absolute;left:16px;bottom:15px;z-index:4;padding:8px 12px;border:1px solid #284162;
+  border-radius:10px;background:rgba(8,18,33,.82);color:#79e4bd;font-size:11px;backdrop-filter:blur(8px)
+}
+
+/* right QA */
+.qa{
+  grid-column:4;grid-row:2;
+  border-left:1px solid var(--line);
+  background:#081222;
+  padding:12px;
+  overflow:auto;
+}
+.qa-card{
+  border:1px solid #22324f;background:#0c1628;border-radius:15px;padding:14px;margin-bottom:11px
+}
+.qa-title{display:flex;align-items:center;justify-content:space-between;font-weight:800}
+.score-wrap{display:flex;gap:16px;align-items:center;margin-top:14px}
+.score{
+  width:78px;height:78px;border-radius:50%;display:grid;place-items:center;font-size:22px;font-weight:900;
+  background:
+    radial-gradient(circle,#0c1628 58%,transparent 59%),
+    conic-gradient(#4f7cff 0 60%,#8d3cff 60% 90%,#20d29b 90% 100%);
+}
+.score-copy b{display:block}.score-copy small{color:#7ee1bd}
+.metric{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid #1e2b45;font-size:13px}
+.metric:first-of-type{margin-top:12px}
+.good{color:#36d6a3}
+.qa-row{
+  display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid #1e2b45;font-size:13px
+}
+.qa-row .qico{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:#111e39;color:#ad83ff}
+.deploy{
+  width:100%;height:44px;border:0;border-radius:11px;color:#fff;font-weight:800;
+  background:linear-gradient(90deg,#8f37ff,#4c81ff)
+}
+
+@media(max-width:1380px){
+  .app{grid-template-columns:70px 360px minmax(0,1fr)}
+  .qa{display:none}
+}
+@media(max-width:1000px){
+  body{overflow:auto}
+  .app{height:auto;min-height:100vh;grid-template-columns:64px 1fr;grid-template-rows:64px auto 700px}
+  .top-center{display:none}
+  .chat{grid-column:2;grid-row:2}
+  .workspace{grid-column:1/-1;grid-row:3}
+  .rail{grid-row:2}
+  .top-actions .top-action{display:none}
+}
 </style>
 </head>
 <body>
 <div class="app">
-  <header class="topbar">
-    <div class="logo"><span class="mark"></span>Veyra</div>
-    <div class="top-center">
-      <button class="tab">▣ Dashboard</button>
-      <button class="tab active">▤ Preview</button>
-      <button class="project-select">Untitled Project <span>⌄</span></button>
-      <button class="top-icon">▣</button><button class="top-icon">↻</button>
-    </div>
-    <div class="top-actions">
-      <button class="action">⌘ K</button><button class="action" id="saveBtn">Save</button><button class="action">Share</button><button class="action">Export</button><button class="publish">Publish</button>
-    </div>
-  </header>
+<header class="topbar">
+  <div class="brand">
+    <div class="veyra-logo"><span class="l"></span><span class="r"></span></div>
+    <span>Veyra</span>
+  </div>
 
-  <aside class="rail">
-    <button class="active"><span>☵</span>Chat</button>
-    <button><span>▦</span>Design</button>
-    <button><span>▤</span>Pages</button>
-    <button><span>⬡</span>Components</button>
-    <button><span>◉</span>Data</button>
-    <button><span>⌘</span>Integrations</button>
-    <button><span>⚙</span>Settings</button>
-    <div class="user">{{ (user.name or user.email or 'U')[:2]|upper if user else 'U' }}</div>
-  </aside>
+  <div class="top-center">
+    <button class="top-btn">▣ Dashboard</button>
+    <button class="top-btn active">▤ Preview</button>
+    <button class="project-select"><span id="topProjectName">Untitled Project</span><span>⌄</span></button>
+    <button class="top-btn">▣</button>
+    <button class="top-btn">↻</button>
+  </div>
 
-  <section class="chat">
-    <div class="chat-head">
-      <div class="project-avatar"></div>
-      <div class="chat-title"><b id="projectTitle">Untitled Project</b><small>AI website builder</small></div>
-      <div class="chat-menu">Agents⌄ &nbsp; ＋</div>
-    </div>
+  <div class="top-actions">
+    <button class="top-action">⌘ K</button>
+    <button class="top-action" id="saveBtn">Save</button>
+    <button class="top-action">Share</button>
+    <button class="top-action">Export</button>
+    <button class="publish">Publish →</button>
+  </div>
+</header>
 
-    <div class="messages" id="messages">
-      <div class="msg">
-        <div class="msg-head"><div class="avatar">{{ (user.name or user.email or 'U')[:2]|upper if user else 'U' }}</div><b>You</b><time>now</time></div>
-        <p>Create a modern website or web app. Tell Veyra what you want and it will build the live preview here.</p>
+<aside class="rail">
+  <button class="rail-btn active"><span class="ico">▤</span><span>Chat</span></button>
+  <button class="rail-btn"><span class="ico">▦</span><span>Design</span></button>
+  <button class="rail-btn"><span class="ico">▧</span><span>Pages</span></button>
+  <button class="rail-btn"><span class="ico">⬡</span><span>Components</span></button>
+  <button class="rail-btn"><span class="ico">◉</span><span>Data</span></button>
+  <button class="rail-btn"><span class="ico">⌘</span><span>Integrations</span></button>
+  <button class="rail-btn"><span class="ico">⚙</span><span>Settings</span></button>
+  <div class="rail-user">{{ (user.name or user.email or 'VE')[:2]|upper if user else 'VE' }}</div>
+</aside>
+
+<section class="chat">
+  <div class="chat-head">
+    <div class="project-orb"></div>
+    <div><b id="projectTitle">Untitled Project</b><small>AI website builder</small></div>
+    <div class="agents">Agents⌄ &nbsp; ＋</div>
+  </div>
+
+  <div class="messages" id="messages">
+    <div class="msg">
+      <div class="msg-head">
+        <div class="avatar">{{ (user.name or user.email or 'VE')[:2]|upper if user else 'VE' }}</div>
+        <b>You</b><time>now</time>
       </div>
-      <div class="msg assistant">
-        <div class="msg-head"><div class="avatar">V</div><b>Veyra Assistant</b><time>ready</time></div>
-        <p>I’m ready. Describe the product, layout, or change you want and I’ll update the same project instead of restarting it.</p>
+      <p>Create a modern website or web app. Tell Veyra what you want and it will build the live preview here.</p>
+    </div>
+
+    <div class="msg assistant">
+      <div class="msg-head">
+        <div class="avatar">✦</div>
+        <b>Veyra Assistant</b><time>ready</time>
+      </div>
+      <p>I’m ready. Describe the product, layout, or change you want and I’ll update the same project instead of restarting it.</p>
+    </div>
+  </div>
+
+  <div class="bottom-chat">
+    <div class="suggest">
+      ✦ Suggested next steps
+      <div class="chips">
+        <button class="chip" data-prompt="Create a premium SaaS landing page">✦ SaaS landing page</button>
+        <button class="chip" data-prompt="Create a modern portfolio website">▣ Portfolio</button>
+        <button class="chip" data-prompt="Create a dark analytics dashboard">▥ Dashboard</button>
+        <button class="chip" data-prompt="Create a modern ecommerce storefront">🛒 E-commerce</button>
       </div>
     </div>
 
-    <div>
-      <div class="suggestions">✦ Suggested next steps
-        <div class="chips">
-          <button class="chip" data-prompt="Create a premium SaaS landing page">SaaS landing page</button>
-          <button class="chip" data-prompt="Create a modern portfolio website">Portfolio</button>
-          <button class="chip" data-prompt="Create a dark analytics dashboard">Dashboard</button>
+    <div class="composer">
+      <div class="compose-box">
+        <textarea id="prompt" placeholder="Ask Veyra to build, redesign, debug, or improve anything..."></textarea>
+        <div class="compose-actions">
+          <button class="mini">＋</button>
+          <button class="mini">◉ Web Search</button>
+          <button class="mini">▧ Visual Edit</button>
+          <button class="mini">&lt;/&gt; Code</button>
+          <button class="send" id="sendBtn">→</button>
         </div>
       </div>
-      <div class="composer">
-        <div class="compose-box">
-          <textarea id="prompt" placeholder="Ask Veyra to build, redesign, debug, or improve anything..."></textarea>
-          <div class="compose-actions">
-            <button class="mini">＋</button><button class="mini">◉ Web Search</button><button class="mini">✦ Visual Edit</button><button class="mini">⌘ Code</button><button class="mini">◉</button>
-            <button class="send" id="sendBtn">→</button>
-          </div>
-        </div>
-      </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <main class="workspace">
-    <div class="workspace-head">
-      <button class="device active">▰</button><button class="device">▯</button><button class="device">▯</button>
-      <div class="live">Live Preview</div>
-      <button class="device">⛶</button><button class="device">↻</button><button class="device">⌁</button>
-    </div>
-    <div class="preview-shell" id="previewShell">
-      <iframe class="preview-frame" id="preview"></iframe>
-      <div class="preview-blur"></div>
-      <div class="preview-empty">
-        <div>
-          <div class="orb"></div>
-          <h2>Your build appears here</h2>
-          <p>Start with a prompt and Veyra will generate the live project preview.</p>
+<main class="workspace">
+  <div class="workspace-head">
+    <button class="device active">▰</button>
+    <button class="device">▯</button>
+    <button class="device">▯</button>
+    <div class="live">Live Preview</div>
+    <button class="device">⛶</button>
+    <button class="device">↻</button>
+    <button class="device">•••</button>
+  </div>
+
+  <div class="preview-card" id="previewCard">
+    <div class="stars"></div>
+    <iframe class="preview-frame" id="preview"></iframe>
+
+    <div class="empty">
+      <div>
+        <div class="orb"></div>
+        <h1>Your build appears here</h1>
+        <p>Start with a prompt and Veyra will generate the live project preview.</p>
+
+        <div class="features">
+          <div class="feature"><div class="feature-ico">▱</div><span>AI-powered<br>website builder</span></div>
+          <div class="feature"><div class="feature-ico">⚡</div><span>Real-time<br>live preview</span></div>
+          <div class="feature"><div class="feature-ico">✦</div><span>Iterate, refine<br>and publish</span></div>
         </div>
       </div>
-      <div class="status" id="status">● Veyra connected</div>
     </div>
-  </main>
+
+    <div class="connection" id="connection">● Veyra connected</div>
+  </div>
+</main>
+
+<aside class="qa">
+  <div class="qa-card">
+    <div class="qa-title"><span>◇ Veyra Quality</span><span>→</span></div>
+    <div class="score-wrap">
+      <div class="score" id="qualityScore">92</div>
+      <div class="score-copy"><b>Overall Score</b><small>● Looks good</small></div>
+    </div>
+    <div class="metric"><span>◇ Performance</span><span class="good">96</span></div>
+    <div class="metric"><span>◇ SEO</span><span class="good">88</span></div>
+    <div class="metric"><span>◇ Accessibility</span><span class="good">92</span></div>
+    <div class="metric"><span>◇ Best Practices</span><span class="good">90</span></div>
+  </div>
+
+  <div class="qa-card">
+    <div class="qa-title"><span>⚒ QA & Auto Fix</span><span>☷</span></div>
+    <div class="qa-row"><div class="qico">✓</div><div><b>No critical issues</b><br><small style="color:#8294b5">Your project is in great shape.</small></div></div>
+    <div class="qa-row"><div class="qico">▷</div><span>Run full audit</span><span style="margin-left:auto">›</span></div>
+    <div class="qa-row"><div class="qico">✦</div><span>Auto fix issues</span><span style="margin-left:auto">›</span></div>
+    <div class="qa-row"><div class="qico">◉</div><span>View suggestions</span><span style="margin-left:auto">3</span></div>
+  </div>
+
+  <div class="qa-card">
+    <div class="qa-title"><span>☁ Deploy</span></div>
+    <div class="qa-row"><div class="qico">✓</div><div><b>Ready to publish</b><br><small style="color:#8294b5">Deploy to a custom domain in one click.</small></div></div>
+    <button class="deploy">☁ Publish to live site</button>
+  </div>
+</aside>
 </div>
 
 <script>
 const state={title:"Untitled Project",html:"",css:"",js:"",project_id:null};
-const promptEl=document.getElementById("prompt"), sendBtn=document.getElementById("sendBtn"),
-messages=document.getElementById("messages"), frame=document.getElementById("preview"),
-shell=document.getElementById("previewShell"), statusEl=document.getElementById("status"),
-titleEl=document.getElementById("projectTitle");
 
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
-function addMsg(kind,text,card){
-  const el=document.createElement("div"); el.className="msg "+(kind==="assistant"?"assistant":"");
-  el.innerHTML=`<div class="msg-head"><div class="avatar">${kind==="assistant"?"V":"{{ (user.name or user.email or 'U')[:2]|upper if user else 'U' }}"}</div><b>${kind==="assistant"?"Veyra Assistant":"You"}</b><time>now</time></div><p>${escapeHtml(text)}</p>`+
-    (card?`<div class="file-card"><div class="file-icon">▤</div><div class="file-meta"><b>${escapeHtml(card)}</b><small>Live project update</small></div><span class="pill">✓ Updated</span></div>`:"");
-  messages.appendChild(el); messages.scrollTop=messages.scrollHeight;
+const promptEl=document.getElementById("prompt");
+const sendBtn=document.getElementById("sendBtn");
+const messages=document.getElementById("messages");
+const frame=document.getElementById("preview");
+const previewCard=document.getElementById("previewCard");
+const connection=document.getElementById("connection");
+const projectTitle=document.getElementById("projectTitle");
+const topProjectName=document.getElementById("topProjectName");
+
+function esc(v){
+  return String(v??"").replace(/[&<>"']/g,m=>({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[m]));
 }
-function render(){
-  const src=`<!doctype html><html><head><meta charset="utf-8"><style>${state.css||""}</style></head><body>${state.html||""}<script>${(state.js||"").replace(/<\/script>/gi,"<\\/script>")}<\/script></body></html>`;
-  frame.srcdoc=src; shell.classList.add("ready");
+
+function addMessage(role,text,cardTitle){
+  const el=document.createElement("div");
+  el.className="msg "+(role==="assistant"?"assistant":"");
+  el.innerHTML=`
+    <div class="msg-head">
+      <div class="avatar">${role==="assistant"?"✦":"{{ (user.name or user.email or 'VE')[:2]|upper if user else 'VE' }}"}</div>
+      <b>${role==="assistant"?"Veyra Assistant":"You"}</b>
+      <time>now</time>
+    </div>
+    <p>${esc(text)}</p>
+    ${cardTitle?`
+      <div class="file-card">
+        <div class="file-icon">▤</div>
+        <div class="file-meta">
+          <b>${esc(cardTitle)}</b>
+          <small>Live project update</small>
+        </div>
+        <span class="status-pill">✓ Updated</span>
+      </div>`:""}
+  `;
+  messages.appendChild(el);
+  messages.scrollTop=messages.scrollHeight;
 }
-async function build(text){
-  if(!text.trim()) return;
-  addMsg("user",text); promptEl.value=""; sendBtn.disabled=true; statusEl.textContent="● Veyra building...";
+
+function renderPreview(){
+  const safeJs=(state.js||"").replace(/<\/script>/gi,"<\\/script>");
+  frame.srcdoc=`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>${state.css||""}</style>
+</head>
+<body>
+${state.html||""}
+<script>${safeJs}<\/script>
+</body>
+</html>`;
+  previewCard.classList.add("ready");
+}
+
+async function build(prompt){
+  prompt=(prompt||"").trim();
+  if(!prompt) return;
+
+  addMessage("user",prompt);
+  promptEl.value="";
+  sendBtn.disabled=true;
+  connection.textContent="● Veyra building...";
+
   try{
-    const r=await fetch("/api/build",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:text,current:{html:state.html,css:state.css,js:state.js}})});
-    const d=await r.json();
-    if(!r.ok||!d.ok) throw new Error(d.error||"Build failed");
-    state.title=d.title||state.title; state.html=d.html||""; state.css=d.css||""; state.js=d.js||"";
-    titleEl.textContent=state.title; render();
-    addMsg("assistant",d.assistant_message||"Done — I updated the project.",state.title);
-    statusEl.textContent="● Veyra connected";
-  }catch(e){
-    addMsg("assistant","I couldn’t complete that build: "+e.message);
-    statusEl.textContent="● Build error";
-  }finally{sendBtn.disabled=false}
+    const res=await fetch("/api/build",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        prompt,
+        current:{
+          html:state.html,
+          css:state.css,
+          js:state.js
+        }
+      })
+    });
+
+    const data=await res.json();
+
+    if(!res.ok || data.ok===false){
+      throw new Error(data.error||"Build failed");
+    }
+
+    state.title=data.title||state.title;
+    state.html=data.html||"";
+    state.css=data.css||"";
+    state.js=data.js||"";
+
+    projectTitle.textContent=state.title;
+    topProjectName.textContent=state.title;
+    renderPreview();
+
+    addMessage(
+      "assistant",
+      data.assistant_message||"Done — I updated the project and refreshed the live preview.",
+      state.title
+    );
+
+    connection.textContent="● Veyra connected";
+  }catch(err){
+    addMessage("assistant","I couldn’t complete that build: "+err.message);
+    connection.textContent="● Build error";
+  }finally{
+    sendBtn.disabled=false;
+  }
 }
+
 sendBtn.addEventListener("click",()=>build(promptEl.value));
-promptEl.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();build(promptEl.value)}});
-document.querySelectorAll("[data-prompt]").forEach(b=>b.addEventListener("click",()=>build(b.dataset.prompt)));
+
+promptEl.addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&!e.shiftKey){
+    e.preventDefault();
+    build(promptEl.value);
+  }
+});
+
+document.querySelectorAll("[data-prompt]").forEach(btn=>{
+  btn.addEventListener("click",()=>build(btn.dataset.prompt));
+});
 
 document.getElementById("saveBtn").addEventListener("click",async()=>{
+  connection.textContent="● Saving...";
   try{
-    const r=await fetch("/api/projects/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({project_id:state.project_id,title:state.title,description:"Built with Veyra",html:state.html,css:state.css,js:state.js})});
-    const d=await r.json(); if(d.id) state.project_id=d.id;
-    statusEl.textContent=d.ok===false?"● Save failed":"● Project saved";
-  }catch{statusEl.textContent="● Save failed"}
+    const res=await fetch("/api/projects/save",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        project_id:state.project_id,
+        title:state.title,
+        description:"Built with Veyra",
+        html:state.html,
+        css:state.css,
+        js:state.js
+      })
+    });
+    const data=await res.json();
+    if(data.id) state.project_id=data.id;
+    connection.textContent=data.ok===false?"● Save failed":"● Project saved";
+  }catch{
+    connection.textContent="● Save failed";
+  }
 });
 </script>
 </body>
