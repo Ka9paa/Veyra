@@ -1,1 +1,203 @@
-{% extends "base.html" %}{% set active='studio' %}{% block title %}Veyra Studio{% endblock %}{% block body %}<div class="v16-app studio-app">{% include '_sidebar.html' %}<div class="v10utility" id="v10Utility"><button id="globalSearchBtn">⌕ Search</button><button id="quickAddBtn">＋ Quick Add</button><button id="notifBtn">◉ <span>3</span></button><button id="activityBtn">Activity</button><a href="/feature-lab">Veyra Lab · 1000</a></div><main class="studio"><header class="apptop"><div class="v26-project-head"><button id="projectName">Untitled Project</button><small id="saveState">Ready</small><i class="v26-live-dot"></i></div><div class="studio-tabs" aria-label="Workspace views"><button class="active" data-view="preview">Preview</button><button data-view="code">Code</button><button data-view="structure">Structure</button><button data-view="data">Data</button></div><div class="v24-studio-actions"><button id="commandBtn">⌘ K</button><button id="saveProjectBtn">Save</button><button id="shareProjectBtn">Share</button><button id="exportProjectBtn">Export</button><button class="purple" id="deployProjectBtn">Deploy</button></div></header><section class="studiobody"><section class="chatpanel"><div class="chathead"><div><span></span><b>Veyra</b><small>AI software engineer</small></div><a href="/app/agents">Agents ↗</a></div><div class="messages" id="messages"><div class="aimsg"><span class="orb chatorb"><i></i></span><div><b>Veyra</b><p>Tell me what you want to build. I’ll create the actual preview, keep the current code as context, and run product checks after each generation.</p></div></div><div class="quickprompts"><button data-prompt="Build a premium SaaS analytics dashboard with a futuristic violet and blue design, realistic cards and charts, and responsive navigation">SaaS dashboard</button><button data-prompt="Build a luxury creative portfolio with editorial typography, case-study cards, and smooth responsive layout">Portfolio</button><button data-prompt="Build a futuristic AI startup landing page with hero, product sections, pricing, testimonials, FAQ, and calls to action">AI startup</button><button data-prompt="Build a modern ecommerce storefront with filters, product cards, cart interactions, and a checkout preview">Storefront</button></div></div><div class="building hidden" id="building"><i></i><div><b>Veyra is building</b><span id="buildText">Planning product…</span></div><div class="buildbars"><em class="on"></em><em></em><em></em><em></em><em></em></div></div><div class="promptbox"><textarea id="prompt" placeholder="Ask Veyra to build, redesign, debug, or improve anything…"></textarea><div><span><button>＋</button><button id="voice">🎙 Voice</button><button>⌁ Context</button><button>✦ Veyra Auto</button></span><button class="send" id="send">➜</button></div><div class="listening hidden" id="listening"><b></b><span>Listening…</span><i></i><i></i><i></i><button id="stopVoice">Stop</button></div></div></section><section class="resultpanel"><div class="resultbar"><div><button class="active" data-device="desktop">▣</button><button data-device="tablet">▯</button><button data-device="mobile">▥</button></div><span>● <b id="previewTitle">Live Preview</b></span><div><button id="focusPreviewBtn" title="Focus preview">⛶</button><button id="refresh">↻</button><button id="open">↗</button></div></div><div class="view active" id="previewView"><div class="iframewrap desktop empty" id="iframewrap"><div class="preview-loading hidden" id="previewLoading"><div class="preview-loading-card"><div class="preview-loading-top"><span></span><span></span><span></span><b>Veyra preview is loading</b></div><div class="preview-loading-body"><div class="preview-loading-hero"></div><div class="preview-loading-row"><i></i><i></i><i></i></div><div class="preview-loading-grid"><div></div><div></div><div></div><div></div></div></div><div class="preview-loading-foot"><em></em><em></em><em></em><p id="previewLoadingText">Planning the preview…</p></div></div></div><iframe id="frame" sandbox="allow-scripts"></iframe></div><div class="empty" id="empty"><div class="empty-shell"><div class="empty-shell-top"><span></span><span></span><span></span><b>Live preview</b></div><div class="empty-shell-body"><div class="empty-shell-hero"></div><div class="empty-shell-cards"><i></i><i></i><i></i></div></div></div><span class="orb emptyorb"><i></i></span><h2>Your build appears here.</h2><p>Start with a prompt, choose a starter, or ask Veyra to redesign the current product.</p></div></div><div class="view" id="codeView"><div class="codebar"><div><button class="active" data-file="html">index.html</button><button data-file="css">styles.css</button><button data-file="js">app.js</button></div><button id="copyCode">Copy</button></div><pre id="code">// Build something first.</pre></div><div class="view" id="structureView"><div class="structure"><article><header>Project files <button>＋</button></header><div id="files">No generated files yet.</div></article><article><header>Component map <button>Auto</button></header><div id="graph" class="graphempty">Generate a project to map its structure.</div></article></div></div><div class="view" id="dataView"><div class="datastudio"><aside><button class="active">Users</button><button>Products</button><button>Analytics</button><button>Custom</button><a href="/app/data-studio">Open Data Studio ↗</a></aside><main><header><b>Mock Users</b><button>＋ Generate</button></header><table><tr><th>Name</th><th>Email</th><th>Plan</th><th>Status</th></tr><tr><td>Avery Morgan</td><td>avery@example.com</td><td>Pro</td><td><span>Active</span></td></tr><tr><td>Jordan Lee</td><td>jordan@example.com</td><td>Team</td><td><span>Active</span></td></tr><tr><td>Sam Rivera</td><td>sam@example.com</td><td>Free</td><td>Trial</td></tr></table></main></div></div></section><aside class="quality" id="qualityPanel"><button class="v23-quality-toggle" id="qualityToggle" title="Hide inspector">›</button><div class="qualitytabs"><button class="active">Quality</button><a href="/app/flows">Flow</a><a href="/app/settings">AI</a></div><section><header><b>Veyra Quality</b><strong id="overall">—</strong></header><p><span>Accessibility</span><b id="qa">—</b></p><p><span>Performance</span><b id="qp">—</b></p><p><span>Responsive</span><b id="qr">—</b></p><p><span>Security</span><b id="qs">—</b></p></section><section><header><b>Auto QA</b><button id="runqa">Run</button></header><div id="qaitems"><p>○ Semantic structure</p><p>○ Accessibility audit</p><p>○ Responsive states</p><p>○ Interaction checks</p></div></section><section><header><b>Auto Fix</b><small>BETA</small></header><p class="subcopy">Let Veyra inspect spacing, responsiveness, accessibility, and interaction quality.</p><button class="autofix" id="autofix">✦ Fix project</button></section><section><header><b>Project memory</b><a href="/app/projects">View</a></header><p class="subcopy">Veyra includes the current HTML, CSS, and JavaScript when you ask for edits.</p></section></aside></section><footer class="appstatus"><div>● Veyra connected</div><div><button>⌘ Console</button><button>✓ Tasks</button><button>⚠ Issues 0</button></div><span id="engine">Veyra ready</span></footer></main></div><div class="command hidden" id="command"><div><input id="cmdinput" placeholder="Search Veyra commands…"><button data-cmd="prompt">✦ Focus prompt</button><button data-cmd="qa">✓ Run QA</button><button data-cmd="code">⌘ Open code</button><button data-cmd="preview">↗ Open preview</button></div></div><div class="v10drawer hidden" id="v10Drawer"><div class="v10drawerHead"><div><small>VEYRA LAB</small><b id="drawerTitle">Quick tools</b></div><button id="drawerClose">×</button></div><div class="v10drawerBody" id="drawerBody"></div></div><div class="v10overlay hidden" id="v10Overlay"></div>{% endblock %}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Veyra Studio</title>
+<style>
+:root{
+  --bg:#07101f; --panel:#0b1426; --panel2:#0e1930; --line:#1f2a43;
+  --text:#f6f8ff; --muted:#8ea0c2; --purple:#8b42ff; --blue:#4f7dff; --green:#22d19b;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#050b16;color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,textarea{font:inherit}
+body{overflow:hidden}
+.app{height:100vh;display:grid;grid-template-columns:74px 455px minmax(0,1fr);grid-template-rows:68px minmax(0,1fr);background:
+radial-gradient(circle at 82% 7%,rgba(92,67,255,.10),transparent 24%),#07101f}
+.topbar{grid-column:1/-1;display:flex;align-items:center;gap:18px;border-bottom:1px solid var(--line);padding:0 18px;background:#07101f}
+.logo{display:flex;align-items:center;gap:10px;font-size:24px;font-weight:800;letter-spacing:-.03em}
+.mark{width:34px;height:26px;position:relative}
+.mark:before,.mark:after{content:"";position:absolute;width:14px;height:28px;border-radius:8px 8px 12px 12px;top:-1px;background:linear-gradient(180deg,#9a39ff,#4e76ff);transform:rotate(-38deg)}
+.mark:before{left:4px}.mark:after{left:16px;transform:rotate(38deg)}
+.top-center{margin:auto;display:flex;align-items:center;gap:10px}
+.tab,.project-select,.top-icon,.action{height:38px;border:1px solid #273353;background:#0d1628;color:#b9c5df;border-radius:10px;padding:0 14px}
+.tab.active{background:linear-gradient(180deg,#252259,#151c3b);border-color:#5c59ff;color:white;box-shadow:0 0 20px rgba(89,70,255,.2)}
+.project-select{min-width:210px;display:flex;align-items:center;justify-content:space-between}
+.top-actions{display:flex;gap:9px;align-items:center}
+.publish{height:40px;border:0;border-radius:11px;padding:0 20px;color:white;font-weight:800;background:linear-gradient(90deg,#8c35ff,#477dff);box-shadow:0 0 24px rgba(80,91,255,.22)}
+.rail{grid-row:2;grid-column:1;border-right:1px solid var(--line);padding:12px 8px;background:#081122;display:flex;flex-direction:column;align-items:center;gap:11px}
+.rail button{width:54px;height:60px;border:0;background:transparent;color:#9aa8c6;border-radius:13px;font-size:11px;display:grid;place-items:center;gap:4px}
+.rail button span{font-size:22px}.rail button.active{background:linear-gradient(180deg,#18255a,#111a38);color:white;box-shadow:inset 3px 0 #8c43ff}
+.rail .user{margin-top:auto;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:#15213e;border:1px solid #2b3b62}
+.chat{grid-row:2;grid-column:2;border-right:1px solid var(--line);background:linear-gradient(180deg,#0a1324,#081120);display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-width:0}
+.chat-head{height:72px;padding:12px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line)}
+.project-avatar{width:42px;height:42px;border-radius:50%;background:radial-gradient(circle at 45% 45%,#0b1230 10%,#5024a5 44%,#8f4aff 62%,#3a74ff 76%,transparent 78%);box-shadow:0 0 18px rgba(132,67,255,.5)}
+.chat-title b{display:block}.chat-title small{color:var(--muted)}
+.chat-menu{margin-left:auto;color:#9caaca}
+.messages{overflow:auto;padding:14px 14px 20px;scrollbar-width:thin}
+.msg{border:1px solid #1c2942;background:#0c1628;border-radius:16px;padding:14px;margin-bottom:10px}
+.msg.assistant{background:#0a1427}
+.msg-head{display:flex;gap:9px;align-items:center;margin-bottom:8px;font-size:13px}.avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#3157ff}.assistant .avatar{border-radius:10px;background:linear-gradient(145deg,#9a37ff,#477dff)}
+.msg time{color:#667897;font-size:11px}.msg p{margin:0;color:#d9e1f2;line-height:1.55;font-size:14px}
+.file-card{margin-top:12px;border:1px solid #2a3858;background:#101b32;border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px}
+.file-icon{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,#8f3cff,#536fff);display:grid;place-items:center}
+.file-meta small{display:block;color:#8091b1}.pill{margin-left:auto;padding:6px 10px;border-radius:999px;background:#0e513f;color:#b9ffe7;font-size:12px}
+.suggestions{padding:0 14px 8px;color:#8798b7;font-size:12px}.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:7px}
+.chip{border:1px solid #39496d;background:#0c1629;color:#dbe5ff;border-radius:999px;padding:7px 10px;font-size:12px}
+.composer{padding:10px 14px 14px}
+.compose-box{border:1px solid #41506f;border-radius:15px;background:#0b1426;box-shadow:0 0 0 1px rgba(90,73,255,.1);padding:11px}
+textarea{width:100%;height:70px;resize:none;border:0;outline:0;background:transparent;color:white}
+.compose-actions{display:flex;gap:7px;align-items:center}
+.mini{height:32px;padding:0 10px;border:1px solid #2a395a;border-radius:9px;background:#101a31;color:#c7d2ea;font-size:12px}
+.send{margin-left:auto;width:40px;height:40px;border:0;border-radius:10px;background:linear-gradient(135deg,#8d3cff,#4d7eff);color:white;font-size:20px}
+.workspace{grid-row:2;grid-column:3;min-width:0;display:grid;grid-template-rows:56px minmax(0,1fr);background:#07101f}
+.workspace-head{display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid var(--line)}
+.device{width:38px;height:34px;border:1px solid #293654;border-radius:9px;background:#0c1628;color:#a9b7d6}.device.active{background:linear-gradient(135deg,#6f3cff,#4b74ff);color:white}
+.live{margin:auto;border:1px solid #273657;border-radius:10px;padding:8px 55px;color:#d5dff3;font-size:12px;background:#081221}.live:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#23d39c;margin-right:8px}
+.preview-shell{position:relative;margin:12px;border:1px solid #273758;border-radius:16px;overflow:hidden;background:#08111f}
+.preview-frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#08111f}
+.preview-blur{position:absolute;inset:0;pointer-events:none;backdrop-filter:blur(5px);background:rgba(7,11,30,.22);transition:.25s}
+.preview-shell.ready .preview-blur{backdrop-filter:blur(2px);background:rgba(7,11,30,.08)}
+.preview-empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:40px;z-index:2}
+.preview-shell.ready .preview-empty{display:none}
+.preview-empty .orb{width:74px;height:74px;border-radius:50%;margin:auto;background:radial-gradient(circle,#05091a 35%,#5222a8 48%,#8c48ff 60%,#3d76ff 76%,transparent 78%);box-shadow:0 0 30px rgba(115,67,255,.6)}
+.preview-empty h2{font-size:24px;margin:18px 0 8px}.preview-empty p{color:#8fa1c3;margin:0}
+.status{position:absolute;bottom:14px;left:14px;font-size:11px;color:#71ddb8;z-index:3}
+@media(max-width:1100px){.app{grid-template-columns:64px 390px minmax(0,1fr)}}
+@media(max-width:850px){body{overflow:auto}.app{height:auto;min-height:100vh;grid-template-columns:64px 1fr;grid-template-rows:64px auto 650px}.chat{grid-column:2;grid-row:2}.workspace{grid-column:1/-1;grid-row:3}.top-center{display:none}.rail{grid-row:2}.top-actions .action{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="logo"><span class="mark"></span>Veyra</div>
+    <div class="top-center">
+      <button class="tab">▣ Dashboard</button>
+      <button class="tab active">▤ Preview</button>
+      <button class="project-select">Untitled Project <span>⌄</span></button>
+      <button class="top-icon">▣</button><button class="top-icon">↻</button>
+    </div>
+    <div class="top-actions">
+      <button class="action">⌘ K</button><button class="action" id="saveBtn">Save</button><button class="action">Share</button><button class="action">Export</button><button class="publish">Publish</button>
+    </div>
+  </header>
+
+  <aside class="rail">
+    <button class="active"><span>☵</span>Chat</button>
+    <button><span>▦</span>Design</button>
+    <button><span>▤</span>Pages</button>
+    <button><span>⬡</span>Components</button>
+    <button><span>◉</span>Data</button>
+    <button><span>⌘</span>Integrations</button>
+    <button><span>⚙</span>Settings</button>
+    <div class="user">{{ (user.name or user.email or 'U')[:2]|upper if user else 'U' }}</div>
+  </aside>
+
+  <section class="chat">
+    <div class="chat-head">
+      <div class="project-avatar"></div>
+      <div class="chat-title"><b id="projectTitle">Untitled Project</b><small>AI website builder</small></div>
+      <div class="chat-menu">Agents⌄ &nbsp; ＋</div>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="msg">
+        <div class="msg-head"><div class="avatar">{{ (user.name or user.email or 'U')[:2]|upper if user else 'U' }}</div><b>You</b><time>now</time></div>
+        <p>Create a modern website or web app. Tell Veyra what you want and it will build the live preview here.</p>
+      </div>
+      <div class="msg assistant">
+        <div class="msg-head"><div class="avatar">V</div><b>Veyra Assistant</b><time>ready</time></div>
+        <p>I’m ready. Describe the product, layout, or change you want and I’ll update the same project instead of restarting it.</p>
+      </div>
+    </div>
+
+    <div>
+      <div class="suggestions">✦ Suggested next steps
+        <div class="chips">
+          <button class="chip" data-prompt="Create a premium SaaS landing page">SaaS landing page</button>
+          <button class="chip" data-prompt="Create a modern portfolio website">Portfolio</button>
+          <button class="chip" data-prompt="Create a dark analytics dashboard">Dashboard</button>
+        </div>
+      </div>
+      <div class="composer">
+        <div class="compose-box">
+          <textarea id="prompt" placeholder="Ask Veyra to build, redesign, debug, or improve anything..."></textarea>
+          <div class="compose-actions">
+            <button class="mini">＋</button><button class="mini">◉ Web Search</button><button class="mini">✦ Visual Edit</button><button class="mini">⌘ Code</button><button class="mini">◉</button>
+            <button class="send" id="sendBtn">→</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main class="workspace">
+    <div class="workspace-head">
+      <button class="device active">▰</button><button class="device">▯</button><button class="device">▯</button>
+      <div class="live">Live Preview</div>
+      <button class="device">⛶</button><button class="device">↻</button><button class="device">⌁</button>
+    </div>
+    <div class="preview-shell" id="previewShell">
+      <iframe class="preview-frame" id="preview"></iframe>
+      <div class="preview-blur"></div>
+      <div class="preview-empty">
+        <div>
+          <div class="orb"></div>
+          <h2>Your build appears here</h2>
+          <p>Start with a prompt and Veyra will generate the live project preview.</p>
+        </div>
+      </div>
+      <div class="status" id="status">● Veyra connected</div>
+    </div>
+  </main>
+</div>
+
+<script>
+const state={title:"Untitled Project",html:"",css:"",js:"",project_id:null};
+const promptEl=document.getElementById("prompt"), sendBtn=document.getElementById("sendBtn"),
+messages=document.getElementById("messages"), frame=document.getElementById("preview"),
+shell=document.getElementById("previewShell"), statusEl=document.getElementById("status"),
+titleEl=document.getElementById("projectTitle");
+
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+function addMsg(kind,text,card){
+  const el=document.createElement("div"); el.className="msg "+(kind==="assistant"?"assistant":"");
+  el.innerHTML=`<div class="msg-head"><div class="avatar">${kind==="assistant"?"V":"{{ (user.name or user.email or 'U')[:2]|upper if user else 'U' }}"}</div><b>${kind==="assistant"?"Veyra Assistant":"You"}</b><time>now</time></div><p>${escapeHtml(text)}</p>`+
+    (card?`<div class="file-card"><div class="file-icon">▤</div><div class="file-meta"><b>${escapeHtml(card)}</b><small>Live project update</small></div><span class="pill">✓ Updated</span></div>`:"");
+  messages.appendChild(el); messages.scrollTop=messages.scrollHeight;
+}
+function render(){
+  const src=`<!doctype html><html><head><meta charset="utf-8"><style>${state.css||""}</style></head><body>${state.html||""}<script>${(state.js||"").replace(/<\/script>/gi,"<\\/script>")}<\/script></body></html>`;
+  frame.srcdoc=src; shell.classList.add("ready");
+}
+async function build(text){
+  if(!text.trim()) return;
+  addMsg("user",text); promptEl.value=""; sendBtn.disabled=true; statusEl.textContent="● Veyra building...";
+  try{
+    const r=await fetch("/api/build",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:text,current:{html:state.html,css:state.css,js:state.js}})});
+    const d=await r.json();
+    if(!r.ok||!d.ok) throw new Error(d.error||"Build failed");
+    state.title=d.title||state.title; state.html=d.html||""; state.css=d.css||""; state.js=d.js||"";
+    titleEl.textContent=state.title; render();
+    addMsg("assistant",d.assistant_message||"Done — I updated the project.",state.title);
+    statusEl.textContent="● Veyra connected";
+  }catch(e){
+    addMsg("assistant","I couldn’t complete that build: "+e.message);
+    statusEl.textContent="● Build error";
+  }finally{sendBtn.disabled=false}
+}
+sendBtn.addEventListener("click",()=>build(promptEl.value));
+promptEl.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();build(promptEl.value)}});
+document.querySelectorAll("[data-prompt]").forEach(b=>b.addEventListener("click",()=>build(b.dataset.prompt)));
+
+document.getElementById("saveBtn").addEventListener("click",async()=>{
+  try{
+    const r=await fetch("/api/projects/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({project_id:state.project_id,title:state.title,description:"Built with Veyra",html:state.html,css:state.css,js:state.js})});
+    const d=await r.json(); if(d.id) state.project_id=d.id;
+    statusEl.textContent=d.ok===false?"● Save failed":"● Project saved";
+  }catch{statusEl.textContent="● Save failed"}
+});
+</script>
+</body>
+</html>

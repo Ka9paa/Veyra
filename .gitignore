@@ -1,5 +1,7 @@
 .env
+Vivetauth/.env
+app_backup.py
 __pycache__/
 *.pyc
-data/veyra.db
-.env
+.venv/
+venv/
