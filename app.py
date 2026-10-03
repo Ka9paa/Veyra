@@ -268,6 +268,17 @@ def init_db():
                 event_type TEXT NOT NULL,
                 created_at TEXT NOT NULL
             )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS login_events(
+                id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                provider TEXT NOT NULL,
+                email TEXT,
+                account_name TEXT,
+                discord_id TEXT,
+                created_at TEXT NOT NULL,
+                delivered INTEGER NOT NULL DEFAULT 0
+            )''')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_login_events_delivered ON login_events(delivered,id)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members(project_id)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_project_members_user ON project_members(user_id)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_analytics_project ON analytics_events(project_id)')
@@ -303,6 +314,7 @@ def init_db():
             c.execute('''CREATE TABLE IF NOT EXISTS project_databases(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER,name TEXT NOT NULL,provider TEXT NOT NULL DEFAULT 'Postgres',status TEXT NOT NULL DEFAULT 'connected',created_at TEXT NOT NULL)''')
             c.execute('''CREATE TABLE IF NOT EXISTS deployments(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER NOT NULL,url TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'ready',created_at TEXT NOT NULL)''')
             c.execute('''CREATE TABLE IF NOT EXISTS analytics_events(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER NOT NULL,event_type TEXT NOT NULL,created_at TEXT NOT NULL)''')
+            c.execute('''CREATE TABLE IF NOT EXISTS login_events(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,provider TEXT NOT NULL,email TEXT,account_name TEXT,discord_id TEXT,created_at TEXT NOT NULL,delivered INTEGER NOT NULL DEFAULT 0)''')
         c.commit()
 
 def _cache_user(user):
@@ -313,19 +325,52 @@ def _cache_user(user):
     safe.pop('password_hash',None)
     session['user_cache']=safe
 
+def record_login_event(user):
+    """Write a safe login event for the Discord admin bot."""
+    if not user:
+        return
+    try:
+        provider=(user.get('provider') or 'account').strip().lower()
+        discord_id=str(
+            user.get('discord_id')
+            or (user.get('provider_user_id') if provider=='discord' else '')
+            or ''
+        ).strip() or None
+
+        with db() as c:
+            c.execute(
+                "INSERT INTO login_events(user_id,provider,email,account_name,discord_id,created_at,delivered) VALUES(?,?,?,?,?,?,0)",
+                (
+                    int(user['id']),
+                    provider,
+                    user.get('email'),
+                    user.get('name'),
+                    discord_id,
+                    now(),
+                )
+            )
+            c.commit()
+    except Exception:
+        app.logger.exception('Unable to record Veyra login event')
+
+
 def _finish_login(uid, remember=True, user=None):
     session.clear()
     session['user_id']=int(uid)
     session.permanent=bool(remember)
 
+    login_user=None
+
     if user:
-        _cache_user(dict(user))
+        login_user=dict(user)
+        _cache_user(login_user)
     else:
         try:
             with db() as c:
                 r=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
                 if r:
-                    _cache_user(dict(r))
+                    login_user=dict(r)
+                    _cache_user(login_user)
         except Exception:
             app.logger.exception('Unable to cache user after login')
 
@@ -334,7 +379,11 @@ def _finish_login(uid, remember=True, user=None):
             c.execute('UPDATE users SET last_active=? WHERE id=?',(now(),uid))
             c.commit()
     except Exception:
-        pass
+        app.logger.exception('Unable to update last_active after login')
+
+    if login_user:
+        record_login_event(login_user)
+
 
 def current_user():
     uid=session.get('user_id')
