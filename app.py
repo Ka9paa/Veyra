@@ -51,6 +51,15 @@ def public_url(path):
 def oauth_url(path):
     path='/' + str(path or '').lstrip('/')
     return f"{OAUTH_BASE_URL}{path}"
+
+def _oauth_on_canonical_host():
+    target=urlparse(OAUTH_BASE_URL)
+    current_host=(request.host or '').split(':')[0].lower()
+    target_host=(target.hostname or '').lower()
+    return bool(target_host and current_host==target_host)
+
+def _canonical_oauth_start(path):
+    return redirect(oauth_url(path),code=302)
 # Production uses the same Neon/Postgres database as the Discord admin bot.
 # SQLite remains only as a local-development fallback.
 DATABASE_URL=(os.getenv('DATABASE_URL') or '').strip()
@@ -782,6 +791,11 @@ def auth_google():
     if not os.getenv('GOOGLE_CLIENT_ID') or not os.getenv('GOOGLE_CLIENT_SECRET'):
         return render_template('oauth_missing.html',provider='Google'),503
 
+    # OAuth state must be created on the SAME hostname that receives the callback.
+    # This prevents www -> apex session/state loss on Safari and other browsers.
+    if not _oauth_on_canonical_host():
+        return _canonical_oauth_start('/auth/google')
+
     redirect_uri=oauth_url('/auth/google/callback')
     app.logger.info('Starting Google OAuth | redirect_uri=%s',redirect_uri)
     return google.authorize_redirect(redirect_uri)
@@ -826,8 +840,16 @@ def auth_discord():
     if not os.getenv('DISCORD_CLIENT_ID') or not os.getenv('DISCORD_CLIENT_SECRET'):
         return render_template('oauth_missing.html',provider='Discord'),503
 
+    # Keep the auth-start session cookie and callback on the same hostname.
+    if not _oauth_on_canonical_host():
+        return _canonical_oauth_start('/auth/discord')
+
     redirect_uri=oauth_url('/auth/discord/callback')
-    app.logger.info('Starting Discord OAuth | redirect_uri=%s',redirect_uri)
+    app.logger.info(
+        'Starting Discord OAuth | client_id=%s | redirect_uri=%s',
+        os.getenv('DISCORD_CLIENT_ID'),
+        redirect_uri
+    )
     return discord_oauth.authorize_redirect(
         redirect_uri,
         scope='identify email'
@@ -862,12 +884,27 @@ def discord_callback():
         return redirect(url_for('dashboard'))
 
     except Exception as exc:
+        error_type=type(exc).__name__
+        error_text=str(exc or '')
         app.logger.exception(
-            'Discord OAuth callback failed | redirect_uri=%s | error=%s',
+            'Discord OAuth callback failed | client_id=%s | redirect_uri=%s | error=%s | detail=%s',
+            os.getenv('DISCORD_CLIENT_ID'),
             redirect_uri,
-            type(exc).__name__
+            error_type,
+            error_text[:500]
         )
-        flash('Discord sign-in failed. Check the Discord OAuth redirect URI and try again.','error')
+
+        lower=error_text.lower()
+        if 'state' in lower:
+            msg='Discord sign-in session expired or changed domains. Please try again.'
+        elif 'invalid_client' in lower or '401' in lower:
+            msg='Discord rejected the configured Client ID or Client Secret.'
+        elif 'redirect' in lower:
+            msg='Discord rejected the OAuth redirect URI.'
+        else:
+            msg=f'Discord sign-in failed ({error_type}). Check Vercel logs for the exact cause.'
+
+        flash(msg,'error')
         return redirect(url_for('login'))
 
 
@@ -878,10 +915,12 @@ def oauth_status():
         'oauth_base_url':OAUTH_BASE_URL,
         'google':{
             'configured':bool(os.getenv('GOOGLE_CLIENT_ID') and os.getenv('GOOGLE_CLIENT_SECRET')),
+            'client_id':os.getenv('GOOGLE_CLIENT_ID') or None,
             'redirect_uri':oauth_url('/auth/google/callback'),
         },
         'discord':{
             'configured':bool(os.getenv('DISCORD_CLIENT_ID') and os.getenv('DISCORD_CLIENT_SECRET')),
+            'client_id':os.getenv('DISCORD_CLIENT_ID') or None,
             'redirect_uri':oauth_url('/auth/discord/callback'),
         },
     })
