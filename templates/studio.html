@@ -438,6 +438,233 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
   .chat{grid-column:2}.workspace{grid-column:1/-1;grid-row:3}
   .top-btn.share,.top-btn.export{display:none}
 }
+
+/* ============================
+   VEYRA STUDIO — ULTRA POLISH
+   ============================ */
+:root{
+  --mx:50vw;
+  --my:20vh;
+}
+
+/* Real logo assets */
+.real-logo{
+  width:27px;
+  height:27px;
+  object-fit:contain;
+  display:block;
+  filter:drop-shadow(0 0 12px rgba(139,92,246,.48));
+  transition:transform .24s ease,filter .24s ease;
+}
+.real-logo.small{width:19px;height:19px}
+.real-logo.hero-logo{width:68px;height:68px}
+.brand-mark:hover .real-logo,
+.veyra-badge:hover .real-logo,
+.avatar-ai:hover .real-logo{
+  transform:scale(1.08) rotate(-2deg);
+  filter:drop-shadow(0 0 18px rgba(139,92,246,.72));
+}
+
+/* Cursor-reactive ambient lighting */
+.shell:before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:0;
+  background:
+    radial-gradient(520px circle at var(--mx) var(--my),rgba(112,78,255,.075),transparent 58%),
+    radial-gradient(340px circle at calc(var(--mx) + 160px) calc(var(--my) + 90px),rgba(68,151,255,.045),transparent 60%);
+  transition:opacity .2s ease;
+}
+.topbar,.rail,.chat,.workspace,.inspector{position:relative;z-index:1}
+
+/* Better glass / depth */
+.topbar{
+  background:linear-gradient(180deg,rgba(8,13,25,.94),rgba(6,11,21,.86));
+  box-shadow:0 8px 35px rgba(0,0,0,.18);
+}
+.chat,.inspector,.rail{
+  box-shadow:inset -1px 0 rgba(255,255,255,.015);
+}
+.card,.message-body,.composer,.project-switch,.address{
+  backdrop-filter:blur(12px);
+}
+
+/* Reactive card edge */
+.card,.message-body,.composer,.project-switch{
+  position:relative;
+  overflow:hidden;
+}
+.card:before,.message-body:before,.composer:before,.project-switch:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  opacity:0;
+  background:radial-gradient(260px circle at var(--local-x,50%) var(--local-y,50%),rgba(132,91,255,.09),transparent 65%);
+  transition:opacity .2s ease;
+}
+.card:hover:before,.message-body:hover:before,.composer:hover:before,.project-switch:hover:before{opacity:1}
+
+/* Stronger active navigation */
+.nav-item{
+  position:relative;
+  overflow:hidden;
+}
+.nav-item:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  opacity:0;
+  background:linear-gradient(110deg,transparent,rgba(125,87,255,.08),transparent);
+  transform:translateX(-100%);
+}
+.nav-item:hover:before{
+  opacity:1;
+  animation:navSweep .65s ease;
+}
+@keyframes navSweep{to{transform:translateX(100%)}}
+.nav-item.active:after{
+  content:"";
+  position:absolute;
+  left:0;
+  top:12px;
+  bottom:12px;
+  width:2px;
+  border-radius:999px;
+  background:linear-gradient(#bc7cff,#6978ff);
+  box-shadow:0 0 14px rgba(139,92,246,.8);
+}
+
+/* Premium buttons */
+.top-btn,.chip,.tool-pill,.device,.zoom-btn,.head-more{
+  transition:transform .16s ease,border-color .16s ease,background .16s ease,color .16s ease,box-shadow .16s ease;
+}
+.top-btn:hover,.chip:hover,.tool-pill:hover,.device:hover,.zoom-btn:hover,.head-more:hover{
+  transform:translateY(-1px);
+}
+.top-btn.primary:hover,.publish-btn:hover,.send:hover{
+  transform:translateY(-1px);
+  box-shadow:0 12px 34px rgba(104,76,255,.34),0 0 0 1px rgba(174,141,255,.16) inset;
+}
+.send{
+  transition:transform .18s ease,box-shadow .18s ease,opacity .18s ease;
+}
+.send:not(:disabled):hover{transform:translateY(-1px) scale(1.03)}
+.send:not(:disabled):active{transform:scale(.97)}
+
+/* Workspace chrome */
+.browserbar{
+  background:linear-gradient(180deg,#09111e,#07101b);
+}
+.canvas{
+  border-color:#304466;
+  box-shadow:
+    0 28px 75px rgba(0,0,0,.42),
+    0 0 0 1px rgba(128,91,255,.055) inset;
+  transition:border-color .25s ease,box-shadow .25s ease;
+}
+.canvas:hover{
+  border-color:#3d5277;
+  box-shadow:
+    0 30px 88px rgba(0,0,0,.46),
+    0 0 34px rgba(97,76,210,.06);
+}
+
+/* Empty state looks intentional, not dead */
+.empty-preview{
+  background:
+    radial-gradient(circle at 50% 44%,rgba(121,74,255,.105),transparent 19%),
+    radial-gradient(circle at 53% 47%,rgba(80,130,255,.055),transparent 34%);
+}
+.empty-preview-inner{
+  animation:emptyFloat 5s ease-in-out infinite;
+}
+@keyframes emptyFloat{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-5px)}
+}
+.empty-preview h1{
+  font-size:31px;
+  background:linear-gradient(180deg,#fff,#c7d0df);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+}
+.empty-preview p{max-width:460px;margin-inline:auto}
+
+/* Better assistant chat identity */
+.chat-head{
+  background:linear-gradient(180deg,rgba(10,18,32,.96),rgba(8,16,29,.88));
+}
+.veyra-badge{
+  position:relative;
+}
+.veyra-badge:after{
+  content:"";
+  position:absolute;
+  width:8px;height:8px;
+  border-radius:50%;
+  right:-1px;bottom:0;
+  background:var(--green);
+  border:3px solid #08101d;
+  box-shadow:0 0 11px rgba(69,223,174,.5);
+}
+.message.assistant .message-body{
+  border-color:#263351;
+}
+.message.assistant:hover .message-body{
+  border-color:#34476c;
+}
+
+/* Typing bubble has more life */
+.typing-bubble{
+  position:relative;
+  overflow:hidden;
+}
+.typing-bubble:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(110deg,transparent 30%,rgba(139,92,246,.08),transparent 70%);
+  transform:translateX(-100%);
+  animation:typingSweep 1.6s infinite ease-in-out;
+}
+@keyframes typingSweep{to{transform:translateX(100%)}}
+
+/* Build card progress animation */
+.step.active .step-dot{
+  animation:stepPulse 1.25s infinite ease-in-out;
+}
+@keyframes stepPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(143,91,255,.55)}
+  50%{box-shadow:0 0 0 5px rgba(143,91,255,0)}
+}
+
+/* Inspector hierarchy */
+.card-head h3{letter-spacing:-.01em}
+.credit-number{
+  background:linear-gradient(135deg,#fff,#aebdff);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.health-ring{
+  box-shadow:0 0 30px rgba(65,221,174,.08);
+}
+
+/* Better resize behavior */
+@media(max-width:1450px){
+  .shell{grid-template-columns:72px 360px minmax(500px,1fr) 286px}
+}
+@media(max-width:1180px){
+  .shell{grid-template-columns:70px 345px minmax(480px,1fr)}
+  .inspector{display:none}
+  .brand{width:220px}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+
 </style>
 </head>
 <body>
@@ -446,10 +673,7 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
 <header class="topbar">
   <div class="brand">
     <div class="brand-mark">
-      <svg viewBox="0 0 32 32" width="26" height="26">
-        <path fill="#9b5cff" d="M3 5h7l6 10 6-10h7L16 28z"/>
-        <path fill="#5f75ff" d="M9 5h5l2 4 2-4h5l-7 13z"/>
-      </svg>
+      <img class="real-logo" src="{{ url_for('static', filename='veyra-mark.svg') }}" alt="Veyra">
     </div>
     <div class="brand-name">Veyra Studio</div>
   </div>
@@ -510,9 +734,7 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
 <section class="chat">
   <div class="chat-head">
     <div class="veyra-badge">
-      <svg viewBox="0 0 32 32" width="25" height="25">
-        <path fill="#9b5cff" d="M3 5h7l6 10 6-10h7L16 28z"/><path fill="#5f75ff" d="M9 5h5l2 4 2-4h5l-7 13z"/>
-      </svg>
+      <img class="real-logo" src="{{ url_for('static', filename='veyra-mark.svg') }}" alt="Veyra">
     </div>
     <div><h3>Veyra Assistant <span class="online"></span></h3><small id="projectTitle">Build, iterate, and launch with AI.</small></div>
     <button class="head-more">•••</button>
@@ -521,17 +743,17 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
   <div class="messages" id="messages">
     <div class="message assistant">
       <div class="avatar-ai">
-        <svg viewBox="0 0 32 32" width="20" height="20"><path fill="#9b5cff" d="M3 5h7l6 10 6-10h7L16 28z"/><path fill="#5f75ff" d="M9 5h5l2 4 2-4h5l-7 13z"/></svg>
+        <img class="real-logo small" src="{{ url_for('static', filename='veyra-mark.svg') }}" alt="">
       </div>
       <div class="message-body">
         <div class="message-meta"><b>Veyra Assistant</b><time>ready</time></div>
-        <p>What would you like to build or change? I’ll keep working inside the same project as you iterate.</p>
+        <p>Tell me what you want to build. I can design, code, refine, debug, and prepare the same project for launch as we work.</p>
       </div>
     </div>
 
     <div class="message assistant typing-row" id="typingRow">
       <div class="avatar-ai">
-        <svg viewBox="0 0 32 32" width="20" height="20"><path fill="#9b5cff" d="M3 5h7l6 10 6-10h7L16 28z"/><path fill="#5f75ff" d="M9 5h5l2 4 2-4h5l-7 13z"/></svg>
+        <img class="real-logo small" src="{{ url_for('static', filename='veyra-mark.svg') }}" alt="">
       </div>
       <div class="typing-bubble"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>
     </div>
@@ -581,12 +803,10 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
     <div class="empty-preview">
       <div class="empty-preview-inner">
         <div class="empty-logo">
-          <svg viewBox="0 0 32 32">
-            <path fill="#9b5cff" d="M3 5h7l6 10 6-10h7L16 28z"/><path fill="#5f75ff" d="M9 5h5l2 4 2-4h5l-7 13z"/>
-          </svg>
+          <img class="real-logo hero-logo" src="{{ url_for('static', filename='veyra-mark.svg') }}" alt="Veyra">
         </div>
         <h1>Your build appears here</h1>
-        <p>Describe what you want in chat. Veyra will generate the real preview here and keep updating it as you iterate.</p>
+        <p>Describe the product you want to create. Veyra will generate a live preview here and refine the same project as you iterate.</p>
       </div>
     </div>
 
@@ -743,7 +963,7 @@ function addMessage(role,text,card=null,steps=null){
   const wrap=document.createElement("div");
   wrap.className="message "+(role==="assistant"?"assistant":"user");
   const avatar=role==="assistant"
-    ? `<div class="avatar-ai"><svg viewBox="0 0 32 32" width="20" height="20"><path fill="#9b5cff" d="M3 5h7l6 10 6-10h7L16 28z"/><path fill="#5f75ff" d="M9 5h5l2 4 2-4h5l-7 13z"/></svg></div>`
+    ? `<div class="avatar-ai"><img class="real-logo small" src="{{ url_for('static', filename='veyra-mark.svg') }}" alt=""></div>`
     : `<div class="avatar-user">{{ (user.name or user.email or 'VE')[:2]|upper if user else 'VE' }}</div>`;
 
   let buildCard="";
@@ -1017,6 +1237,37 @@ if(qp.get("project")){
 }else{
   syncUI();
 }
+
+// Premium cursor-reactive lighting.
+document.addEventListener("pointermove", e=>{
+  document.documentElement.style.setProperty("--mx",e.clientX+"px");
+  document.documentElement.style.setProperty("--my",e.clientY+"px");
+
+  const reactive=e.target.closest(".card,.message-body,.composer,.project-switch");
+  if(reactive){
+    const r=reactive.getBoundingClientRect();
+    reactive.style.setProperty("--local-x",(e.clientX-r.left)+"px");
+    reactive.style.setProperty("--local-y",(e.clientY-r.top)+"px");
+  }
+},{passive:true});
+
+// Slight interactive depth on the live canvas without moving the actual website iframe.
+canvas.addEventListener("pointermove", e=>{
+  const r=canvas.getBoundingClientRect();
+  const x=(e.clientX-r.left)/r.width-.5;
+  const y=(e.clientY-r.top)/r.height-.5;
+  canvas.style.setProperty("--canvas-x",x);
+  canvas.style.setProperty("--canvas-y",y);
+});
+canvas.addEventListener("pointerleave",()=>{
+  canvas.style.removeProperty("--canvas-x");
+  canvas.style.removeProperty("--canvas-y");
+});
+
+// Keep the latest assistant activity visible.
+const chatObserver=new MutationObserver(()=>scrollChat());
+chatObserver.observe(messages,{childList:true,subtree:true});
+
 </script>
 </body>
 </html>
