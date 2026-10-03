@@ -7,6 +7,7 @@ import zipfile
 from pathlib import Path
 from datetime import datetime, timezone
 from functools import wraps
+from urllib.parse import urlparse
 
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for, flash, send_file
 from authlib.integrations.flask_client import OAuth
