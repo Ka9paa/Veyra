@@ -1,627 +1,117 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Veyra Studio</title>
 <style>
-:root{
-  --bg:#07101f;
-  --bg2:#0a1324;
-  --panel:#0c1628;
-  --panel2:#101b31;
-  --line:#1f2d49;
-  --line2:#314263;
-  --text:#f7f9ff;
-  --muted:#8da0c1;
-  --muted2:#6f82a6;
-  --purple:#8e3cff;
-  --violet:#6e4dff;
-  --blue:#4c7dff;
-  --green:#25d3a0;
-  --shadow:0 20px 60px rgba(0,0,0,.28);
-}
-*{box-sizing:border-box}
-html,body{margin:0;height:100%;background:#050b15;color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-body{overflow:hidden}
-.app{
-  transform:scale(.86);
-  transform-origin:top left;
-  width:116.28% !important;
-  height:116.28vh !important;
-}
-button,textarea{font:inherit}
-button{cursor:pointer}
-
-.app{
-  height:100vh;
-  display:grid;
-  grid-template-columns:76px 390px minmax(0,1fr) 315px;
-  grid-template-rows:72px minmax(0,1fr);
-  background:
-    radial-gradient(circle at 80% 0%,rgba(79,65,255,.10),transparent 26%),
-    linear-gradient(180deg,#081120,#07101f);
-}
-
-/* top */
-.topbar{
-  grid-column:1/-1;
-  display:flex;
-  align-items:center;
-  gap:18px;
-  padding:0 18px;
-  border-bottom:1px solid var(--line);
-  background:rgba(7,16,31,.96);
-  backdrop-filter:blur(16px);
-}
-.brand{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  min-width:220px;
-  font-size:24px;
-  font-weight:800;
-  letter-spacing:-.035em;
-}
-.veyra-front-logo{
-  width:29px;
-  height:29px;
-  object-fit:contain;
-  flex:0 0 auto;
-  filter:drop-shadow(0 0 10px rgba(126,65,255,.28));
-}
-.top-center{
-  margin:auto;
-  display:flex;
-  align-items:center;
-  gap:10px;
-}
-.top-btn,.project-select,.top-action{
-  height:40px;
-  border:1px solid #273654;
-  background:#0d1729;
-  color:#c8d3ea;
-  border-radius:11px;
-  padding:0 15px;
-  transition:.18s ease;
-}
-.top-btn:hover,.project-select:hover,.top-action:hover{border-color:#465b86;background:#111d34;color:#fff}
-.top-btn.active{
-  color:#fff;
-  border-color:#674dff;
-  background:linear-gradient(180deg,#282162,#151d3b);
-  box-shadow:0 0 22px rgba(105,72,255,.2);
-}
-.project-select{
-  width:220px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-}
-.top-actions{display:flex;align-items:center;gap:9px}
-.publish{
-  height:42px;padding:0 22px;border:0;border-radius:12px;color:#fff;font-weight:800;
-  background:linear-gradient(90deg,#9639ff,#4b7fff);
-  box-shadow:0 0 28px rgba(88,83,255,.3);
-}
-
-/* rail */
-.rail{
-  grid-column:1;grid-row:2;
-  border-right:1px solid var(--line);
-  background:#081122;
-  padding:14px 8px;
-  display:flex;flex-direction:column;align-items:center;gap:10px;
-}
-.rail-btn{
-  width:58px;height:62px;border:0;border-radius:14px;background:transparent;color:#8fa1c3;
-  display:grid;place-items:center;gap:4px;font-size:11px;position:relative
-}
-.rail-btn .ico{font-size:21px}
-.rail-btn:hover{background:#0f1a31;color:#fff}
-.rail-btn.active{
-  color:#fff;background:linear-gradient(180deg,#172354,#101933);
-  box-shadow:inset 3px 0 #9147ff;
-}
-.rail-user{
-  margin-top:auto;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;
-  background:#121d38;border:1px solid #2d3d61;color:#e2e9ff;font-weight:700
-}
-
-/* chat */
-.chat{
-  grid-column:2;grid-row:2;
-  min-width:0;
-  display:grid;
-  grid-template-rows:86px minmax(0,1fr) auto;
-  border-right:1px solid var(--line);
-  background:linear-gradient(180deg,#0a1426,#081120);
-}
-.chat-head{
-  display:flex;align-items:center;gap:12px;padding:16px 16px;border-bottom:1px solid var(--line)
-}
-.project-orb{
-  width:46px;height:46px;border-radius:50%;
-  background:radial-gradient(circle,#060916 26%,#32147b 47%,#8d46ff 65%,#477aff 77%,transparent 79%);
-  box-shadow:0 0 24px rgba(123,69,255,.42);
-}
-.chat-head b{display:block;font-size:15px}
-.chat-head small{color:var(--muted);font-size:12px}
-.agents{margin-left:auto;color:#a9b8d5;font-size:13px}
-.messages{overflow:auto;padding:14px;scrollbar-width:thin}
-.msg{
-  border:1px solid #1f2c47;background:#0d1729;border-radius:16px;padding:14px;margin-bottom:12px;
-  box-shadow:0 8px 24px rgba(0,0,0,.08)
-}
-.msg.assistant{background:linear-gradient(180deg,#0e1830,#0b1528)}
-.msg-head{display:flex;align-items:center;gap:9px;margin-bottom:8px}
-.avatar{
-  width:36px;height:36px;border-radius:50%;display:grid;place-items:center;
-  background:#3259ff;font-size:12px;font-weight:800
-}
-.assistant .avatar{
-  border-radius:11px;
-  background:linear-gradient(135deg,#993aff,#4a7cff);
-}
-.msg-head b{font-size:13px}
-.msg-head time{font-size:11px;color:#687a9c}
-.msg p{margin:0;color:#dde4f4;font-size:14px;line-height:1.55}
-.file-card{
-  margin-top:12px;padding:10px 11px;border:1px solid #2d3c5e;border-radius:12px;
-  display:flex;align-items:center;gap:10px;background:#111c33
-}
-.file-icon{
-  width:34px;height:34px;border-radius:9px;display:grid;place-items:center;
-  background:linear-gradient(135deg,#8e3cff,#5078ff)
-}
-.file-meta b{font-size:12px}.file-meta small{display:block;color:#8394b4;font-size:11px;margin-top:2px}
-.status-pill{
-  margin-left:auto;padding:6px 9px;border-radius:999px;font-size:11px;color:#c5ffe9;background:#0d563f
-}
-.bottom-chat{border-top:1px solid transparent}
-.suggest{padding:0 14px 10px;color:#8396b7;font-size:12px}
-.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-.chip{
-  border:1px solid #35476d;background:#0b162a;color:#dbe5f8;border-radius:999px;padding:8px 11px;font-size:12px
-}
-.composer{padding:0 14px 14px}
-.compose-box{
-  border:1px solid #43557a;border-radius:16px;background:#0b1527;padding:11px;
-  box-shadow:0 0 0 1px rgba(95,76,255,.08),0 14px 30px rgba(0,0,0,.14)
-}
-textarea{
-  width:100%;height:66px;resize:none;border:0;outline:0;background:transparent;color:#fff;
-  line-height:1.45
-}
-textarea::placeholder{color:#7183a5}
-.compose-actions{display:flex;gap:7px;align-items:center}
-.mini{
-  height:32px;border:1px solid #2b3a5a;border-radius:9px;background:#101a30;color:#cbd5e9;padding:0 9px;font-size:11px
-}
-.send{
-  margin-left:auto;width:41px;height:41px;border:0;border-radius:11px;color:#fff;font-size:20px;
-  background:linear-gradient(135deg,#963bff,#4a7cff);box-shadow:0 0 18px rgba(99,73,255,.3)
-}
-
-/* preview */
-.workspace{
-  grid-column:3;grid-row:2;
-  min-width:0;
-  display:grid;
-  grid-template-rows:62px minmax(0,1fr);
-  background:#07101f;
-}
-.workspace-head{
-  display:flex;align-items:center;gap:9px;padding:0 12px;border-bottom:1px solid var(--line)
-}
-.device{
-  width:39px;height:36px;border:1px solid #293957;border-radius:10px;background:#0c1729;color:#9eaecc
-}
-.device.active{
-  color:#fff;border-color:#6950ff;background:linear-gradient(135deg,#763cff,#5079ff);
-  box-shadow:0 0 18px rgba(94,76,255,.25)
-}
-.live{
-  margin:auto;padding:8px 34px;border:1px solid #2b3a5c;border-radius:10px;background:#091321;color:#d7e1f2;font-size:12px
-}
-.live::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#27d5a0;margin-right:8px}
-.preview-card{
-  margin:12px;border:1px solid #334666;border-radius:17px;overflow:hidden;position:relative;
-  background:
-    radial-gradient(circle at 54% 37%,rgba(136,55,255,.20),transparent 18%),
-    radial-gradient(circle at 92% 8%,rgba(64,82,255,.20),transparent 22%),
-    linear-gradient(180deg,#0b1330,#081120);
-  box-shadow:var(--shadow)
-}
-.preview-card::before{
-  content:"";position:absolute;inset:0;pointer-events:none;
-  background:
-    radial-gradient(circle at 50% 46%,transparent 0 26%,rgba(104,68,255,.09) 26.3% 26.5%,transparent 26.8% 100%),
-    radial-gradient(circle at 50% 46%,transparent 0 40%,rgba(78,85,255,.07) 40.2% 40.4%,transparent 40.7% 100%);
-}
-.stars{
-  position:absolute;inset:0;opacity:.45;
-  background-image:
-    radial-gradient(circle at 10% 20%,#fff 0 1px,transparent 1.5px),
-    radial-gradient(circle at 25% 47%,#6ea0ff 0 1px,transparent 1.5px),
-    radial-gradient(circle at 70% 18%,#fff 0 1px,transparent 1.5px),
-    radial-gradient(circle at 82% 44%,#916dff 0 1px,transparent 1.5px),
-    radial-gradient(circle at 60% 72%,#fff 0 1px,transparent 1.5px),
-    radial-gradient(circle at 38% 80%,#4e7cff 0 1px,transparent 1.5px);
-}
-.empty{
-  position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:40px;z-index:2
-}
-.orb{
-  width:110px;height:110px;border-radius:50%;margin:auto;
-  background:radial-gradient(circle,#02040d 35%,#25115a 45%,#7d35ff 58%,#5a6fff 67%,#3da0ff 73%,transparent 75%);
-  box-shadow:0 0 34px rgba(126,62,255,.62),0 0 70px rgba(59,86,255,.18);
-  position:relative
-}
-.orb::after{
-  content:"";position:absolute;width:210px;height:80px;border:1px solid rgba(128,77,255,.55);
-  border-radius:50%;left:50%;top:52%;transform:translate(-50%,-50%) rotate(12deg);
-  box-shadow:0 0 16px rgba(104,67,255,.16)
-}
-.empty h1{font-size:31px;letter-spacing:-.03em;margin:25px 0 8px}
-.empty p{color:#9aaccc;font-size:16px;line-height:1.5;margin:0 auto;max-width:520px}
-.features{display:flex;gap:28px;justify-content:center;margin-top:30px;flex-wrap:wrap}
-.feature{display:flex;align-items:center;gap:10px;color:#c6d2e8;font-size:12px;text-align:left}
-.feature-ico{
-  width:42px;height:42px;border-radius:50%;display:grid;place-items:center;border:1px solid #5b45a5;
-  background:#111832;color:#af83ff
-}
-.preview-frame{position:absolute;inset:0;border:0;width:100%;height:100%;background:#07101f;z-index:1}
-.preview-card.ready .empty{display:none}
-.preview-card.ready .stars{display:none}
-.connection{
-  position:absolute;left:16px;bottom:15px;z-index:4;padding:8px 12px;border:1px solid #284162;
-  border-radius:10px;background:rgba(8,18,33,.82);color:#79e4bd;font-size:11px;backdrop-filter:blur(8px)
-}
-
-/* right QA */
-.qa{
-  grid-column:4;grid-row:2;
-  border-left:1px solid var(--line);
-  background:#081222;
-  padding:12px;
-  overflow:auto;
-}
-.qa-card{
-  border:1px solid #22324f;background:#0c1628;border-radius:15px;padding:14px;margin-bottom:11px
-}
-.qa-title{display:flex;align-items:center;justify-content:space-between;font-weight:800}
-.score-wrap{display:flex;gap:16px;align-items:center;margin-top:14px}
-.score{
-  width:78px;height:78px;border-radius:50%;display:grid;place-items:center;font-size:22px;font-weight:900;
-  background:
-    radial-gradient(circle,#0c1628 58%,transparent 59%),
-    conic-gradient(#4f7cff 0 60%,#8d3cff 60% 90%,#20d29b 90% 100%);
-}
-.score-copy b{display:block}.score-copy small{color:#7ee1bd}
-.metric{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid #1e2b45;font-size:13px}
-.metric:first-of-type{margin-top:12px}
-.good{color:#36d6a3}
-.qa-row{
-  display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid #1e2b45;font-size:13px
-}
-.qa-row .qico{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:#111e39;color:#ad83ff}
-.deploy{
-  width:100%;height:44px;border:0;border-radius:11px;color:#fff;font-weight:800;
-  background:linear-gradient(90deg,#8f37ff,#4c81ff)
-}
-
-@media(max-width:1380px){
-  .app{grid-template-columns:70px 360px minmax(0,1fr)}
-  .qa{display:none}
-}
-@media(max-width:1000px){
-  body{overflow:auto}
-  .app{height:auto;min-height:100vh;grid-template-columns:64px 1fr;grid-template-rows:64px auto 700px}
-  .top-center{display:none}
-  .chat{grid-column:2;grid-row:2}
-  .workspace{grid-column:1/-1;grid-row:3}
-  .rail{grid-row:2}
-  .top-actions .top-action{display:none}
-}
-</style>
-</head>
-<body>
-<div class="app">
-<header class="topbar">
-  <div class="brand">
-    <img class="veyra-front-logo" src="{{ url_for('static', filename='veyra-mark.svg') }}" alt="Veyra">
-    <span>Veyra</span>
-  </div>
-
-  <div class="top-center">
-    <button class="top-btn">▣ Dashboard</button>
-    <button class="top-btn active">▤ Preview</button>
-    <button class="project-select"><span id="topProjectName">Untitled Project</span><span>⌄</span></button>
-    <button class="top-btn">▣</button>
-    <button class="top-btn">↻</button>
-  </div>
-
-  <div class="top-actions">
-    <button class="top-action">⌘ K</button>
-    <button class="top-action" id="saveBtn">Save</button>
-    <button class="top-action">Share</button>
-    <button class="top-action">Export</button>
-    <button class="publish">Publish →</button>
-  </div>
+:root{--bg:#070c15;--panel:#0b1220;--panel2:#0f1728;--line:#1d2940;--line2:#2a3958;--text:#f7f8fc;--muted:#8391aa;--violet:#8f52ff;--blue:#6177ff;--green:#36d8a0;--danger:#ff6a7c}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:13px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}button,textarea{font:inherit}button{cursor:pointer}.app{height:100vh;display:grid;grid-template-columns:72px 365px minmax(480px,1fr) 300px;grid-template-rows:62px minmax(0,1fr);background:radial-gradient(circle at 70% 0,#39206d22,transparent 28%),#070c15}.top{grid-column:1/-1;display:flex;align-items:center;border-bottom:1px solid var(--line);background:#080e18eF;backdrop-filter:blur(18px);padding:0 14px;gap:14px}.brand{display:flex;align-items:center;gap:10px;width:250px}.vmark{width:34px;height:34px;display:grid;place-items:center}.vmark svg{width:30px;height:30px;filter:drop-shadow(0 0 13px #8f52ff66)}.brand b{font-size:17px}.projectbox{height:38px;min-width:210px;border:1px solid var(--line2);border-radius:10px;background:#0d1524;color:#dce4f3;display:flex;align-items:center;gap:9px;padding:0 12px}.center-tabs{display:flex;gap:6px;margin:auto}.tab,.iconbtn,.action{height:38px;border:1px solid var(--line2);border-radius:10px;background:#0c1422;color:#a7b4c9;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;gap:7px}.tab.active{color:#fff;border-color:#744cff;background:#171b3f;box-shadow:0 0 20px #744cff1f}.top-actions{display:flex;gap:7px;margin-left:auto}.action.primary{border:0;background:linear-gradient(135deg,var(--violet),var(--blue));color:#fff;font-weight:800}.action:disabled{opacity:.45;cursor:not-allowed}.rail{grid-row:2;border-right:1px solid var(--line);background:#080e18;padding:10px 7px;display:flex;flex-direction:column;gap:7px}.rail a,.rail button{height:58px;border:0;border-radius:12px;background:transparent;color:#8291aa;text-decoration:none;display:grid;place-items:center;gap:3px;font-size:10px}.rail a:hover,.rail button:hover,.rail .active{background:#111a2e;color:#fff}.rail .active{box-shadow:inset 2px 0 #8f52ff}.rail svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.8}.rail-user{margin-top:auto;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#141d31;border:1px solid #2b3853;font-weight:800}.chat{grid-row:2;border-right:1px solid var(--line);display:grid;grid-template-rows:70px minmax(0,1fr) auto;background:#09111e}.chat-head{display:flex;align-items:center;gap:11px;padding:12px;border-bottom:1px solid var(--line)}.ai-emblem{width:42px;height:42px;border-radius:13px;background:#12152a;border:1px solid #5136aa;display:grid;place-items:center;box-shadow:0 0 20px #7846ff29}.ai-emblem svg{width:25px;height:25px}.chat-head b{display:block}.chat-head small{color:var(--muted)}.messages{padding:12px;overflow:auto}.msg{border:1px solid #1f2b43;border-radius:13px;background:#0d1523;padding:12px;margin-bottom:10px}.msg.assistant{background:linear-gradient(180deg,#10172a,#0c1422)}.mh{display:flex;align-items:center;gap:8px;margin-bottom:7px}.avatar{width:29px;height:29px;border-radius:9px;display:grid;place-items:center;background:#1d2a44;font-size:10px;font-weight:800}.assistant .avatar{background:linear-gradient(135deg,#7c3dff,#596fff)}.mh time{color:#66758e;font-size:10px}.msg p{margin:0;color:#d8e0ee}.file{display:flex;align-items:center;gap:9px;margin-top:10px;padding:9px;border:1px solid #263651;border-radius:10px;background:#0e1829}.file-icon{width:31px;height:31px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(135deg,#8f52ff,#6177ff)}.ok{margin-left:auto;color:#72efbd;font-size:11px}.suggest{padding:0 12px 8px;color:#7586a3}.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.chip{border:1px solid #2a3957;border-radius:999px;background:#0c1525;color:#bdc8da;padding:7px 9px;font-size:11px}.composer{padding:0 12px 12px}.compose{border:1px solid #364868;border-radius:14px;background:#0b1423;padding:10px}.compose textarea{width:100%;height:62px;border:0;outline:0;background:transparent;color:#fff;resize:none}.composefoot{display:flex;align-items:center;gap:6px}.send{margin-left:auto;width:38px;height:38px;border:0;border-radius:10px;background:linear-gradient(135deg,#8f52ff,#6177ff);color:#fff;font-size:18px}.workspace{grid-row:2;min-width:0;display:grid;grid-template-rows:54px minmax(0,1fr);background:#070d17}.workspacebar{display:flex;align-items:center;gap:7px;padding:8px 10px;border-bottom:1px solid var(--line)}.device{width:36px;height:34px;border:1px solid #263651;border-radius:9px;background:#0d1524;color:#8594ae}.device.active{background:#171b40;color:#fff;border-color:#744cff}.address{height:34px;flex:1;border:1px solid #263651;border-radius:9px;background:#0b1320;color:#7788a6;padding:0 12px;display:flex;align-items:center;gap:7px}.dot{width:7px;height:7px;border-radius:50%;background:var(--green)}.canvas{margin:10px;border:1px solid #2a3958;border-radius:14px;overflow:hidden;position:relative;background:radial-gradient(circle at 50% 35%,#5d2ad725,transparent 24%),#080f1c;box-shadow:0 22px 70px #0006}.preview{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}.empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:30px}.empty .bigmark svg{width:70px;height:70px;filter:drop-shadow(0 0 26px #8f52ff66)}.empty h1{font-size:29px;margin:18px 0 7px}.empty p{color:#8a9ab5;margin:0}.canvas.ready .empty{display:none}.codeview{position:absolute;inset:0;display:none;padding:12px;background:#080f1b;grid-template-rows:auto 1fr}.canvas.code .preview,.canvas.code .empty{display:none}.canvas.code .codeview{display:grid}.code-tabs{display:flex;gap:6px;margin-bottom:8px}.code-tabs button{border:1px solid #2b3954;background:#101827;color:#aab7cb;border-radius:8px;padding:6px 10px}.code-tabs button.active{border-color:#744cff;color:#fff}.editor{width:100%;height:100%;border:1px solid #23314c;border-radius:11px;background:#060b13;color:#d8e0ed;padding:12px;resize:none;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;outline:none}.applycode{position:absolute;right:24px;bottom:22px;height:36px;border:0;border-radius:9px;background:linear-gradient(135deg,#8f52ff,#6177ff);color:#fff;font-weight:800;padding:0 13px}.right{grid-row:2;border-left:1px solid var(--line);background:#080f1b;padding:10px;overflow:auto}.panel{border:1px solid #1f2b43;border-radius:13px;background:#0c1422;padding:13px;margin-bottom:9px}.panel h3{font-size:13px;margin:0 0 10px}.row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid #1a263c}.row:first-of-type{border-top:0}.muted{color:#8291a9}.metric{font-weight:800}.good{color:#63e8b5}.empty-state{border:1px dashed #2a3957;border-radius:11px;padding:17px;text-align:center;color:#7f8fa8}.publish-card button{width:100%;height:39px;border:0;border-radius:9px;background:linear-gradient(135deg,#8f52ff,#6177ff);color:#fff;font-weight:800}.url{display:block;color:#91a0b7;word-break:break-all;margin-top:9px}.credits{font-size:25px;font-weight:900}@media(max-width:1250px){.app{grid-template-columns:64px 340px 1fr}.right{display:none}}@media(max-width:900px){body{overflow:auto}.app{height:auto;min-height:100vh;grid-template-columns:64px 1fr;grid-template-rows:58px auto 640px}.chat{grid-column:2}.workspace{grid-column:1/-1;grid-row:3}.top .projectbox{display:none}}
+</style></head>
+<body><div class="app">
+<header class="top">
+  <div class="brand"><div class="vmark"><svg viewBox="0 0 32 32"><path fill="#8f52ff" d="M3 5h7l6 10 6-10h7L16 28z"/><path fill="#6574ff" d="M9 5h5l2 4 2-4h5l-7 13z"/></svg></div><b>Veyra Studio</b></div>
+  <div class="projectbox"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9eacc1"><path d="M4 5h16v14H4z"/><path d="M4 9h16"/></svg><span id="topProjectName">Untitled Project</span></div>
+  <div class="center-tabs"><button class="tab active" id="previewTab">Preview</button><button class="tab" id="codeTab">Code</button></div>
+  <div class="top-actions"><a class="action" href="{{url_for('dashboard')}}">Dashboard</a><button class="action" id="saveBtn">Save</button><button class="action" id="exportBtn">Export</button><button class="action primary" id="publishBtn">Publish</button></div>
 </header>
 
 <aside class="rail">
-  <button class="rail-btn active"><span class="ico">▤</span><span>Chat</span></button>
-  <button class="rail-btn"><span class="ico">▦</span><span>Design</span></button>
-  <button class="rail-btn"><span class="ico">▧</span><span>Pages</span></button>
-  <button class="rail-btn"><span class="ico">⬡</span><span>Components</span></button>
-  <button class="rail-btn"><span class="ico">◉</span><span>Data</span></button>
-  <button class="rail-btn"><span class="ico">⌘</span><span>Integrations</span></button>
-  <button class="rail-btn"><span class="ico">⚙</span><span>Settings</span></button>
-  <div class="rail-user">{{ (user.name or user.email or 'VE')[:2]|upper if user else 'VE' }}</div>
+<a class="active" href="#"><svg viewBox="0 0 24 24"><path d="M5 5h14v11H8l-3 3z"/></svg><span>Chat</span></a>
+<a href="{{url_for('projects_page')}}"><svg viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v10A1.5 1.5 0 0 1 19.5 20h-15A1.5 1.5 0 0 1 3 18.5z"/></svg><span>Projects</span></a>
+<a href="{{url_for('deployments_page')}}"><svg viewBox="0 0 24 24"><path d="m12 3 7 4-7 4-7-4zM5 7v8l7 4 7-4V7"/></svg><span>Deploy</span></a>
+<a href="{{url_for('analytics_page')}}"><svg viewBox="0 0 24 24"><path d="M4 19 9 13l4 3 7-10"/><path d="M15 6h5v5"/></svg><span>Analytics</span></a>
+<a href="{{url_for('settings_page')}}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M4 12h2m12 0h2M12 4v2m0 12v2"/></svg><span>Settings</span></a>
+<div class="rail-user">{{ (user.name or user.email or 'VE')[:2]|upper if user else 'VE' }}</div>
 </aside>
 
 <section class="chat">
-  <div class="chat-head">
-    <div class="project-orb"></div>
-    <div><b id="projectTitle">Untitled Project</b><small>AI website builder</small></div>
-    <div class="agents">Agents⌄ &nbsp; ＋</div>
-  </div>
-
+  <div class="chat-head"><div class="ai-emblem"><svg viewBox="0 0 32 32"><path fill="#8f52ff" d="M3 5h7l6 10 6-10h7L16 28z"/><path fill="#6574ff" d="M9 5h5l2 4 2-4h5l-7 13z"/></svg></div><div><b>Veyra Assistant</b><small id="projectTitle">AI website builder</small></div></div>
   <div class="messages" id="messages">
-    <div class="msg">
-      <div class="msg-head">
-        <div class="avatar">{{ (user.name or user.email or 'VE')[:2]|upper if user else 'VE' }}</div>
-        <b>You</b><time>now</time>
-      </div>
-      <p>Create a modern website or web app. Tell Veyra what you want and it will build the live preview here.</p>
-    </div>
-
-    <div class="msg assistant">
-      <div class="msg-head">
-        <div class="avatar">✦</div>
-        <b>Veyra Assistant</b><time>ready</time>
-      </div>
-      <p>I’m ready. Describe the product, layout, or change you want and I’ll update the same project instead of restarting it.</p>
-    </div>
+    <div class="msg assistant"><div class="mh"><div class="avatar">V</div><b>Veyra Assistant</b><time>ready</time></div><p>Describe what you want to build or change. I’ll keep editing the same project instead of restarting it.</p></div>
   </div>
-
-  <div class="bottom-chat">
-    <div class="suggest">
-      ✦ Suggested next steps
-      <div class="chips">
-        <button class="chip" data-prompt="Create a premium SaaS landing page">✦ SaaS landing page</button>
-        <button class="chip" data-prompt="Create a modern portfolio website">▣ Portfolio</button>
-        <button class="chip" data-prompt="Create a dark analytics dashboard">▥ Dashboard</button>
-        <button class="chip" data-prompt="Create a modern ecommerce storefront">🛒 E-commerce</button>
-      </div>
-    </div>
-
-    <div class="composer">
-      <div class="compose-box">
-        <textarea id="prompt" placeholder="Ask Veyra to build, redesign, debug, or improve anything..."></textarea>
-        <div class="compose-actions">
-          <button class="mini">＋</button>
-          <button class="mini">◉ Web Search</button>
-          <button class="mini">▧ Visual Edit</button>
-          <button class="mini">&lt;/&gt; Code</button>
-          <button class="send" id="sendBtn">→</button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <div><div class="suggest">Starter prompts<div class="chips"><button class="chip" data-prompt="Create a premium SaaS landing page">SaaS</button><button class="chip" data-prompt="Create a modern portfolio website">Portfolio</button><button class="chip" data-prompt="Create a dark analytics dashboard">Dashboard</button><button class="chip" data-prompt="Create a modern ecommerce storefront">Store</button></div></div><div class="composer"><div class="compose"><textarea id="prompt" placeholder="Ask Veyra to build, redesign, debug, or improve anything..."></textarea><div class="composefoot"><span class="muted" id="engineStatus">Veyra AI</span><button class="send" id="sendBtn">→</button></div></div></div></div>
 </section>
 
 <main class="workspace">
-  <div class="workspace-head">
-    <button class="device active">▰</button>
-    <button class="device">▯</button>
-    <button class="device">▯</button>
-    <div class="live">Live Preview</div>
-    <button class="device">⛶</button>
-    <button class="device">↻</button>
-    <button class="device">•••</button>
-  </div>
-
-  <div class="preview-card" id="previewCard">
-    <div class="stars"></div>
-    <iframe class="preview-frame" id="preview"></iframe>
-
-    <div class="empty">
-      <div>
-        <div class="orb"></div>
-        <h1>Your build appears here</h1>
-        <p>Start with a prompt and Veyra will generate the live project preview.</p>
-
-        <div class="features">
-          <div class="feature"><div class="feature-ico">▱</div><span>AI-powered<br>website builder</span></div>
-          <div class="feature"><div class="feature-ico">⚡</div><span>Real-time<br>live preview</span></div>
-          <div class="feature"><div class="feature-ico">✦</div><span>Iterate, refine<br>and publish</span></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="connection" id="connection">● Veyra connected</div>
+  <div class="workspacebar"><button class="device active">▰</button><button class="device">▯</button><div class="address"><span class="dot"></span><span id="addressText">Live preview</span></div><button class="device" id="refreshBtn">↻</button></div>
+  <div class="canvas" id="canvas">
+    <iframe class="preview" id="preview"></iframe>
+    <div class="empty"><div><div class="bigmark"><svg viewBox="0 0 32 32"><path fill="#8f52ff" d="M3 5h7l6 10 6-10h7L16 28z"/><path fill="#6574ff" d="M9 5h5l2 4 2-4h5l-7 13z"/></svg></div><h1>Your build appears here</h1><p>Start with a prompt. No fake preview — this area only changes when a real build exists.</p></div></div>
+    <div class="codeview"><div class="code-tabs"><button class="active" data-code="html">HTML</button><button data-code="css">CSS</button><button data-code="js">JS</button></div><textarea class="editor" id="codeEditor"></textarea><button class="applycode" id="applyCode">Apply changes</button></div>
   </div>
 </main>
 
-<aside class="qa">
-  <div class="qa-card">
-    <div class="qa-title"><span>◇ Veyra Quality</span><span>→</span></div>
-    <div class="score-wrap">
-      <div class="score" id="qualityScore">92</div>
-      <div class="score-copy"><b>Overall Score</b><small>● Looks good</small></div>
-    </div>
-    <div class="metric"><span>◇ Performance</span><span class="good">96</span></div>
-    <div class="metric"><span>◇ SEO</span><span class="good">88</span></div>
-    <div class="metric"><span>◇ Accessibility</span><span class="good">92</span></div>
-    <div class="metric"><span>◇ Best Practices</span><span class="good">90</span></div>
-  </div>
-
-  <div class="qa-card">
-    <div class="qa-title"><span>⚒ QA & Auto Fix</span><span>☷</span></div>
-    <div class="qa-row"><div class="qico">✓</div><div><b>No critical issues</b><br><small style="color:#8294b5">Your project is in great shape.</small></div></div>
-    <div class="qa-row"><div class="qico">▷</div><span>Run full audit</span><span style="margin-left:auto">›</span></div>
-    <div class="qa-row"><div class="qico">✦</div><span>Auto fix issues</span><span style="margin-left:auto">›</span></div>
-    <div class="qa-row"><div class="qico">◉</div><span>View suggestions</span><span style="margin-left:auto">3</span></div>
-  </div>
-
-  <div class="qa-card">
-    <div class="qa-title"><span>☁ Deploy</span></div>
-    <div class="qa-row"><div class="qico">✓</div><div><b>Ready to publish</b><br><small style="color:#8294b5">Deploy to a custom domain in one click.</small></div></div>
-    <button class="deploy">☁ Publish to live site</button>
-  </div>
+<aside class="right">
+  <div class="panel"><h3>Project</h3><div class="row"><span class="muted">Name</span><span class="metric" id="sideName">Untitled Project</span></div><div class="row"><span class="muted">Access</span><span class="metric" id="accessRole">owner</span></div><div class="row"><span class="muted">Saved</span><span class="metric" id="savedState">Not yet</span></div></div>
+  <div class="panel"><h3>Build quality</h3><div id="qualityEmpty" class="empty-state">No audit yet. Build something first.</div><div id="qualityRows" style="display:none"><div class="row"><span class="muted">Accessibility</span><span class="metric" id="qA11y">—</span></div><div class="row"><span class="muted">Performance</span><span class="metric" id="qPerf">—</span></div><div class="row"><span class="muted">Responsive</span><span class="metric" id="qResp">—</span></div><div class="row"><span class="muted">Security</span><span class="metric" id="qSec">—</span></div></div></div>
+  <div class="panel publish-card"><h3>Deployment</h3><div id="deployEmpty" class="empty-state">Save the project, then publish it.</div><button id="sidePublish" style="display:none">Publish live</button><a class="url" id="liveUrl" target="_blank"></a></div>
+  <div class="panel"><h3>Account & usage</h3><div class="credits">{{ user.credits or 0 }}</div><span class="muted">credits available</span><div class="row"><span class="muted">New AI build</span><span>25</span></div><div class="row"><span class="muted">Follow-up edit</span><span>10</span></div></div>
 </aside>
 </div>
 
 <script>
-const state={title:"Untitled Project",html:"",css:"",js:"",project_id:null};
-
-const promptEl=document.getElementById("prompt");
-const sendBtn=document.getElementById("sendBtn");
-const messages=document.getElementById("messages");
-const frame=document.getElementById("preview");
-const previewCard=document.getElementById("previewCard");
-const connection=document.getElementById("connection");
-const projectTitle=document.getElementById("projectTitle");
-const topProjectName=document.getElementById("topProjectName");
-
-function esc(v){
-  return String(v??"").replace(/[&<>"']/g,m=>({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-  }[m]));
+const state={title:"Untitled Project",html:"",css:"",js:"",project_id:null,access_role:"owner",published_url:""};
+let codeType="html";
+const $=id=>document.getElementById(id);
+const promptEl=$("prompt"),sendBtn=$("sendBtn"),messages=$("messages"),frame=$("preview"),canvas=$("canvas");
+function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
+function syncUI(){
+  $("topProjectName").textContent=state.title;$("sideName").textContent=state.title;$("projectTitle").textContent=state.title;
+  $("accessRole").textContent=state.access_role||"owner";
+  $("savedState").textContent=state.project_id?"Saved":"Not yet";
+  $("deployEmpty").style.display=state.project_id?"none":"block";
+  $("sidePublish").style.display=state.project_id&&state.access_role==="owner"?"block":"none";
+  $("publishBtn").disabled=!state.project_id||state.access_role!=="owner";
+  if(state.published_url){$("liveUrl").textContent=state.published_url;$("liveUrl").href=state.published_url;$("addressText").textContent=state.published_url;}
 }
-
-function addMessage(role,text,cardTitle){
-  const el=document.createElement("div");
-  el.className="msg "+(role==="assistant"?"assistant":"");
-  el.innerHTML=`
-    <div class="msg-head">
-      <div class="avatar">${role==="assistant"?"✦":"{{ (user.name or user.email or 'VE')[:2]|upper if user else 'VE' }}"}</div>
-      <b>${role==="assistant"?"Veyra Assistant":"You"}</b>
-      <time>now</time>
-    </div>
-    <p>${esc(text)}</p>
-    ${cardTitle?`
-      <div class="file-card">
-        <div class="file-icon">▤</div>
-        <div class="file-meta">
-          <b>${esc(cardTitle)}</b>
-          <small>Live project update</small>
-        </div>
-        <span class="status-pill">✓ Updated</span>
-      </div>`:""}
-  `;
-  messages.appendChild(el);
-  messages.scrollTop=messages.scrollHeight;
+function addMessage(role,text,card){
+  const el=document.createElement("div");el.className="msg "+(role==="assistant"?"assistant":"");
+  el.innerHTML=`<div class="mh"><div class="avatar">${role==="assistant"?"V":"{{ (user.name or user.email or 'VE')[:2]|upper if user else 'VE' }}"}</div><b>${role==="assistant"?"Veyra Assistant":"You"}</b><time>now</time></div><p>${esc(text)}</p>${card?`<div class="file"><div class="file-icon">V</div><div><b>${esc(card)}</b><span class="muted">Live project update</span></div><span class="ok">Updated</span></div>`:""}`;
+  messages.appendChild(el);messages.scrollTop=messages.scrollHeight;
 }
-
 function renderPreview(){
-  const safeJs=(state.js||"").replace(/<\/script>/gi,"<\\/script>");
-  frame.srcdoc=`<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<style>${state.css||""}</style>
-</head>
-<body>
-${state.html||""}
-<script>${safeJs}<\/script>
-</body>
-</html>`;
-  previewCard.classList.add("ready");
+  const safe=(state.js||"").replace(/<\/script>/gi,"<\\/script>");
+  frame.srcdoc=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${state.css||""}</style></head><body>${state.html||""}<script>${safe}<\/script></body></html>`;
+  if(state.html||state.css||state.js)canvas.classList.add("ready");
 }
-
+function setQuality(q){
+  if(!q)return;$("qualityEmpty").style.display="none";$("qualityRows").style.display="block";
+  $("qA11y").textContent=q.accessibility??"—";$("qPerf").textContent=q.performance??"—";$("qResp").textContent=q.responsive??"—";$("qSec").textContent=q.security??"—";
+}
 async function build(prompt){
-  prompt=(prompt||"").trim();
-  if(!prompt) return;
-
-  addMessage("user",prompt);
-  promptEl.value="";
-  sendBtn.disabled=true;
-  connection.textContent="● Veyra building...";
-
+  prompt=(prompt||"").trim();if(!prompt)return;addMessage("user",prompt);promptEl.value="";sendBtn.disabled=true;$("engineStatus").textContent="Veyra building…";
   try{
-    const res=await fetch("/api/build",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        prompt,
-        current:{
-          html:state.html,
-          css:state.css,
-          js:state.js
-        }
-      })
-    });
-
-    const data=await res.json();
-
-    if(!res.ok || data.ok===false){
-      throw new Error(data.error||"Build failed");
-    }
-
-    state.title=data.title||state.title;
-    state.html=data.html||"";
-    state.css=data.css||"";
-    state.js=data.js||"";
-
-    projectTitle.textContent=state.title;
-    topProjectName.textContent=state.title;
-    renderPreview();
-
-    addMessage(
-      "assistant",
-      data.assistant_message||"Done — I updated the project and refreshed the live preview.",
-      state.title
-    );
-
-    connection.textContent="● Veyra connected";
-  }catch(err){
-    addMessage("assistant","I couldn’t complete that build: "+err.message);
-    connection.textContent="● Build error";
-  }finally{
-    sendBtn.disabled=false;
-  }
+    const res=await fetch("/api/build",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,current:{html:state.html,css:state.css,js:state.js}})});
+    const data=await res.json();if(!res.ok||data.ok===false)throw new Error(data.error||"Build failed");
+    state.title=data.title||state.title;state.html=data.html||"";state.css=data.css||"";state.js=data.js||"";renderPreview();setQuality(data.quality);syncUI();
+    addMessage("assistant",data.assistant_message||"Done — I updated the project.",state.title);$("engineStatus").textContent=data.engine||"Veyra AI";
+  }catch(e){addMessage("assistant","Build failed: "+e.message);$("engineStatus").textContent="Build error";}finally{sendBtn.disabled=false;}
 }
-
-sendBtn.addEventListener("click",()=>build(promptEl.value));
-
-promptEl.addEventListener("keydown",e=>{
-  if(e.key==="Enter"&&!e.shiftKey){
-    e.preventDefault();
-    build(promptEl.value);
-  }
-});
-
-document.querySelectorAll("[data-prompt]").forEach(btn=>{
-  btn.addEventListener("click",()=>build(btn.dataset.prompt));
-});
-
-document.getElementById("saveBtn").addEventListener("click",async()=>{
-  connection.textContent="● Saving...";
-  try{
-    const res=await fetch("/api/projects/save",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        project_id:state.project_id,
-        title:state.title,
-        description:"Built with Veyra",
-        html:state.html,
-        css:state.css,
-        js:state.js
-      })
-    });
-    const data=await res.json();
-    if(data.id) state.project_id=data.id;
-    connection.textContent=data.ok===false?"● Save failed":"● Project saved";
-  }catch{
-    connection.textContent="● Save failed";
-  }
-});
-</script>
-</body>
-</html>
+async function save(){
+  const res=await fetch("/api/projects/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({project_id:state.project_id,title:state.title,description:"Built with Veyra",html:state.html,css:state.css,js:state.js})});
+  const data=await res.json();if(!res.ok||data.ok===false)throw new Error(data.error||"Save failed");state.project_id=data.project_id;syncUI();return data;
+}
+async function publish(){
+  if(!state.project_id)await save();
+  const res=await fetch("/api/projects/publish",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({project_id:state.project_id})});
+  const data=await res.json();if(!res.ok||data.ok===false)throw new Error(data.error||"Publish failed");state.published_url=data.url;syncUI();addMessage("assistant","Published successfully. Your live URL is "+data.url);
+}
+async function loadProject(id){
+  const res=await fetch("/api/projects/"+id);const data=await res.json();if(!res.ok||!data.ok)throw new Error(data.error||"Project load failed");
+  const p=data.project;state.project_id=p.id;state.title=p.name||state.title;state.html=p.html||"";state.css=p.css||"";state.js=p.js||"";state.access_role=p.access_role||"viewer";renderPreview();syncUI();addMessage("assistant","Loaded "+state.title+".");
+}
+async function doExport(){
+  const res=await fetch("/api/projects/export",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title:state.title,html:state.html,css:state.css,js:state.js})});
+  if(!res.ok)throw new Error("Export failed");const blob=await res.blob();const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=(state.title||"veyra-project").replace(/[^a-z0-9_-]+/gi,"-").toLowerCase()+".zip";a.click();URL.revokeObjectURL(a.href);
+}
+sendBtn.onclick=()=>build(promptEl.value);promptEl.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();build(promptEl.value)}});
+document.querySelectorAll("[data-prompt]").forEach(b=>b.onclick=()=>build(b.dataset.prompt));
+$("saveBtn").onclick=async()=>{try{await save();addMessage("assistant","Project saved.");}catch(e){addMessage("assistant",e.message)}};
+$("publishBtn").onclick=$("sidePublish").onclick=async()=>{try{await publish()}catch(e){addMessage("assistant",e.message)}};
+$("exportBtn").onclick=async()=>{try{await doExport()}catch(e){addMessage("assistant",e.message)}};
+$("refreshBtn").onclick=renderPreview;
+$("previewTab").onclick=()=>{canvas.classList.remove("code");$("previewTab").classList.add("active");$("codeTab").classList.remove("active")};
+$("codeTab").onclick=()=>{canvas.classList.add("code");$("codeTab").classList.add("active");$("previewTab").classList.remove("active");$("codeEditor").value=state[codeType]||""};
+document.querySelectorAll("[data-code]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-code]").forEach(x=>x.classList.remove("active"));b.classList.add("active");codeType=b.dataset.code;$("codeEditor").value=state[codeType]||""});
+$("applyCode").onclick=()=>{state[codeType]=$("codeEditor").value;renderPreview();addMessage("assistant",codeType.toUpperCase()+" updated from the code editor.")};
+const qp=new URLSearchParams(location.search);if(qp.get("project"))loadProject(qp.get("project")).catch(e=>addMessage("assistant",e.message));
+syncUI();
+</script></body></html>

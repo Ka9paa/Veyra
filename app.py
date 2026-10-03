@@ -61,7 +61,7 @@ else:
 
 
 class _PgCursor:
-    _ID_TABLES={'users','projects','vouches','support_threads','admin_audit'}
+    _ID_TABLES={'users','projects','vouches','support_threads','admin_audit','project_members','agents','project_databases','deployments','analytics_events'}
 
     def __init__(self, cursor):
         self._cursor=cursor
@@ -222,6 +222,50 @@ def init_db():
                 granted_by TEXT NOT NULL,
                 granted_at TEXT NOT NULL
             )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS project_members(
+                id BIGSERIAL PRIMARY KEY,
+                project_id BIGINT NOT NULL,
+                user_id BIGINT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'editor',
+                added_by BIGINT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(project_id,user_id)
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS agents(
+                id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'idle',
+                created_at TEXT NOT NULL
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS project_databases(
+                id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                project_id BIGINT,
+                name TEXT NOT NULL,
+                provider TEXT NOT NULL DEFAULT 'Postgres',
+                status TEXT NOT NULL DEFAULT 'connected',
+                created_at TEXT NOT NULL
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS deployments(
+                id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                project_id BIGINT NOT NULL,
+                url TEXT DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'ready',
+                created_at TEXT NOT NULL
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS analytics_events(
+                id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                project_id BIGINT NOT NULL,
+                event_type TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )''')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members(project_id)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_project_members_user ON project_members(user_id)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_analytics_project ON analytics_events(project_id)')
         else:
             c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 50,created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
             c.execute('''CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)''')
@@ -249,6 +293,11 @@ def init_db():
                 granted_by TEXT NOT NULL,
                 granted_at TEXT NOT NULL
             )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS project_members(id INTEGER PRIMARY KEY AUTOINCREMENT,project_id INTEGER NOT NULL,user_id INTEGER NOT NULL,role TEXT NOT NULL DEFAULT 'editor',added_by INTEGER NOT NULL,created_at TEXT NOT NULL,UNIQUE(project_id,user_id))''')
+            c.execute('''CREATE TABLE IF NOT EXISTS agents(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'idle',created_at TEXT NOT NULL)''')
+            c.execute('''CREATE TABLE IF NOT EXISTS project_databases(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER,name TEXT NOT NULL,provider TEXT NOT NULL DEFAULT 'Postgres',status TEXT NOT NULL DEFAULT 'connected',created_at TEXT NOT NULL)''')
+            c.execute('''CREATE TABLE IF NOT EXISTS deployments(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER NOT NULL,url TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'ready',created_at TEXT NOT NULL)''')
+            c.execute('''CREATE TABLE IF NOT EXISTS analytics_events(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER NOT NULL,event_type TEXT NOT NULL,created_at TEXT NOT NULL)''')
         c.commit()
 
 def _cache_user(user):
@@ -933,69 +982,284 @@ def account():
 @login_required
 def studio():return render_template('studio.html',user=current_user())
 
+def _owned_projects(uid):
+    with db() as c:
+        return [dict(r) for r in c.execute(
+            'SELECT * FROM projects WHERE user_id=? ORDER BY updated_at DESC',
+            (uid,)
+        ).fetchall()]
+
+
+def _project_for_owner(project_id, uid):
+    with db() as c:
+        row=c.execute('SELECT * FROM projects WHERE id=? AND user_id=?',(project_id,uid)).fetchone()
+        return dict(row) if row else None
+
+
+def _project_access(project_id, uid):
+    with db() as c:
+        project=c.execute('SELECT * FROM projects WHERE id=?',(project_id,)).fetchone()
+        if not project:
+            return None, None
+        project=dict(project)
+        if int(project['user_id'])==int(uid):
+            return project, 'owner'
+        membership=c.execute(
+            'SELECT role FROM project_members WHERE project_id=? AND user_id=?',
+            (project_id,uid)
+        ).fetchone()
+        if membership:
+            return project, str(membership['role'] or 'viewer')
+        return project, None
+
+
+def _visible_projects(uid):
+    with db() as c:
+        rows=c.execute(
+            '''SELECT p.*, 'owner' AS access_role
+               FROM projects p
+               WHERE p.user_id=?
+               UNION ALL
+               SELECT p.*, pm.role AS access_role
+               FROM projects p
+               JOIN project_members pm ON pm.project_id=p.id
+               WHERE pm.user_id=?
+               ORDER BY updated_at DESC''',
+            (uid,uid)
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    u=current_user()
+    u=current_user(); uid=u['id']
     with db() as c:
-        rows=c.execute('SELECT * FROM projects WHERE user_id=? ORDER BY updated_at DESC LIMIT 4',(u['id'],)).fetchall()
-        count=c.execute('SELECT COUNT(*) AS n FROM projects WHERE user_id=?',(u['id'],)).fetchone()['n']
-    projects=[dict(r) for r in rows]
-    stats={'projects':count,'deployments':0,'team':1}
-    return render_template('dashboard.html',user=u,projects=projects,stats=stats)
+        rows=c.execute('SELECT * FROM projects WHERE user_id=? ORDER BY updated_at DESC LIMIT 6',(uid,)).fetchall()
+        project_count=c.execute('SELECT COUNT(*) AS n FROM projects WHERE user_id=?',(uid,)).fetchone()['n']
+        deployment_count=c.execute('SELECT COUNT(*) AS n FROM deployments WHERE user_id=?',(uid,)).fetchone()['n']
+        analytics_count=c.execute('SELECT COUNT(*) AS n FROM analytics_events WHERE user_id=?',(uid,)).fetchone()['n']
+    return render_template('dashboard.html',user=u,projects=[dict(r) for r in rows],stats={
+        'projects':int(project_count or 0),
+        'deployments':int(deployment_count or 0),
+        'analytics':int(analytics_count or 0),
+    })
+
 
 @app.route('/app/projects')
 @login_required
-def projects_page():return render_template('projects.html',user=current_user())
+def projects_page():
+    u=current_user()
+    return render_template('projects.html',user=u,projects=_visible_projects(u['id']))
+
 
 @app.route('/app/templates')
 @login_required
-def templates_page():return render_template('templates.html',user=current_user())
+def templates_page():
+    starter_templates=[
+        {'name':'SaaS landing page','kind':'Marketing','description':'Hero, features, pricing and CTA sections.'},
+        {'name':'Portfolio','kind':'Personal','description':'Projects, about, experience and contact sections.'},
+        {'name':'Admin dashboard','kind':'App','description':'Sidebar, metrics shell, tables and settings layout.'},
+        {'name':'Storefront','kind':'Commerce','description':'Product grid, product details and cart-ready layout.'},
+    ]
+    return render_template('templates.html',user=current_user(),templates=starter_templates)
+
 
 @app.route('/app/deployments')
 @login_required
-def deployments_page():return render_template('deployments.html',user=current_user())
+def deployments_page():
+    u=current_user()
+    with db() as c:
+        rows=c.execute("SELECT d.*,p.name AS project_name FROM deployments d JOIN projects p ON p.id=d.project_id WHERE d.user_id=? ORDER BY d.created_at DESC",(u['id'],)).fetchall()
+    return render_template('deployments.html',user=u,deployments=[dict(r) for r in rows])
 
-@app.route('/app/flows')
-@login_required
-def flows_page():return render_template('flows.html',user=current_user())
 
 @app.route('/app/agents')
 @login_required
-def agents_page():return render_template('agents.html',user=current_user())
+def agents_page():
+    u=current_user()
+    with db() as c:
+        rows=c.execute('SELECT * FROM agents WHERE user_id=? ORDER BY created_at DESC',(u['id'],)).fetchall()
+    return render_template('agents.html',user=u,agents=[dict(r) for r in rows])
 
-@app.route('/app/automations')
-@login_required
-def automations_page():return render_template('automations.html',user=current_user())
 
-@app.route('/app/components')
+@app.post('/app/agents/create')
 @login_required
-def components_page():return render_template('components.html',user=current_user())
+def agents_create():
+    u=current_user(); name=(request.form.get('name') or '').strip()[:80]
+    description=(request.form.get('description') or '').strip()[:300]
+    if not name:
+        flash('Agent name is required.','error'); return redirect(url_for('agents_page'))
+    with db() as c:
+        c.execute('INSERT INTO agents(user_id,name,description,status,created_at) VALUES(?,?,?,?,?)',(u['id'],name,description,'idle',now()))
+        c.commit()
+    return redirect(url_for('agents_page'))
 
-@app.route('/app/tokens')
-@login_required
-def tokens_page():return render_template('tokens.html',user=current_user())
-
-@app.route('/app/data-studio')
-@login_required
-def data_studio_page():return render_template('data_studio.html',user=current_user())
 
 @app.route('/app/settings')
 @login_required
-def settings_page():return render_template('settings.html',user=current_user())
+def settings_page():
+    return render_template('settings.html',user=current_user())
+
+
+@app.route('/app/profile')
+@login_required
+def profile_page():
+    return redirect(url_for('account'))
 
 
 @app.route('/app/databases')
 @login_required
-def databases_page():return render_template('databases.html',user=current_user())
+def databases_page():
+    u=current_user()
+    with db() as c:
+        rows=c.execute("SELECT d.*,p.name AS project_name FROM project_databases d LEFT JOIN projects p ON p.id=d.project_id WHERE d.user_id=? ORDER BY d.created_at DESC",(u['id'],)).fetchall()
+    return render_template('databases.html',user=u,databases=[dict(r) for r in rows])
+
 
 @app.route('/app/analytics')
 @login_required
-def analytics_page():return render_template('analytics.html',user=current_user())
+def analytics_page():
+    u=current_user()
+    with db() as c:
+        events=c.execute("SELECT a.*,p.name AS project_name FROM analytics_events a JOIN projects p ON p.id=a.project_id WHERE a.user_id=? ORDER BY a.created_at DESC LIMIT 100",(u['id'],)).fetchall()
+    return render_template('analytics.html',user=u,events=[dict(r) for r in events])
+
 
 @app.route('/app/team')
 @login_required
-def team_page():return render_template('team.html',user=current_user())
+def team_page():
+    u=current_user()
+    return render_template('team.html',user=u,projects=_owned_projects(u['id']))
+
+
+@app.route('/app/projects/<int:project_id>/members')
+@login_required
+def project_members_page(project_id):
+    u=current_user(); project=_project_for_owner(project_id,u['id'])
+    if not project:
+        return ('Project not found',404)
+    with db() as c:
+        rows=c.execute("SELECT pm.*,u.name,u.email,u.avatar_url FROM project_members pm JOIN users u ON u.id=pm.user_id WHERE pm.project_id=? ORDER BY pm.created_at ASC",(project_id,)).fetchall()
+    return render_template('project_members.html',user=u,project=project,members=[dict(r) for r in rows])
+
+
+@app.post('/app/projects/<int:project_id>/members/add')
+@login_required
+def project_members_add(project_id):
+    u=current_user(); project=_project_for_owner(project_id,u['id'])
+    if not project:
+        return ('Project not found',404)
+    email=(request.form.get('email') or '').strip().lower()[:240]
+    role=(request.form.get('role') or 'editor').strip().lower()
+    if role not in {'viewer','editor'}:
+        role='editor'
+    if not email:
+        flash('Enter a Veyra account email.','error')
+        return redirect(url_for('project_members_page',project_id=project_id))
+    with db() as c:
+        target=c.execute('SELECT id,email,name FROM users WHERE LOWER(email)=LOWER(?) ORDER BY id ASC LIMIT 1',(email,)).fetchone()
+        if not target:
+            flash('No Veyra account uses that email yet. Ask them to create an account first.','error')
+            return redirect(url_for('project_members_page',project_id=project_id))
+        if int(target['id'])==int(u['id']):
+            flash('You already own this project.','error')
+            return redirect(url_for('project_members_page',project_id=project_id))
+        try:
+            c.execute('INSERT INTO project_members(project_id,user_id,role,added_by,created_at) VALUES(?,?,?,?,?)',(project_id,target['id'],role,u['id'],now()))
+            c.commit()
+            flash('Project member added.','success')
+        except Exception:
+            c.rollback()
+            flash('That person is already on this project.','error')
+    return redirect(url_for('project_members_page',project_id=project_id))
+
+
+@app.post('/app/projects/<int:project_id>/members/<int:member_id>/remove')
+@login_required
+def project_members_remove(project_id,member_id):
+    u=current_user(); project=_project_for_owner(project_id,u['id'])
+    if not project:
+        return ('Project not found',404)
+    with db() as c:
+        c.execute('DELETE FROM project_members WHERE id=? AND project_id=?',(member_id,project_id))
+        c.commit()
+    flash('Project member removed.','success')
+    return redirect(url_for('project_members_page',project_id=project_id))
+
+
+@app.get('/api/projects/<int:project_id>')
+@login_required
+def get_project(project_id):
+    u=current_user()
+    project,role=_project_access(project_id,u['id'])
+    if not project or not role:
+        return jsonify({'ok':False,'error':'Project not found'}),404
+    project['access_role']=role
+    return jsonify({'ok':True,'project':project})
+
+
+@app.post('/api/projects/publish')
+@login_required
+def publish_project():
+    payload=request.get_json(silent=True) or {}
+    project_id=payload.get('project_id')
+    if not project_id:
+        return jsonify({'ok':False,'error':'Save the project before publishing.'}),400
+
+    u=current_user()
+    project=_project_for_owner(project_id,u['id'])
+    if not project:
+        return jsonify({'ok':False,'error':'Only the project owner can publish.'}),403
+
+    public_path=f"/p/{int(project_id)}"
+    public_url=public_url(public_path)
+
+    with db() as c:
+        existing=c.execute(
+            'SELECT id FROM deployments WHERE project_id=? AND user_id=? ORDER BY id DESC LIMIT 1',
+            (project_id,u['id'])
+        ).fetchone()
+        if existing:
+            c.execute(
+                "UPDATE deployments SET url=?,status='ready',created_at=? WHERE id=?",
+                (public_url,now(),existing['id'])
+            )
+        else:
+            c.execute(
+                'INSERT INTO deployments(user_id,project_id,url,status,created_at) VALUES(?,?,?,?,?)',
+                (u['id'],project_id,public_url,'ready',now())
+            )
+        c.commit()
+
+    return jsonify({'ok':True,'url':public_url,'project_id':int(project_id)})
+
+
+@app.get('/p/<int:project_id>')
+def public_project(project_id):
+    with db() as c:
+        project=c.execute('SELECT * FROM projects WHERE id=?',(project_id,)).fetchone()
+        deployment=c.execute(
+            "SELECT id FROM deployments WHERE project_id=? AND status='ready' ORDER BY id DESC LIMIT 1",
+            (project_id,)
+        ).fetchone()
+        if not project or not deployment:
+            return ('Project not published',404)
+
+        project=dict(project)
+        try:
+            c.execute(
+                'INSERT INTO analytics_events(user_id,project_id,event_type,created_at) VALUES(?,?,?,?)',
+                (project['user_id'],project_id,'page_view',now())
+            )
+            c.commit()
+        except Exception:
+            c.rollback()
+
+    safe_js=(project.get('js') or '').replace('</script>','<\\/script>')
+    page='''<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>''' + (project.get('css') or '') + '''</style></head><body>''' + (project.get('html') or '') + '''<script>''' + safe_js + '''</script></body></html>'''
+    return page
+
 
 @app.get('/api/ai/status')
 @login_required
@@ -1102,17 +1366,27 @@ def save_project():
     uid=current_user()['id']
     with db() as c:
         existing=None
+        access_role=None
         if project_id:
-            existing=c.execute(
-                'SELECT id FROM projects WHERE id=? AND user_id=?',
-                (project_id,uid)
-            ).fetchone()
-        if existing:
+            existing=c.execute('SELECT * FROM projects WHERE id=?',(project_id,)).fetchone()
+            if existing:
+                if int(existing['user_id'])==int(uid):
+                    access_role='owner'
+                else:
+                    member=c.execute(
+                        'SELECT role FROM project_members WHERE project_id=? AND user_id=?',
+                        (project_id,uid)
+                    ).fetchone()
+                    access_role=str(member['role']) if member else None
+
+        if existing and access_role in {'owner','editor'}:
             c.execute(
-                'UPDATE projects SET name=?,description=?,html=?,css=?,js=?,updated_at=? WHERE id=? AND user_id=?',
-                (title,description,html,css,js,now(),project_id,uid)
+                'UPDATE projects SET name=?,description=?,html=?,css=?,js=?,updated_at=? WHERE id=?',
+                (title,description,html,css,js,now(),project_id)
             )
             saved_id=int(project_id)
+        elif existing:
+            return jsonify({'ok':False,'error':'You do not have edit access to this project.'}),403
         else:
             cur=c.execute(
                 'INSERT INTO projects(user_id,name,description,html,css,js,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',
