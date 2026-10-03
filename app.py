@@ -42,10 +42,15 @@ app.config.update(
 # Canonical public URL used by OAuth providers.
 # Keep this stable so Google/Discord callbacks do not change between Vercel hosts.
 PUBLIC_BASE_URL=(os.getenv('PUBLIC_BASE_URL') or 'https://buildveyra.xyz').strip().rstrip('/')
+OAUTH_BASE_URL=(os.getenv('OAUTH_BASE_URL') or PUBLIC_BASE_URL or 'https://buildveyra.xyz').strip().rstrip('/')
 
 def public_url(path):
     path='/' + str(path or '').lstrip('/')
     return f"{PUBLIC_BASE_URL}{path}"
+
+def oauth_url(path):
+    path='/' + str(path or '').lstrip('/')
+    return f"{OAUTH_BASE_URL}{path}"
 # Production uses the same Neon/Postgres database as the Discord admin bot.
 # SQLite remains only as a local-development fallback.
 DATABASE_URL=(os.getenv('DATABASE_URL') or '').strip()
@@ -727,41 +732,70 @@ def logout():
 def auth_google():
     if not os.getenv('GOOGLE_CLIENT_ID') or not os.getenv('GOOGLE_CLIENT_SECRET'):
         return render_template('oauth_missing.html',provider='Google'),503
-    # Force one canonical callback instead of letting a Vercel preview/www host
-    # change the redirect_uri sent to Google.
-    return google.authorize_redirect(public_url('/auth/google/callback'))
+
+    redirect_uri=oauth_url('/auth/google/callback')
+    app.logger.info('Starting Google OAuth | redirect_uri=%s',redirect_uri)
+    return google.authorize_redirect(redirect_uri)
+
 
 @app.route('/auth/google/callback')
 def google_callback():
+    redirect_uri=oauth_url('/auth/google/callback')
     try:
-        token=google.authorize_access_token()
-        info=token.get('userinfo') or google.parse_id_token(token)
-    except Exception:
-        app.logger.exception('Google OAuth callback failed')
-        flash('Google sign-in failed. Please try again.','error')
-        return redirect(url_for('login'))
+        token=google.authorize_access_token(redirect_uri=redirect_uri)
+        info=token.get('userinfo')
+        if not info:
+            info=google.get(
+                'https://openidconnect.googleapis.com/v1/userinfo',
+                token=token
+            ).json()
 
-    uid=upsert_oauth(
-        'google',
-        str(info.get('sub')),
-        info.get('email'),
-        info.get('name') or info.get('email') or 'Veyra User',
-        info.get('picture')
-    )
-    _finish_login(uid, remember=True)
-    return redirect(url_for('dashboard'))
+        google_id=str(info.get('sub') or '').strip()
+        if not google_id:
+            raise ValueError('Google did not return a user ID')
+
+        uid=upsert_oauth(
+            'google',
+            google_id,
+            info.get('email'),
+            info.get('name') or info.get('email') or 'Veyra User',
+            info.get('picture')
+        )
+        _finish_login(uid,remember=True)
+        return redirect(url_for('dashboard'))
+
+    except Exception as exc:
+        app.logger.exception(
+            'Google OAuth callback failed | redirect_uri=%s | error=%s',
+            redirect_uri,
+            type(exc).__name__
+        )
+        flash('Google sign-in failed. Check the Google OAuth redirect URI and try again.','error')
+        return redirect(url_for('login'))
 @app.route('/auth/discord')
 def auth_discord():
     if not os.getenv('DISCORD_CLIENT_ID') or not os.getenv('DISCORD_CLIENT_SECRET'):
         return render_template('oauth_missing.html',provider='Discord'),503
-    return discord_oauth.authorize_redirect(public_url('/auth/discord/callback'))
+
+    redirect_uri=oauth_url('/auth/discord/callback')
+    app.logger.info('Starting Discord OAuth | redirect_uri=%s',redirect_uri)
+    return discord_oauth.authorize_redirect(
+        redirect_uri,
+        scope='identify email'
+    )
+
 
 @app.route('/auth/discord/callback')
 def discord_callback():
+    redirect_uri=oauth_url('/auth/discord/callback')
     try:
-        discord_oauth.authorize_access_token()
-        profile=discord_oauth.get('users/@me').json()
+        token=discord_oauth.authorize_access_token(redirect_uri=redirect_uri)
+        response=discord_oauth.get('users/@me',token=token)
 
+        if response.status_code != 200:
+            raise RuntimeError(f'Discord profile request returned HTTP {response.status_code}')
+
+        profile=response.json()
         discord_id=str(profile.get('id') or '').strip()
         if not discord_id:
             raise ValueError('Discord did not return a user ID')
@@ -778,11 +812,30 @@ def discord_callback():
         _finish_login(uid,remember=True)
         return redirect(url_for('dashboard'))
 
-    except Exception:
-        app.logger.exception('Discord OAuth callback failed')
-        flash('Discord sign-in failed. Please try again.','error')
+    except Exception as exc:
+        app.logger.exception(
+            'Discord OAuth callback failed | redirect_uri=%s | error=%s',
+            redirect_uri,
+            type(exc).__name__
+        )
+        flash('Discord sign-in failed. Check the Discord OAuth redirect URI and try again.','error')
         return redirect(url_for('login'))
 
+
+
+@app.get('/auth/status')
+def oauth_status():
+    return jsonify({
+        'oauth_base_url':OAUTH_BASE_URL,
+        'google':{
+            'configured':bool(os.getenv('GOOGLE_CLIENT_ID') and os.getenv('GOOGLE_CLIENT_SECRET')),
+            'redirect_uri':oauth_url('/auth/google/callback'),
+        },
+        'discord':{
+            'configured':bool(os.getenv('DISCORD_CLIENT_ID') and os.getenv('DISCORD_CLIENT_SECRET')),
+            'redirect_uri':oauth_url('/auth/discord/callback'),
+        },
+    })
 
 
 @app.route('/admin')
