@@ -1,8 +1,8 @@
 .env
 Vivetauth/.env
 app_backup.py
+data/
 __pycache__/
 *.pyc
 .venv/
 venv/
-data/

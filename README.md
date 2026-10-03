@@ -1,16 +1,13 @@
-# Veyra current GitHub-ready integration bundle
+# Veyra Compact Final
 
-Includes the current Veyra website integration files available in this chat:
-- app.py
-- templates/auth.html
-- templates/studio.html (new chat + blurred live-preview workspace)
-- Vivetauth/main.py
-- requirements files
-- Vercel config
-- .env examples
-- Windows launch scripts
-- latest workspace design reference
+This bundle contains the current Veyra integration files from this chat.
 
-Important: keep any additional templates/static/assets already present in your existing GitHub repo. This package cannot contain files that were never uploaded to this chat.
+Main UI change:
+- Studio UI is scaled down to 86% while still filling the browser viewport.
+- Uses the existing `static/veyra-mark.svg` front-page logo, with `veyra-logo.png` fallback.
+- Keeps `/api/build` and `/api/projects/save` wiring.
 
-Production secrets belong in Vercel/PebbleHost environment variables, not GitHub.
+Copy these files over your existing GitHub Veyra repository. Keep any existing
+templates/static assets that are not included in this ZIP.
+
+Do not commit real .env files or secrets.
