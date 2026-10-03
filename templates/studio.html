@@ -308,10 +308,17 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
     linear-gradient(180deg,#08101c,#060c16);
   box-shadow:var(--shadow);
 }
-.preview{position:absolute;inset:0;width:100%;height:100%;border:0;background:white}
+.preview{position:absolute;inset:0;width:100%;height:100%;border:0;background:#07101b;opacity:0;pointer-events:none;transition:opacity .28s ease}.canvas.has-preview .preview{opacity:1;pointer-events:auto}
 .empty-preview{
   position:absolute;inset:0;display:grid;place-items:center;
   text-align:center;padding:34px;
+  background:
+    linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px),
+    radial-gradient(circle at 50% 42%,rgba(122,74,255,.18),transparent 22%),
+    radial-gradient(circle at 50% 45%,rgba(79,119,255,.08),transparent 38%),
+    linear-gradient(180deg,#08111e,#060b14);
+  background-size:32px 32px,32px 32px,auto,auto,auto;
 }
 .empty-preview-inner{max-width:420px}
 .empty-logo{width:68px;height:68px;margin:auto;display:grid;place-items:center}
@@ -665,6 +672,133 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
   *,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 }
 
+
+/* ===== VEYRA STUDIO CLEANUP ===== */
+.workspace{grid-template-rows:54px minmax(0,1fr)}
+.inspector{
+  overflow-y:auto;
+  scrollbar-width:none;
+}
+.inspector::-webkit-scrollbar{display:none}
+
+.empty-preview-inner{
+  width:min(520px,88%);
+  padding:18px;
+}
+.empty-kicker{
+  margin:16px 0 8px;
+  font-size:10px;
+  letter-spacing:.22em;
+  font-weight:850;
+  color:#8c76d8;
+}
+.empty-preview h1{
+  margin:7px 0 10px;
+  font-size:34px;
+  line-height:1.08;
+  letter-spacing:-.045em;
+  background:linear-gradient(180deg,#fff 10%,#c9d3e3 85%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+}
+.empty-preview p{
+  max-width:500px;
+  color:#8190a9;
+  font-size:13px;
+}
+.empty-actions{
+  margin-top:18px;
+  display:flex;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:7px;
+}
+.empty-chip{
+  height:34px;
+  padding:0 12px;
+  border:1px solid #2e3d5e;
+  border-radius:999px;
+  background:rgba(12,21,37,.82);
+  color:#aab7ca;
+  cursor:pointer;
+  transition:.18s ease;
+}
+.empty-chip:hover{
+  color:#fff;
+  border-color:#6f4fe3;
+  background:#161735;
+  transform:translateY(-1px);
+  box-shadow:0 8px 20px rgba(82,59,176,.14);
+}
+.empty-logo{
+  width:78px;height:78px;
+  border-radius:22px;
+  display:grid;
+  place-items:center;
+  background:radial-gradient(circle at 40% 30%,rgba(151,101,255,.2),rgba(20,24,48,.68));
+  border:1px solid rgba(133,91,255,.22);
+  box-shadow:0 0 60px rgba(112,72,255,.14),inset 0 0 30px rgba(123,84,255,.08);
+}
+.empty-logo .real-logo.hero-logo{
+  width:50px;height:50px;
+}
+.card{
+  box-shadow:0 12px 30px rgba(0,0,0,.12);
+}
+.project-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+  margin-top:10px;
+  padding-top:10px;
+  border-top:1px solid #18263d;
+}
+.mini-action{
+  height:32px;
+  border:1px solid #293a59;
+  border-radius:9px;
+  background:#0d1727;
+  color:#98a8be;
+  font-weight:700;
+  cursor:pointer;
+}
+.mini-action:hover{
+  color:#fff;
+  border-color:#6b4ae3;
+  background:#141733;
+}
+#suggestionCard,#healthCard{
+  animation:cardIn .25s ease both;
+}
+@keyframes cardIn{
+  from{opacity:0;transform:translateY(4px)}
+  to{opacity:1;transform:none}
+}
+.browserbar{
+  padding-inline:12px;
+}
+.address{
+  max-width:none;
+}
+.canvas{
+  margin:10px 12px 12px;
+}
+@media(max-width:1180px){
+  .shell{grid-template-columns:70px 345px minmax(460px,1fr)}
+}
+
+
+.studio-credit-pill{
+  height:36px;padding:0 10px;border:1px solid #293a58;border-radius:10px;
+  background:#091321;color:#8393ab;display:flex;align-items:center;gap:7px;
+  white-space:nowrap;font-size:11px;
+}
+.studio-credit-pill span{width:7px;height:7px;border-radius:50%;background:linear-gradient(135deg,#9b5cff,#5d7cff);box-shadow:0 0 10px rgba(139,92,246,.65)}
+.studio-credit-pill b{color:#fff;font-size:12px}
+@keyframes creditFlash{0%{box-shadow:0 0 0 0 rgba(139,92,246,.4)}100%{box-shadow:0 0 0 8px rgba(139,92,246,0)}}
+.studio-credit-pill.flash{animation:creditFlash .55s ease}
+
 </style>
 </head>
 <body>
@@ -691,8 +825,8 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
 
   <div class="saved-indicator" id="savedIndicator"><span class="cloud"></span><span id="savedText">Not saved</span></div>
 
+  <div class="studio-credit-pill"><span></span><b id="studioCreditCount">{{user.credits or 0}}</b> credits</div>
   <div class="top-actions">
-    <a class="top-btn" href="{{url_for('dashboard')}}">Dashboard</a>
     <button class="top-btn" id="saveBtn">Save</button>
     <button class="top-btn share" id="shareBtn">Share</button>
     <button class="top-btn export" id="exportBtn">Export</button>
@@ -775,8 +909,6 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
         <textarea id="prompt" placeholder="Ask Veyra to build, edit, redesign, debug, or improve anything..."></textarea>
         <div class="compose-actions">
           <button class="tool-pill">＋</button>
-          <button class="tool-pill">Web</button>
-          <button class="tool-pill">Visual</button>
           <span class="engine-label" id="engineStatus">Veyra AI</span>
           <button class="send" id="sendBtn">➜</button>
         </div>
@@ -805,8 +937,14 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
         <div class="empty-logo">
           <img class="real-logo hero-logo" src="{{ url_for('static', filename='veyra-mark.svg') }}" alt="Veyra">
         </div>
-        <h1>Your build appears here</h1>
-        <p>Describe the product you want to create. Veyra will generate a live preview here and refine the same project as you iterate.</p>
+        <div class="empty-kicker">VEYRA CANVAS</div>
+        <h1>Build something worth shipping.</h1>
+        <p>Describe the product in chat. Veyra will design, code, preview, and keep refining the same project as you iterate.</p>
+        <div class="empty-actions">
+          <button class="empty-chip" data-empty-prompt="Create a premium SaaS landing page with a bold hero and pricing">SaaS landing</button>
+          <button class="empty-chip" data-empty-prompt="Create a clean portfolio with projects and contact">Portfolio</button>
+          <button class="empty-chip" data-empty-prompt="Create a modern dark analytics dashboard">Dashboard</button>
+        </div>
       </div>
     </div>
 
@@ -829,11 +967,6 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
       <button class="apply-code" id="applyCode">Apply changes</button>
     </div>
   </div>
-
-  <div class="zoom-bar">
-    <div class="zoom-left"><button class="zoom-btn">−</button><span>100%</span><button class="zoom-btn">＋</button></div>
-    <div class="zoom-right"><span id="viewportLabel">Desktop</span></div>
-  </div>
 </main>
 
 <aside class="inspector">
@@ -841,10 +974,13 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
     <div class="card-head"><h3>Project</h3><span class="badge" id="accessBadge">owner</span></div>
     <div class="info-row"><span>Name</span><strong id="sideName">Untitled Project</strong></div>
     <div class="info-row"><span>Status</span><strong id="savedState">Not saved</strong></div>
-    <div class="info-row"><span>Members</span><strong><button class="top-btn" id="membersBtn" style="height:29px;padding:0 8px;font-size:10px">Manage</button></strong></div>
+    <div class="project-actions">
+      <button class="mini-action" id="membersBtn">Members</button>
+      <button class="mini-action" id="projectSaveBtn">Save now</button>
+    </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="healthCard" style="display:none">
     <div class="card-head"><h3>Project health</h3><span class="badge" id="qualityBadge">No audit</span></div>
     <div class="empty-card" id="qualityEmpty">Build something first. Real quality metrics will appear here.</div>
     <div class="health-wrap" id="healthWrap">
@@ -858,7 +994,7 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
     </div>
   </div>
 
-  <div class="card" id="suggestionCard">
+  <div class="card" id="suggestionCard" style="display:none">
     <div class="card-head"><h3>AI suggestions</h3><span class="badge" id="suggestCount">0</span></div>
     <div class="empty-card" id="suggestEmpty">No suggestions yet. Veyra only shows suggestions derived from your real build quality.</div>
     <div id="suggestionsList"></div>
@@ -869,15 +1005,6 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
     <div class="empty-card" id="deployEmpty">Save your project first, then publish it when you’re ready.</div>
     <button class="publish-btn" id="sidePublish" style="display:none">Publish to live site</button>
     <a class="live-url" id="liveUrl" target="_blank"></a>
-  </div>
-
-  <div class="card">
-    <div class="card-head"><h3>Account & usage</h3><a href="{{url_for('account')}}" style="font-size:10px;color:#8b72f7;text-decoration:none">Manage →</a></div>
-    <div class="credit-number">{{ user.credits or 0 }}</div>
-    <div class="small-note">credits available</div>
-    <div class="credit-bar"><span></span></div>
-    <div class="info-row"><span>New AI build</span><strong>25 credits</strong></div>
-    <div class="info-row"><span>Follow-up edit</span><strong>10 credits</strong></div>
   </div>
 </aside>
 
@@ -994,12 +1121,14 @@ function qualityNumber(v){
 function setQuality(q){
   state.quality=q||null;
   if(!q){
+    $("healthCard").style.display="none";
     $("qualityEmpty").style.display="block";
     $("healthWrap").style.display="none";
     $("qualityBadge").textContent="No audit";
     updateSuggestions(null);
     return;
   }
+  $("healthCard").style.display="block";
   const values=[
     qualityNumber(q.accessibility),
     qualityNumber(q.performance),
@@ -1039,6 +1168,7 @@ function updateSuggestions(q){
     if(s!==null&&s<90)suggestions.push(["Security","Review scripts, forms, and unsafe client-side behavior."]);
   }
   $("suggestCount").textContent=suggestions.length;
+  $("suggestionCard").style.display=suggestions.length?"block":"none";
   empty.style.display=suggestions.length?"none":"block";
   suggestions.forEach(([title,desc])=>{
     const el=document.createElement("div");
@@ -1072,6 +1202,19 @@ async function build(prompt){
     state.css=data.css||"";
     state.js=data.js||"";
     state.dirty=true;
+
+    if(Number.isFinite(Number(data.credits_remaining))){
+      const creditEl=$("studioCreditCount");
+      if(creditEl){
+        creditEl.textContent=String(data.credits_remaining);
+        const pill=creditEl.closest(".studio-credit-pill");
+        if(pill){
+          pill.classList.remove("flash");
+          void pill.offsetWidth;
+          pill.classList.add("flash");
+        }
+      }
+    }
 
     renderPreview();
     setQuality(data.quality);
@@ -1164,6 +1307,7 @@ promptEl.addEventListener("keydown",e=>{
   if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();build(promptEl.value)}
 });
 document.querySelectorAll("[data-prompt]").forEach(b=>b.onclick=()=>build(b.dataset.prompt));
+document.querySelectorAll("[data-empty-prompt]").forEach(b=>b.onclick=()=>build(b.dataset.emptyPrompt));
 
 $("saveBtn").onclick=async()=>{
   try{await save();addMessage("assistant","Saved. Your latest project version is stored.");}
@@ -1186,6 +1330,14 @@ $("shareBtn").onclick=async()=>{
 };
 $("membersBtn").onclick=()=>{
   if(state.project_id)location.href="/app/projects/"+state.project_id+"/members";
+};
+$("projectSaveBtn").onclick=async()=>{
+  try{
+    await save();
+    addMessage("assistant","Saved. Your latest project version is stored.");
+  }catch(e){
+    addMessage("assistant",e.message);
+  }
 };
 
 $("refreshBtn").onclick=renderPreview;

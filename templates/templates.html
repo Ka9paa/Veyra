@@ -1,1 +1,5 @@
-{% extends 'app_base.html' %}{% block top_title %}Templates{% endblock %}{% block content %}<div class="eyebrow">Starter library</div><h1 class="title">Templates</h1><p class="sub">Real Veyra starter blueprints. No fake ratings or usage numbers.</p><div class="grid">{% for t in templates %}<div class="card"><h3>{{t.name}}</h3><span class="tag">{{t.kind}}</span><p class="muted">{{t.description}}</p><a class="btn primary" href="{{url_for('studio')}}?template={{t.name|urlencode}}">Use template</a></div>{% endfor %}</div>{% endblock %}
+{% extends 'app_base.html' %}{% block title %}Templates — Veyra{% endblock %}{% block top_title %}Templates{% endblock %}
+{% block content %}
+<div class="hero-row"><div><div class="eyebrow">Start faster</div><h1 class="title">Templates</h1><p class="subtitle">Clean starting points. No fake popularity counts, ratings, or social proof.</p></div></div>
+<div class="template-grid">{% for t in templates %}<div class="template-card"><div class="template-preview"></div><span class="tag">{{t.kind}}</span><h3>{{t.name}}</h3><p>{{t.description}}</p><a class="btn primary" href="{{url_for('studio')}}?template={{t.name|urlencode}}">Use template</a></div>{% endfor %}</div>
+{% endblock %}

@@ -1,1 +1,9 @@
-{% extends 'app_base.html' %}{% block top_title %}Settings{% endblock %}{% block content %}<div class="eyebrow">Settings</div><h1 class="title">Account settings</h1><p class="sub">Real settings only.</p><div class="grid"><div class="card"><h3>Account</h3><p class="muted">{{user.email or 'No email'}}</p><a class="btn" href="{{url_for('account')}}">Open profile & account</a></div><div class="card"><h3>Plan</h3><p class="muted">{{(user.plan or 'free')|upper}} · {{user.credits or 0}} credits</p></div><div class="card"><h3>AI engine</h3><p class="muted">Veyra uses your configured server-side AI connection.</p></div></div>{% endblock %}
+{% extends 'app_base.html' %}{% block title %}Settings — Veyra{% endblock %}{% block top_title %}Settings{% endblock %}
+{% block content %}
+<div class="hero-row"><div><div class="eyebrow">Account</div><h1 class="title">Settings</h1><p class="subtitle">Only controls that are actually connected to your Veyra account.</p></div></div>
+<div class="grid">
+  <div class="card"><div class="card-head"><h3>Profile & security</h3></div><p>{{user.email or 'No email on file'}}</p><a class="btn" href="{{url_for('account')}}">Open account</a></div>
+  <div class="card"><div class="card-head"><h3>Plan & credits</h3></div><div class="metric-value">{{user.credits or 0}}</div><span class="muted">{{(user.plan or 'free')|upper}} plan</span></div>
+  <div class="card"><div class="card-head"><h3>Veyra AI</h3></div><p>Your AI connection is configured server-side. Live successful builds use credits; local fallback builds do not.</p></div>
+</div>
+{% endblock %}

@@ -1,27 +1,7 @@
-{% extends 'app_base.html' %}
-{% block title %}Projects — Veyra{% endblock %}{% block top_title %}Projects{% endblock %}
+{% extends 'app_base.html' %}{% block title %}Projects — Veyra{% endblock %}{% block top_title %}Projects{% endblock %}
 {% block content %}
-<div class="eyebrow">Projects</div><h1 class="title">Your projects</h1>
-<p class="sub">Owned and shared projects. Access is shown exactly as stored.</p>
-{% if projects %}
-<div class="list">
-{% for p in projects %}
-<div class="row">
-  <div style="display:flex;align-items:center;gap:12px">
-    <div class="project-emblem"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 9h16"/></svg></div>
-    <div><strong>{{p.name}}</strong><span class="muted">{{p.description or 'No description'}}</span></div>
-  </div>
-  <div style="display:flex;align-items:center;gap:8px">
-    <span class="tag">{{p.access_role or 'owner'}}</span>
-    <a class="btn" href="{{url_for('studio')}}?project={{p.id}}">Open</a>
-    {% if (p.access_role or 'owner') == 'owner' %}
-    <a class="btn" href="{{url_for('project_members_page',project_id=p.id)}}">Members</a>
-    {% endif %}
-  </div>
-</div>
-{% endfor %}
-</div>
-{% else %}
-<div class="empty"><h3>No projects yet</h3><p class="muted">Nothing fake gets shown here.</p><a class="btn primary" href="{{url_for('studio')}}">Start building</a></div>
-{% endif %}
+<div class="hero-row"><div><div class="eyebrow">Workspace</div><h1 class="title">Projects</h1><p class="subtitle">Everything you own or have been invited to, with the real access level shown.</p></div><a class="btn primary" href="{{url_for('studio')}}">＋ New project</a></div>
+{% if projects %}<div class="list">{% for p in projects %}
+<div class="list-row"><div class="row-main"><div class="emblem"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 9h16"/></svg></div><div class="row-copy"><strong>{{p.name}}</strong><span class="muted">{{p.description or 'No description yet'}}</span></div></div><div style="display:flex;align-items:center;gap:7px"><span class="tag">{{p.access_role or 'owner'}}</span><a class="btn" href="{{url_for('studio')}}?project={{p.id}}">Open</a>{% if (p.access_role or 'owner')=='owner' %}<a class="btn" href="{{url_for('project_members_page',project_id=p.id)}}">Members</a>{% endif %}</div></div>
+{% endfor %}</div>{% else %}<div class="empty"><div class="empty-icon">◇</div><h3>No projects yet</h3><p>Nothing appears here until you actually create or join a project.</p><a class="btn primary" href="{{url_for('studio')}}">Create your first project</a></div>{% endif %}
 {% endblock %}
