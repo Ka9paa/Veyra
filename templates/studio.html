@@ -1,117 +1,1022 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Veyra Studio</title>
 <style>
-:root{--bg:#070c15;--panel:#0b1220;--panel2:#0f1728;--line:#1d2940;--line2:#2a3958;--text:#f7f8fc;--muted:#8391aa;--violet:#8f52ff;--blue:#6177ff;--green:#36d8a0;--danger:#ff6a7c}
-*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:13px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}button,textarea{font:inherit}button{cursor:pointer}.app{height:100vh;display:grid;grid-template-columns:72px 365px minmax(480px,1fr) 300px;grid-template-rows:62px minmax(0,1fr);background:radial-gradient(circle at 70% 0,#39206d22,transparent 28%),#070c15}.top{grid-column:1/-1;display:flex;align-items:center;border-bottom:1px solid var(--line);background:#080e18eF;backdrop-filter:blur(18px);padding:0 14px;gap:14px}.brand{display:flex;align-items:center;gap:10px;width:250px}.vmark{width:34px;height:34px;display:grid;place-items:center}.vmark svg{width:30px;height:30px;filter:drop-shadow(0 0 13px #8f52ff66)}.brand b{font-size:17px}.projectbox{height:38px;min-width:210px;border:1px solid var(--line2);border-radius:10px;background:#0d1524;color:#dce4f3;display:flex;align-items:center;gap:9px;padding:0 12px}.center-tabs{display:flex;gap:6px;margin:auto}.tab,.iconbtn,.action{height:38px;border:1px solid var(--line2);border-radius:10px;background:#0c1422;color:#a7b4c9;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;gap:7px}.tab.active{color:#fff;border-color:#744cff;background:#171b3f;box-shadow:0 0 20px #744cff1f}.top-actions{display:flex;gap:7px;margin-left:auto}.action.primary{border:0;background:linear-gradient(135deg,var(--violet),var(--blue));color:#fff;font-weight:800}.action:disabled{opacity:.45;cursor:not-allowed}.rail{grid-row:2;border-right:1px solid var(--line);background:#080e18;padding:10px 7px;display:flex;flex-direction:column;gap:7px}.rail a,.rail button{height:58px;border:0;border-radius:12px;background:transparent;color:#8291aa;text-decoration:none;display:grid;place-items:center;gap:3px;font-size:10px}.rail a:hover,.rail button:hover,.rail .active{background:#111a2e;color:#fff}.rail .active{box-shadow:inset 2px 0 #8f52ff}.rail svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.8}.rail-user{margin-top:auto;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#141d31;border:1px solid #2b3853;font-weight:800}.chat{grid-row:2;border-right:1px solid var(--line);display:grid;grid-template-rows:70px minmax(0,1fr) auto;background:#09111e}.chat-head{display:flex;align-items:center;gap:11px;padding:12px;border-bottom:1px solid var(--line)}.ai-emblem{width:42px;height:42px;border-radius:13px;background:#12152a;border:1px solid #5136aa;display:grid;place-items:center;box-shadow:0 0 20px #7846ff29}.ai-emblem svg{width:25px;height:25px}.chat-head b{display:block}.chat-head small{color:var(--muted)}.messages{padding:12px;overflow:auto}.msg{border:1px solid #1f2b43;border-radius:13px;background:#0d1523;padding:12px;margin-bottom:10px}.msg.assistant{background:linear-gradient(180deg,#10172a,#0c1422)}.mh{display:flex;align-items:center;gap:8px;margin-bottom:7px}.avatar{width:29px;height:29px;border-radius:9px;display:grid;place-items:center;background:#1d2a44;font-size:10px;font-weight:800}.assistant .avatar{background:linear-gradient(135deg,#7c3dff,#596fff)}.mh time{color:#66758e;font-size:10px}.msg p{margin:0;color:#d8e0ee}.file{display:flex;align-items:center;gap:9px;margin-top:10px;padding:9px;border:1px solid #263651;border-radius:10px;background:#0e1829}.file-icon{width:31px;height:31px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(135deg,#8f52ff,#6177ff)}.ok{margin-left:auto;color:#72efbd;font-size:11px}.suggest{padding:0 12px 8px;color:#7586a3}.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.chip{border:1px solid #2a3957;border-radius:999px;background:#0c1525;color:#bdc8da;padding:7px 9px;font-size:11px}.composer{padding:0 12px 12px}.compose{border:1px solid #364868;border-radius:14px;background:#0b1423;padding:10px}.compose textarea{width:100%;height:62px;border:0;outline:0;background:transparent;color:#fff;resize:none}.composefoot{display:flex;align-items:center;gap:6px}.send{margin-left:auto;width:38px;height:38px;border:0;border-radius:10px;background:linear-gradient(135deg,#8f52ff,#6177ff);color:#fff;font-size:18px}.workspace{grid-row:2;min-width:0;display:grid;grid-template-rows:54px minmax(0,1fr);background:#070d17}.workspacebar{display:flex;align-items:center;gap:7px;padding:8px 10px;border-bottom:1px solid var(--line)}.device{width:36px;height:34px;border:1px solid #263651;border-radius:9px;background:#0d1524;color:#8594ae}.device.active{background:#171b40;color:#fff;border-color:#744cff}.address{height:34px;flex:1;border:1px solid #263651;border-radius:9px;background:#0b1320;color:#7788a6;padding:0 12px;display:flex;align-items:center;gap:7px}.dot{width:7px;height:7px;border-radius:50%;background:var(--green)}.canvas{margin:10px;border:1px solid #2a3958;border-radius:14px;overflow:hidden;position:relative;background:radial-gradient(circle at 50% 35%,#5d2ad725,transparent 24%),#080f1c;box-shadow:0 22px 70px #0006}.preview{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}.empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:30px}.empty .bigmark svg{width:70px;height:70px;filter:drop-shadow(0 0 26px #8f52ff66)}.empty h1{font-size:29px;margin:18px 0 7px}.empty p{color:#8a9ab5;margin:0}.canvas.ready .empty{display:none}.codeview{position:absolute;inset:0;display:none;padding:12px;background:#080f1b;grid-template-rows:auto 1fr}.canvas.code .preview,.canvas.code .empty{display:none}.canvas.code .codeview{display:grid}.code-tabs{display:flex;gap:6px;margin-bottom:8px}.code-tabs button{border:1px solid #2b3954;background:#101827;color:#aab7cb;border-radius:8px;padding:6px 10px}.code-tabs button.active{border-color:#744cff;color:#fff}.editor{width:100%;height:100%;border:1px solid #23314c;border-radius:11px;background:#060b13;color:#d8e0ed;padding:12px;resize:none;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;outline:none}.applycode{position:absolute;right:24px;bottom:22px;height:36px;border:0;border-radius:9px;background:linear-gradient(135deg,#8f52ff,#6177ff);color:#fff;font-weight:800;padding:0 13px}.right{grid-row:2;border-left:1px solid var(--line);background:#080f1b;padding:10px;overflow:auto}.panel{border:1px solid #1f2b43;border-radius:13px;background:#0c1422;padding:13px;margin-bottom:9px}.panel h3{font-size:13px;margin:0 0 10px}.row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid #1a263c}.row:first-of-type{border-top:0}.muted{color:#8291a9}.metric{font-weight:800}.good{color:#63e8b5}.empty-state{border:1px dashed #2a3957;border-radius:11px;padding:17px;text-align:center;color:#7f8fa8}.publish-card button{width:100%;height:39px;border:0;border-radius:9px;background:linear-gradient(135deg,#8f52ff,#6177ff);color:#fff;font-weight:800}.url{display:block;color:#91a0b7;word-break:break-all;margin-top:9px}.credits{font-size:25px;font-weight:900}@media(max-width:1250px){.app{grid-template-columns:64px 340px 1fr}.right{display:none}}@media(max-width:900px){body{overflow:auto}.app{height:auto;min-height:100vh;grid-template-columns:64px 1fr;grid-template-rows:58px auto 640px}.chat{grid-column:2}.workspace{grid-column:1/-1;grid-row:3}.top .projectbox{display:none}}
-</style></head>
-<body><div class="app">
-<header class="top">
-  <div class="brand"><div class="vmark"><svg viewBox="0 0 32 32"><path fill="#8f52ff" d="M3 5h7l6 10 6-10h7L16 28z"/><path fill="#6574ff" d="M9 5h5l2 4 2-4h5l-7 13z"/></svg></div><b>Veyra Studio</b></div>
-  <div class="projectbox"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9eacc1"><path d="M4 5h16v14H4z"/><path d="M4 9h16"/></svg><span id="topProjectName">Untitled Project</span></div>
-  <div class="center-tabs"><button class="tab active" id="previewTab">Preview</button><button class="tab" id="codeTab">Code</button></div>
-  <div class="top-actions"><a class="action" href="{{url_for('dashboard')}}">Dashboard</a><button class="action" id="saveBtn">Save</button><button class="action" id="exportBtn">Export</button><button class="action primary" id="publishBtn">Publish</button></div>
+:root{
+  --bg:#050914;
+  --bg2:#07101e;
+  --panel:#0a1220;
+  --panel2:#0d1727;
+  --panel3:#101b2e;
+  --line:#1b2941;
+  --line2:#2a3b5a;
+  --text:#f7f9fd;
+  --muted:#8290a8;
+  --muted2:#5d6b82;
+  --violet:#8b5cf6;
+  --violet2:#6d5dfc;
+  --blue:#5d7cff;
+  --cyan:#58d7ff;
+  --green:#45dfae;
+  --yellow:#ffcb66;
+  --red:#ff6c86;
+  --shadow:0 28px 80px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:13px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}
+button,textarea,input{font:inherit}
+button{cursor:pointer}
+a{color:inherit}
+button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8b5cf6;outline-offset:2px}
+
+/* No more white native scrollbar */
+*{scrollbar-width:thin;scrollbar-color:#33415d transparent}
+*::-webkit-scrollbar{width:8px;height:8px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#3b4b68,#28364e);border:2px solid transparent;background-clip:padding-box;border-radius:999px}
+*::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,#50617e,#364762);border:2px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-corner{background:transparent}
+
+.shell{
+  height:100vh;
+  display:grid;
+  grid-template-columns:76px 382px minmax(520px,1fr) 304px;
+  grid-template-rows:64px minmax(0,1fr);
+  background:
+    radial-gradient(circle at 42% -10%,rgba(113,76,255,.14),transparent 25%),
+    radial-gradient(circle at 78% 8%,rgba(57,111,255,.08),transparent 22%),
+    var(--bg);
+}
+
+/* ---------- TOP ---------- */
+.topbar{
+  grid-column:1/-1;
+  z-index:20;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:0 14px;
+  border-bottom:1px solid var(--line);
+  background:rgba(6,11,21,.9);
+  backdrop-filter:blur(18px);
+}
+.brand{width:245px;display:flex;align-items:center;gap:10px;flex:0 0 auto}
+.brand-mark,.veyra-badge,.avatar-ai{
+  display:grid;place-items:center;
+  border:1px solid #3c2d7f;
+  background:radial-gradient(circle at 35% 25%,rgba(138,92,246,.28),transparent 60%),#11182a;
+  box-shadow:inset 0 0 22px rgba(139,92,246,.08),0 0 28px rgba(103,79,255,.08);
+}
+.brand-mark{width:36px;height:36px;border-radius:11px}
+.brand-mark svg,.veyra-badge svg,.avatar-ai svg{filter:drop-shadow(0 0 10px rgba(139,92,246,.6))}
+.brand-name{font-size:16px;font-weight:850;letter-spacing:-.02em}
+.project-switch{
+  min-width:210px;height:38px;padding:0 12px;
+  display:flex;align-items:center;gap:9px;
+  border:1px solid var(--line2);border-radius:10px;
+  color:#d8e0ed;background:linear-gradient(180deg,#0e1728,#0a1321);
+}
+.project-switch .chev{margin-left:auto;color:#71819c}
+.view-switch{
+  display:flex;align-items:center;gap:4px;
+  margin:auto;
+  padding:3px;
+  border:1px solid var(--line);
+  border-radius:11px;background:#091220;
+}
+.view-tab{
+  height:32px;padding:0 15px;border:0;border-radius:8px;
+  background:transparent;color:#8998af;font-weight:700;
+}
+.view-tab.active{
+  color:#fff;
+  background:linear-gradient(180deg,#2b1d55,#181837);
+  box-shadow:inset 0 0 0 1px #7652f6,0 0 22px rgba(112,77,255,.15);
+}
+.saved-indicator{
+  display:flex;align-items:center;gap:7px;color:#73829c;font-size:11px;white-space:nowrap
+}
+.saved-indicator .cloud{width:7px;height:7px;border-radius:50%;background:#46556e}
+.saved-indicator.saved .cloud{background:var(--green);box-shadow:0 0 12px rgba(69,223,174,.55)}
+.top-actions{display:flex;gap:6px;margin-left:auto}
+.top-btn{
+  height:38px;padding:0 12px;
+  border:1px solid var(--line2);border-radius:10px;
+  background:#0c1524;color:#a9b6ca;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  text-decoration:none;font-weight:700;
+}
+.top-btn:hover{background:#111c2e;color:#fff;border-color:#3a4b6b}
+.top-btn.primary{
+  color:white;border-color:#7148ff;
+  background:linear-gradient(135deg,#8152ff,#5d6fff);
+  box-shadow:0 8px 28px rgba(110,77,255,.23);
+}
+.top-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ---------- NAV ---------- */
+.rail{
+  grid-row:2;
+  min-height:0;
+  padding:10px 7px;
+  display:flex;flex-direction:column;gap:5px;
+  border-right:1px solid var(--line);
+  background:#070d18;
+}
+.nav-item{
+  height:58px;
+  border:0;border-radius:12px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  text-decoration:none;color:#7787a2;background:transparent;
+  font-size:10px;
+  transition:.18s ease;
+}
+.nav-item:hover{color:#fff;background:#0e1728}
+.nav-item.active{
+  color:#fff;
+  background:linear-gradient(180deg,#171637,#10172a);
+  box-shadow:inset 2px 0 #925cff,inset 0 0 0 1px rgba(119,83,255,.2);
+}
+.nav-item svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8}
+.profile-dot{
+  margin:auto auto 2px;
+  width:43px;height:43px;border-radius:50%;
+  display:grid;place-items:center;
+  border:1px solid #34435f;background:#111a2d;
+  font-weight:850;color:#dbe4f3;
+  position:relative;
+}
+.profile-dot:after{
+  content:"";position:absolute;right:1px;bottom:2px;
+  width:8px;height:8px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 0 3px #07101b;
+}
+
+/* ---------- CHAT ---------- */
+.chat{
+  grid-row:2;
+  min-height:0;
+  display:grid;
+  grid-template-rows:70px minmax(0,1fr) auto;
+  border-right:1px solid var(--line);
+  background:linear-gradient(180deg,#08101d,#07101b);
+}
+.chat-head{
+  display:flex;align-items:center;gap:11px;
+  padding:12px 13px;border-bottom:1px solid var(--line);
+}
+.veyra-badge{width:43px;height:43px;border-radius:13px;flex:0 0 auto}
+.chat-head h3{font-size:13px;margin:0}
+.chat-head small{display:block;color:var(--muted);margin-top:1px}
+.online{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 12px rgba(69,223,174,.55);display:inline-block;margin-left:6px}
+.head-more{
+  margin-left:auto;width:36px;height:36px;border-radius:10px;border:1px solid var(--line2);
+  background:#0e1727;color:#8796ad
+}
+.messages{
+  min-height:0;
+  overflow:auto;
+  padding:12px 11px 16px;
+  scroll-behavior:smooth;
+}
+.message{
+  display:grid;
+  grid-template-columns:34px minmax(0,1fr);
+  gap:9px;
+  margin-bottom:12px;
+}
+.message.user .message-body{background:#0d1727}
+.message-body{
+  border:1px solid #1c2a43;
+  border-radius:14px;
+  background:linear-gradient(180deg,#0f1728,#0c1524);
+  padding:11px 12px;
+  box-shadow:0 8px 24px rgba(0,0,0,.08);
+}
+.avatar-ai,.avatar-user{width:34px;height:34px;border-radius:11px}
+.avatar-user{
+  display:grid;place-items:center;background:#192642;border:1px solid #304462;
+  font-weight:850;font-size:10px;color:#e3ebf7
+}
+.message-meta{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.message-meta b{font-size:12px}
+.message-meta time{font-size:10px;color:#5e708c}
+.message-body p{margin:0;color:#d2dbea}
+.build-card{
+  margin-top:10px;
+  border:1px solid #253553;border-radius:11px;
+  overflow:hidden;background:#0a1322;
+}
+.build-card-head{display:flex;align-items:center;gap:9px;padding:10px}
+.build-mini{width:31px;height:31px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(135deg,#7c4dff,#5f7cff);font-weight:900}
+.build-card .done{margin-left:auto;color:#70efbd;font-size:11px}
+.build-steps{padding:0 10px 9px}
+.step{display:flex;align-items:center;gap:8px;padding:5px 0;color:#8292ab;font-size:11px}
+.step .step-dot{width:7px;height:7px;border-radius:50%;background:#33425e}
+.step.active{color:#e6ebf5}.step.active .step-dot{background:#8f5bff;box-shadow:0 0 10px rgba(143,91,255,.7)}
+.step.done{color:#9fb0c7}.step.done .step-dot{background:var(--green)}
+
+/* typing bubble */
+.typing-row{display:none}
+.typing-row.visible{display:grid}
+.typing-bubble{
+  width:max-content;
+  min-width:74px;
+  height:42px;
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  border:1px solid #2c2a62;
+  border-radius:15px;
+  background:linear-gradient(180deg,#14162e,#0d1627);
+  box-shadow:0 0 24px rgba(121,79,255,.08);
+}
+.typing-dot{
+  width:7px;height:7px;border-radius:50%;
+  background:#9b68ff;
+  animation:typingBounce 1.15s infinite ease-in-out;
+}
+.typing-dot:nth-child(2){animation-delay:.14s}
+.typing-dot:nth-child(3){animation-delay:.28s}
+@keyframes typingBounce{
+  0%,60%,100%{transform:translateY(0);opacity:.45}
+  30%{transform:translateY(-6px);opacity:1}
+}
+.suggestions{padding:0 12px 8px;color:#6f819d;font-size:11px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.chip{
+  border:1px solid #293957;border-radius:999px;
+  background:#0b1424;color:#adbbcf;
+  padding:7px 10px;font-size:11px
+}
+.chip:hover{border-color:#6c4cdc;color:#fff;background:#12172f}
+.composer-wrap{padding:0 11px 11px}
+.composer{
+  border:1px solid #35496d;border-radius:15px;background:#0a1424;
+  padding:10px;
+  box-shadow:inset 0 0 0 1px rgba(123,80,255,.08),0 0 28px rgba(85,58,180,.05);
+}
+.composer:focus-within{border-color:#7650ef;box-shadow:0 0 0 3px rgba(118,80,239,.08)}
+.composer textarea{
+  width:100%;height:64px;border:0;outline:0;resize:none;
+  background:transparent;color:#f5f7fb;
+}
+.composer textarea::placeholder{color:#5f708c}
+.compose-actions{display:flex;align-items:center;gap:6px}
+.tool-pill{
+  height:31px;border:1px solid #293957;border-radius:9px;background:#0c1525;color:#8392aa;
+  padding:0 9px;font-size:10px
+}
+.engine-label{color:#64758f;font-size:10px}
+.send{
+  margin-left:auto;width:38px;height:38px;border:0;border-radius:11px;
+  color:#fff;background:linear-gradient(135deg,#8b53ff,#5d74ff);
+  box-shadow:0 8px 22px rgba(108,78,255,.25);font-size:17px
+}
+.send:disabled{opacity:.45}
+
+/* ---------- WORKSPACE ---------- */
+.workspace{
+  grid-row:2;
+  min-width:0;min-height:0;
+  display:grid;grid-template-rows:54px minmax(0,1fr) 40px;
+  background:#060b14;
+}
+.browserbar{
+  display:flex;align-items:center;gap:7px;
+  padding:8px 10px;border-bottom:1px solid var(--line);
+  background:#08101c;
+}
+.device{
+  width:35px;height:34px;border:1px solid #263756;border-radius:9px;
+  background:#0c1524;color:#7c8ca6;
+}
+.device.active{color:#fff;border-color:#704cf0;background:#1c1942}
+.browser-controls{display:flex;gap:5px}
+.address{
+  flex:1;height:34px;border:1px solid #263756;border-radius:9px;
+  background:#0a1322;color:#71829e;
+  display:flex;align-items:center;gap:8px;padding:0 11px;
+}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 10px rgba(69,223,174,.5)}
+.canvas{
+  position:relative;min-height:0;margin:10px;
+  overflow:hidden;border:1px solid #2b3d5c;border-radius:14px;
+  background:
+    radial-gradient(circle at 50% 42%,rgba(114,72,255,.12),transparent 24%),
+    linear-gradient(180deg,#08101c,#060c16);
+  box-shadow:var(--shadow);
+}
+.preview{position:absolute;inset:0;width:100%;height:100%;border:0;background:white}
+.empty-preview{
+  position:absolute;inset:0;display:grid;place-items:center;
+  text-align:center;padding:34px;
+}
+.empty-preview-inner{max-width:420px}
+.empty-logo{width:68px;height:68px;margin:auto;display:grid;place-items:center}
+.empty-logo svg{width:68px;filter:drop-shadow(0 0 30px rgba(132,86,255,.5))}
+.empty-preview h1{font-size:28px;margin:18px 0 7px;letter-spacing:-.03em}
+.empty-preview p{margin:0;color:#71819c}
+.canvas.has-preview .empty-preview{display:none}
+.loading-shroud{
+  position:absolute;inset:0;display:none;place-items:center;
+  background:rgba(5,9,17,.72);backdrop-filter:blur(10px);
+}
+.loading-shroud.visible{display:grid}
+.loading-orb{
+  width:94px;height:94px;border-radius:50%;
+  display:grid;place-items:center;position:relative;
+  background:radial-gradient(circle at 38% 30%,#bda0ff,#744dff 38%,#11162a 70%);
+  box-shadow:0 0 80px rgba(120,76,255,.32);
+  animation:orbPulse 1.6s infinite ease-in-out;
+}
+.loading-orb:after{
+  content:"";position:absolute;inset:-12px;border-radius:50%;
+  border:1px solid rgba(139,92,246,.2);
+  animation:ringPulse 1.6s infinite ease-out;
+}
+@keyframes orbPulse{0%,100%{transform:scale(.96)}50%{transform:scale(1.04)}}
+@keyframes ringPulse{0%{transform:scale(.84);opacity:.8}100%{transform:scale(1.2);opacity:0}}
+.loading-text{margin-top:17px;color:#c4cde0;font-weight:750}
+.codeview{
+  position:absolute;inset:0;display:none;
+  padding:12px;background:#07101b;
+  grid-template-rows:auto minmax(0,1fr);
+}
+.canvas.code .preview,.canvas.code .empty-preview{display:none}
+.canvas.code .codeview{display:grid}
+.code-tabs{display:flex;gap:6px;margin-bottom:8px}
+.code-tab{height:30px;padding:0 10px;border:1px solid #2b3b5b;border-radius:8px;background:#0d1727;color:#8b9ab0}
+.code-tab.active{color:#fff;border-color:#6f4bee;background:#18183a}
+.editor{
+  width:100%;height:100%;resize:none;outline:0;
+  border:1px solid #263858;border-radius:11px;
+  background:#050a12;color:#d8e1ef;padding:13px;
+  font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;
+}
+.apply-code{
+  position:absolute;right:24px;bottom:23px;
+  height:35px;padding:0 13px;border:0;border-radius:9px;
+  color:#fff;font-weight:800;background:linear-gradient(135deg,#8552ff,#5d74ff)
+}
+.zoom-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 12px;border-top:1px solid var(--line);
+  color:#687a96;background:#08101c;font-size:10px
+}
+.zoom-left,.zoom-right{display:flex;align-items:center;gap:6px}
+.zoom-btn{width:28px;height:27px;border:1px solid #243451;border-radius:8px;background:#0b1422;color:#8190a8}
+
+/* ---------- RIGHT ---------- */
+.inspector{
+  grid-row:2;min-height:0;overflow:auto;
+  padding:10px;border-left:1px solid var(--line);
+  background:#07101a;
+}
+.card{
+  border:1px solid #1c2a43;border-radius:14px;
+  background:linear-gradient(180deg,#0c1524,#09121f);
+  padding:13px;margin-bottom:9px;
+}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.card h3{font-size:13px;margin:0}
+.badge{font-size:10px;padding:4px 7px;border-radius:999px;border:1px solid #2b3b59;color:#8292aa}
+.badge.green{color:#65e6b4;border-color:#1d5b49;background:#0b231d}
+.info-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:8px 0;border-top:1px solid #18263d;
+}
+.info-row:first-of-type{border-top:0}
+.info-row span:first-child{color:#7f8fa8}
+.info-row strong{text-align:right}
+.empty-card{
+  border:1px dashed #2a3a58;border-radius:11px;
+  padding:15px;text-align:center;color:#71819a
+}
+.health-wrap{display:none;align-items:center;gap:12px}
+.health-ring{
+  --score:0;
+  width:70px;height:70px;border-radius:50%;
+  display:grid;place-items:center;
+  background:conic-gradient(var(--green) calc(var(--score)*1%),#1b2a43 0);
+  position:relative;flex:0 0 auto;
+}
+.health-ring:after{content:"";position:absolute;inset:8px;border-radius:50%;background:#0b1423}
+.health-ring b{position:relative;z-index:1;font-size:19px}
+.health-list{flex:1}
+.health-line{display:flex;justify-content:space-between;color:#7f8fa8;font-size:11px;padding:3px 0}
+.health-line strong{color:#d9e2ef}
+.suggestion{display:flex;gap:9px;padding:9px 0;border-top:1px solid #18263d}
+.suggestion:first-of-type{border-top:0}
+.suggestion-icon{
+  width:29px;height:29px;border-radius:8px;display:grid;place-items:center;
+  background:#151b34;color:#9f72ff;flex:0 0 auto
+}
+.suggestion b{display:block;font-size:11px}
+.suggestion small{color:#6f819c}
+.publish-btn{
+  width:100%;height:39px;border:0;border-radius:10px;
+  color:#fff;font-weight:850;background:linear-gradient(135deg,#8953ff,#5c71ff);
+  box-shadow:0 9px 28px rgba(105,75,255,.22)
+}
+.live-url{display:block;margin-top:9px;color:#7f90aa;word-break:break-all;font-size:10px}
+.credit-number{font-size:28px;font-weight:900;letter-spacing:-.04em}
+.credit-bar{height:5px;border-radius:999px;background:#182640;overflow:hidden;margin:9px 0}
+.credit-bar>span{display:block;height:100%;background:linear-gradient(90deg,#8f52ff,#5d7cff);width:min(100%,calc({{ user.credits or 0 }} / 150 * 100%))}
+.small-note{font-size:10px;color:#6d7d96}
+
+/* responsive */
+@media(max-width:1300px){
+  .shell{grid-template-columns:70px 354px minmax(500px,1fr)}
+  .inspector{display:none}
+}
+@media(max-width:980px){
+  html,body{overflow:auto}
+  .shell{height:auto;min-height:100vh;grid-template-columns:66px 1fr;grid-template-rows:60px auto 660px}
+  .brand{width:auto}.brand-name{display:none}.project-switch{display:none}.saved-indicator{display:none}
+  .chat{grid-column:2}.workspace{grid-column:1/-1;grid-row:3}
+  .top-btn.share,.top-btn.export{display:none}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">
+      <svg viewBox="0 0 32 32" width="26" height="26">
+        <path fill="#9b5cff" d="M3 5h7l6 10 6-10h7L16 28z"/>
+        <path fill="#5f75ff" d="M9 5h5l2 4 2-4h5l-7 13z"/>
+      </svg>
+    </div>
+    <div class="brand-name">Veyra Studio</div>
+  </div>
+
+  <div class="project-switch">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8fa0ba" stroke-width="1.8"><path d="M4 5h16v14H4z"/><path d="M4 9h16"/></svg>
+    <span id="topProjectName">Untitled Project</span>
+    <span class="chev">⌄</span>
+  </div>
+
+  <div class="view-switch">
+    <button class="view-tab active" id="previewTab">Preview</button>
+    <button class="view-tab" id="codeTab">Code</button>
+  </div>
+
+  <div class="saved-indicator" id="savedIndicator"><span class="cloud"></span><span id="savedText">Not saved</span></div>
+
+  <div class="top-actions">
+    <a class="top-btn" href="{{url_for('dashboard')}}">Dashboard</a>
+    <button class="top-btn" id="saveBtn">Save</button>
+    <button class="top-btn share" id="shareBtn">Share</button>
+    <button class="top-btn export" id="exportBtn">Export</button>
+    <button class="top-btn primary" id="publishBtn">Publish</button>
+  </div>
 </header>
 
 <aside class="rail">
-<a class="active" href="#"><svg viewBox="0 0 24 24"><path d="M5 5h14v11H8l-3 3z"/></svg><span>Chat</span></a>
-<a href="{{url_for('projects_page')}}"><svg viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v10A1.5 1.5 0 0 1 19.5 20h-15A1.5 1.5 0 0 1 3 18.5z"/></svg><span>Projects</span></a>
-<a href="{{url_for('deployments_page')}}"><svg viewBox="0 0 24 24"><path d="m12 3 7 4-7 4-7-4zM5 7v8l7 4 7-4V7"/></svg><span>Deploy</span></a>
-<a href="{{url_for('analytics_page')}}"><svg viewBox="0 0 24 24"><path d="M4 19 9 13l4 3 7-10"/><path d="M15 6h5v5"/></svg><span>Analytics</span></a>
-<a href="{{url_for('settings_page')}}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M4 12h2m12 0h2M12 4v2m0 12v2"/></svg><span>Settings</span></a>
-<div class="rail-user">{{ (user.name or user.email or 'VE')[:2]|upper if user else 'VE' }}</div>
+  <a class="nav-item active" href="#">
+    <svg viewBox="0 0 24 24"><path d="M5 5h14v11H8l-3 3z"/></svg><span>Chat</span>
+  </a>
+  <a class="nav-item" href="{{url_for('projects_page')}}">
+    <svg viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v10A1.5 1.5 0 0 1 19.5 20h-15A1.5 1.5 0 0 1 3 18.5z"/></svg><span>Projects</span>
+  </a>
+  <a class="nav-item" href="{{url_for('templates_page')}}">
+    <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>Templates</span>
+  </a>
+  <a class="nav-item" href="{{url_for('agents_page')}}">
+    <svg viewBox="0 0 24 24"><path d="m12 3 1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/></svg><span>Agents</span>
+  </a>
+  <a class="nav-item" href="{{url_for('databases_page')}}">
+    <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v7c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 12v7c0 1.7 3.1 3 7 3s7-1.3 7-3v-7"/></svg><span>Data</span>
+  </a>
+  <a class="nav-item" href="{{url_for('deployments_page')}}">
+    <svg viewBox="0 0 24 24"><path d="m12 3 7 4-7 4-7-4zM5 7v8l7 4 7-4V7"/></svg><span>Deploy</span>
+  </a>
+  <a class="nav-item" href="{{url_for('analytics_page')}}">
+    <svg viewBox="0 0 24 24"><path d="M4 19 9 13l4 3 7-10"/><path d="M15 6h5v5"/></svg><span>Analytics</span>
+  </a>
+  <a class="nav-item" href="{{url_for('team_page')}}">
+    <svg viewBox="0 0 24 24"><path d="M16 20v-1.5A4.5 4.5 0 0 0 11.5 14h-4A4.5 4.5 0 0 0 3 18.5V20"/><circle cx="9.5" cy="7" r="3"/></svg><span>Members</span>
+  </a>
+  <a class="nav-item" href="{{url_for('settings_page')}}">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M4 12h2m12 0h2M12 4v2m0 12v2M6.3 6.3l1.4 1.4m8.6 8.6 1.4 1.4m0-11.4-1.4 1.4m-8.6 8.6-1.4 1.4"/></svg><span>Settings</span>
+  </a>
+  <div class="profile-dot">{{ (user.name or user.email or 'VE')[:2]|upper if user else 'VE' }}</div>
 </aside>
 
 <section class="chat">
-  <div class="chat-head"><div class="ai-emblem"><svg viewBox="0 0 32 32"><path fill="#8f52ff" d="M3 5h7l6 10 6-10h7L16 28z"/><path fill="#6574ff" d="M9 5h5l2 4 2-4h5l-7 13z"/></svg></div><div><b>Veyra Assistant</b><small id="projectTitle">AI website builder</small></div></div>
-  <div class="messages" id="messages">
-    <div class="msg assistant"><div class="mh"><div class="avatar">V</div><b>Veyra Assistant</b><time>ready</time></div><p>Describe what you want to build or change. I’ll keep editing the same project instead of restarting it.</p></div>
+  <div class="chat-head">
+    <div class="veyra-badge">
+      <svg viewBox="0 0 32 32" width="25" height="25">
+        <path fill="#9b5cff" d="M3 5h7l6 10 6-10h7L16 28z"/><path fill="#5f75ff" d="M9 5h5l2 4 2-4h5l-7 13z"/>
+      </svg>
+    </div>
+    <div><h3>Veyra Assistant <span class="online"></span></h3><small id="projectTitle">Build, iterate, and launch with AI.</small></div>
+    <button class="head-more">•••</button>
   </div>
-  <div><div class="suggest">Starter prompts<div class="chips"><button class="chip" data-prompt="Create a premium SaaS landing page">SaaS</button><button class="chip" data-prompt="Create a modern portfolio website">Portfolio</button><button class="chip" data-prompt="Create a dark analytics dashboard">Dashboard</button><button class="chip" data-prompt="Create a modern ecommerce storefront">Store</button></div></div><div class="composer"><div class="compose"><textarea id="prompt" placeholder="Ask Veyra to build, redesign, debug, or improve anything..."></textarea><div class="composefoot"><span class="muted" id="engineStatus">Veyra AI</span><button class="send" id="sendBtn">→</button></div></div></div></div>
+
+  <div class="messages" id="messages">
+    <div class="message assistant">
+      <div class="avatar-ai">
+        <svg viewBox="0 0 32 32" width="20" height="20"><path fill="#9b5cff" d="M3 5h7l6 10 6-10h7L16 28z"/><path fill="#5f75ff" d="M9 5h5l2 4 2-4h5l-7 13z"/></svg>
+      </div>
+      <div class="message-body">
+        <div class="message-meta"><b>Veyra Assistant</b><time>ready</time></div>
+        <p>What would you like to build or change? I’ll keep working inside the same project as you iterate.</p>
+      </div>
+    </div>
+
+    <div class="message assistant typing-row" id="typingRow">
+      <div class="avatar-ai">
+        <svg viewBox="0 0 32 32" width="20" height="20"><path fill="#9b5cff" d="M3 5h7l6 10 6-10h7L16 28z"/><path fill="#5f75ff" d="M9 5h5l2 4 2-4h5l-7 13z"/></svg>
+      </div>
+      <div class="typing-bubble"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="suggestions">
+      Try something
+      <div class="chips">
+        <button class="chip" data-prompt="Create a premium SaaS landing page with a bold hero, features, social proof and pricing">SaaS landing</button>
+        <button class="chip" data-prompt="Create a polished personal portfolio with projects, about, experience and contact">Portfolio</button>
+        <button class="chip" data-prompt="Create a dark modern analytics dashboard with sidebar navigation and responsive cards">Dashboard</button>
+        <button class="chip" data-prompt="Create a premium ecommerce storefront with product cards and strong conversion design">Storefront</button>
+      </div>
+    </div>
+
+    <div class="composer-wrap">
+      <div class="composer">
+        <textarea id="prompt" placeholder="Ask Veyra to build, edit, redesign, debug, or improve anything..."></textarea>
+        <div class="compose-actions">
+          <button class="tool-pill">＋</button>
+          <button class="tool-pill">Web</button>
+          <button class="tool-pill">Visual</button>
+          <span class="engine-label" id="engineStatus">Veyra AI</span>
+          <button class="send" id="sendBtn">➜</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </section>
 
 <main class="workspace">
-  <div class="workspacebar"><button class="device active">▰</button><button class="device">▯</button><div class="address"><span class="dot"></span><span id="addressText">Live preview</span></div><button class="device" id="refreshBtn">↻</button></div>
+  <div class="browserbar">
+    <div class="browser-controls">
+      <button class="device active" data-width="100%">▰</button>
+      <button class="device" data-width="820px">▯</button>
+      <button class="device" data-width="420px">▯</button>
+    </div>
+    <div class="address"><span class="live-dot"></span><span id="addressText">Live preview</span></div>
+    <button class="device" id="refreshBtn">↻</button>
+    <button class="device" id="openLiveBtn">↗</button>
+  </div>
+
   <div class="canvas" id="canvas">
     <iframe class="preview" id="preview"></iframe>
-    <div class="empty"><div><div class="bigmark"><svg viewBox="0 0 32 32"><path fill="#8f52ff" d="M3 5h7l6 10 6-10h7L16 28z"/><path fill="#6574ff" d="M9 5h5l2 4 2-4h5l-7 13z"/></svg></div><h1>Your build appears here</h1><p>Start with a prompt. No fake preview — this area only changes when a real build exists.</p></div></div>
-    <div class="codeview"><div class="code-tabs"><button class="active" data-code="html">HTML</button><button data-code="css">CSS</button><button data-code="js">JS</button></div><textarea class="editor" id="codeEditor"></textarea><button class="applycode" id="applyCode">Apply changes</button></div>
+
+    <div class="empty-preview">
+      <div class="empty-preview-inner">
+        <div class="empty-logo">
+          <svg viewBox="0 0 32 32">
+            <path fill="#9b5cff" d="M3 5h7l6 10 6-10h7L16 28z"/><path fill="#5f75ff" d="M9 5h5l2 4 2-4h5l-7 13z"/>
+          </svg>
+        </div>
+        <h1>Your build appears here</h1>
+        <p>Describe what you want in chat. Veyra will generate the real preview here and keep updating it as you iterate.</p>
+      </div>
+    </div>
+
+    <div class="loading-shroud" id="loadingShroud">
+      <div style="text-align:center">
+        <div class="loading-orb">
+          <svg viewBox="0 0 32 32" width="34" height="34"><path fill="white" d="M3 5h7l6 10 6-10h7L16 28z"/></svg>
+        </div>
+        <div class="loading-text" id="loadingText">Building your project…</div>
+      </div>
+    </div>
+
+    <div class="codeview">
+      <div class="code-tabs">
+        <button class="code-tab active" data-code="html">HTML</button>
+        <button class="code-tab" data-code="css">CSS</button>
+        <button class="code-tab" data-code="js">JS</button>
+      </div>
+      <textarea class="editor" id="codeEditor"></textarea>
+      <button class="apply-code" id="applyCode">Apply changes</button>
+    </div>
+  </div>
+
+  <div class="zoom-bar">
+    <div class="zoom-left"><button class="zoom-btn">−</button><span>100%</span><button class="zoom-btn">＋</button></div>
+    <div class="zoom-right"><span id="viewportLabel">Desktop</span></div>
   </div>
 </main>
 
-<aside class="right">
-  <div class="panel"><h3>Project</h3><div class="row"><span class="muted">Name</span><span class="metric" id="sideName">Untitled Project</span></div><div class="row"><span class="muted">Access</span><span class="metric" id="accessRole">owner</span></div><div class="row"><span class="muted">Saved</span><span class="metric" id="savedState">Not yet</span></div></div>
-  <div class="panel"><h3>Build quality</h3><div id="qualityEmpty" class="empty-state">No audit yet. Build something first.</div><div id="qualityRows" style="display:none"><div class="row"><span class="muted">Accessibility</span><span class="metric" id="qA11y">—</span></div><div class="row"><span class="muted">Performance</span><span class="metric" id="qPerf">—</span></div><div class="row"><span class="muted">Responsive</span><span class="metric" id="qResp">—</span></div><div class="row"><span class="muted">Security</span><span class="metric" id="qSec">—</span></div></div></div>
-  <div class="panel publish-card"><h3>Deployment</h3><div id="deployEmpty" class="empty-state">Save the project, then publish it.</div><button id="sidePublish" style="display:none">Publish live</button><a class="url" id="liveUrl" target="_blank"></a></div>
-  <div class="panel"><h3>Account & usage</h3><div class="credits">{{ user.credits or 0 }}</div><span class="muted">credits available</span><div class="row"><span class="muted">New AI build</span><span>25</span></div><div class="row"><span class="muted">Follow-up edit</span><span>10</span></div></div>
+<aside class="inspector">
+  <div class="card">
+    <div class="card-head"><h3>Project</h3><span class="badge" id="accessBadge">owner</span></div>
+    <div class="info-row"><span>Name</span><strong id="sideName">Untitled Project</strong></div>
+    <div class="info-row"><span>Status</span><strong id="savedState">Not saved</strong></div>
+    <div class="info-row"><span>Members</span><strong><button class="top-btn" id="membersBtn" style="height:29px;padding:0 8px;font-size:10px">Manage</button></strong></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Project health</h3><span class="badge" id="qualityBadge">No audit</span></div>
+    <div class="empty-card" id="qualityEmpty">Build something first. Real quality metrics will appear here.</div>
+    <div class="health-wrap" id="healthWrap">
+      <div class="health-ring" id="healthRing"><b id="healthScore">—</b></div>
+      <div class="health-list">
+        <div class="health-line"><span>Accessibility</span><strong id="qA11y">—</strong></div>
+        <div class="health-line"><span>Performance</span><strong id="qPerf">—</strong></div>
+        <div class="health-line"><span>Responsive</span><strong id="qResp">—</strong></div>
+        <div class="health-line"><span>Security</span><strong id="qSec">—</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="suggestionCard">
+    <div class="card-head"><h3>AI suggestions</h3><span class="badge" id="suggestCount">0</span></div>
+    <div class="empty-card" id="suggestEmpty">No suggestions yet. Veyra only shows suggestions derived from your real build quality.</div>
+    <div id="suggestionsList"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Deployment</h3><span class="badge" id="deployBadge">Not published</span></div>
+    <div class="empty-card" id="deployEmpty">Save your project first, then publish it when you’re ready.</div>
+    <button class="publish-btn" id="sidePublish" style="display:none">Publish to live site</button>
+    <a class="live-url" id="liveUrl" target="_blank"></a>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>Account & usage</h3><a href="{{url_for('account')}}" style="font-size:10px;color:#8b72f7;text-decoration:none">Manage →</a></div>
+    <div class="credit-number">{{ user.credits or 0 }}</div>
+    <div class="small-note">credits available</div>
+    <div class="credit-bar"><span></span></div>
+    <div class="info-row"><span>New AI build</span><strong>25 credits</strong></div>
+    <div class="info-row"><span>Follow-up edit</span><strong>10 credits</strong></div>
+  </div>
 </aside>
+
 </div>
 
 <script>
-const state={title:"Untitled Project",html:"",css:"",js:"",project_id:null,access_role:"owner",published_url:""};
+const state={
+  title:"Untitled Project",
+  html:"",
+  css:"",
+  js:"",
+  project_id:null,
+  access_role:"owner",
+  published_url:"",
+  quality:null,
+  dirty:false
+};
+
 let codeType="html";
+let viewportWidth="100%";
 const $=id=>document.getElementById(id);
-const promptEl=$("prompt"),sendBtn=$("sendBtn"),messages=$("messages"),frame=$("preview"),canvas=$("canvas");
-function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
+const messages=$("messages");
+const promptEl=$("prompt");
+const sendBtn=$("sendBtn");
+const frame=$("preview");
+const canvas=$("canvas");
+const typingRow=$("typingRow");
+const loadingShroud=$("loadingShroud");
+
+function esc(v){
+  return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+
+function scrollChat(){
+  requestAnimationFrame(()=>messages.scrollTop=messages.scrollHeight);
+}
+
+function setTyping(show,text="Building your project…"){
+  typingRow.classList.toggle("visible",show);
+  loadingShroud.classList.toggle("visible",show);
+  $("loadingText").textContent=text;
+  if(show)scrollChat();
+}
+
+function setDirty(dirty=true){
+  state.dirty=dirty;
+  const box=$("savedIndicator");
+  box.classList.toggle("saved",!dirty && !!state.project_id);
+  $("savedText").textContent=dirty?"Unsaved changes":state.project_id?"Saved":"Not saved";
+  $("savedState").textContent=dirty?"Unsaved":state.project_id?"Saved":"Not saved";
+}
+
 function syncUI(){
-  $("topProjectName").textContent=state.title;$("sideName").textContent=state.title;$("projectTitle").textContent=state.title;
-  $("accessRole").textContent=state.access_role||"owner";
-  $("savedState").textContent=state.project_id?"Saved":"Not yet";
+  $("topProjectName").textContent=state.title;
+  $("projectTitle").textContent=state.title==="Untitled Project"?"Build, iterate, and launch with AI.":state.title;
+  $("sideName").textContent=state.title;
+  $("accessBadge").textContent=state.access_role||"viewer";
+
+  const owner=state.access_role==="owner";
+  $("publishBtn").disabled=!owner;
+  $("sidePublish").style.display=state.project_id&&owner?"block":"none";
   $("deployEmpty").style.display=state.project_id?"none":"block";
-  $("sidePublish").style.display=state.project_id&&state.access_role==="owner"?"block":"none";
-  $("publishBtn").disabled=!state.project_id||state.access_role!=="owner";
-  if(state.published_url){$("liveUrl").textContent=state.published_url;$("liveUrl").href=state.published_url;$("addressText").textContent=state.published_url;}
+  $("membersBtn").disabled=!state.project_id||!owner;
+  $("shareBtn").disabled=!state.project_id||!owner;
+
+  if(state.published_url){
+    $("liveUrl").textContent=state.published_url;
+    $("liveUrl").href=state.published_url;
+    $("addressText").textContent=state.published_url;
+    $("deployBadge").textContent="Live";
+    $("deployBadge").classList.add("green");
+  }else{
+    $("liveUrl").textContent="";
+    $("liveUrl").removeAttribute("href");
+    $("addressText").textContent="Live preview";
+    $("deployBadge").textContent="Not published";
+    $("deployBadge").classList.remove("green");
+  }
+  setDirty(state.dirty);
 }
-function addMessage(role,text,card){
-  const el=document.createElement("div");el.className="msg "+(role==="assistant"?"assistant":"");
-  el.innerHTML=`<div class="mh"><div class="avatar">${role==="assistant"?"V":"{{ (user.name or user.email or 'VE')[:2]|upper if user else 'VE' }}"}</div><b>${role==="assistant"?"Veyra Assistant":"You"}</b><time>now</time></div><p>${esc(text)}</p>${card?`<div class="file"><div class="file-icon">V</div><div><b>${esc(card)}</b><span class="muted">Live project update</span></div><span class="ok">Updated</span></div>`:""}`;
-  messages.appendChild(el);messages.scrollTop=messages.scrollHeight;
+
+function addMessage(role,text,card=null,steps=null){
+  const wrap=document.createElement("div");
+  wrap.className="message "+(role==="assistant"?"assistant":"user");
+  const avatar=role==="assistant"
+    ? `<div class="avatar-ai"><svg viewBox="0 0 32 32" width="20" height="20"><path fill="#9b5cff" d="M3 5h7l6 10 6-10h7L16 28z"/><path fill="#5f75ff" d="M9 5h5l2 4 2-4h5l-7 13z"/></svg></div>`
+    : `<div class="avatar-user">{{ (user.name or user.email or 'VE')[:2]|upper if user else 'VE' }}</div>`;
+
+  let buildCard="";
+  if(card){
+    const stepHtml=(steps||[]).map((s,i)=>`<div class="step ${i===steps.length-1?"active":"done"}"><span class="step-dot"></span><span>${esc(s)}</span></div>`).join("");
+    buildCard=`<div class="build-card"><div class="build-card-head"><div class="build-mini">V</div><div><b>${esc(card)}</b><div class="small-note">Live project update</div></div><span class="done">Updated</span></div>${stepHtml?`<div class="build-steps">${stepHtml}</div>`:""}</div>`;
+  }
+
+  wrap.innerHTML=`${avatar}<div class="message-body"><div class="message-meta"><b>${role==="assistant"?"Veyra Assistant":"You"}</b><time>now</time></div><p>${esc(text)}</p>${buildCard}</div>`;
+  messages.insertBefore(wrap,typingRow);
+  scrollChat();
 }
+
 function renderPreview(){
   const safe=(state.js||"").replace(/<\/script>/gi,"<\\/script>");
-  frame.srcdoc=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${state.css||""}</style></head><body>${state.html||""}<script>${safe}<\/script></body></html>`;
-  if(state.html||state.css||state.js)canvas.classList.add("ready");
+  frame.srcdoc=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{min-height:100%}${state.css||""}</style></head><body>${state.html||""}<script>${safe}<\/script></body></html>`;
+  frame.style.width=viewportWidth;
+  frame.style.left="50%";
+  frame.style.transform="translateX(-50%)";
+  if(state.html||state.css||state.js)canvas.classList.add("has-preview");
 }
+
+function qualityNumber(v){
+  const n=Number(v);
+  return Number.isFinite(n)?Math.max(0,Math.min(100,n)):null;
+}
+
 function setQuality(q){
-  if(!q)return;$("qualityEmpty").style.display="none";$("qualityRows").style.display="block";
-  $("qA11y").textContent=q.accessibility??"—";$("qPerf").textContent=q.performance??"—";$("qResp").textContent=q.responsive??"—";$("qSec").textContent=q.security??"—";
+  state.quality=q||null;
+  if(!q){
+    $("qualityEmpty").style.display="block";
+    $("healthWrap").style.display="none";
+    $("qualityBadge").textContent="No audit";
+    updateSuggestions(null);
+    return;
+  }
+  const values=[
+    qualityNumber(q.accessibility),
+    qualityNumber(q.performance),
+    qualityNumber(q.responsive),
+    qualityNumber(q.security)
+  ].filter(v=>v!==null);
+
+  $("qualityEmpty").style.display="none";
+  $("healthWrap").style.display="flex";
+  $("qA11y").textContent=q.accessibility??"—";
+  $("qPerf").textContent=q.performance??"—";
+  $("qResp").textContent=q.responsive??"—";
+  $("qSec").textContent=q.security??"—";
+
+  if(values.length){
+    const score=Math.round(values.reduce((a,b)=>a+b,0)/values.length);
+    $("healthScore").textContent=score;
+    $("healthRing").style.setProperty("--score",score);
+    $("qualityBadge").textContent=score>=90?"Excellent":score>=75?"Good":"Needs work";
+  }else{
+    $("healthScore").textContent="—";
+    $("qualityBadge").textContent="Audited";
+  }
+  updateSuggestions(q);
 }
+
+function updateSuggestions(q){
+  const list=$("suggestionsList");
+  const empty=$("suggestEmpty");
+  list.innerHTML="";
+  const suggestions=[];
+  if(q){
+    const a=qualityNumber(q.accessibility),p=qualityNumber(q.performance),r=qualityNumber(q.responsive),s=qualityNumber(q.security);
+    if(a!==null&&a<90)suggestions.push(["Accessibility","Improve labels, contrast, and semantic structure."]);
+    if(p!==null&&p<90)suggestions.push(["Performance","Reduce heavy assets and unnecessary render work."]);
+    if(r!==null&&r<90)suggestions.push(["Responsive design","Tighten layouts and spacing for smaller screens."]);
+    if(s!==null&&s<90)suggestions.push(["Security","Review scripts, forms, and unsafe client-side behavior."]);
+  }
+  $("suggestCount").textContent=suggestions.length;
+  empty.style.display=suggestions.length?"none":"block";
+  suggestions.forEach(([title,desc])=>{
+    const el=document.createElement("div");
+    el.className="suggestion";
+    el.innerHTML=`<div class="suggestion-icon">✦</div><div><b>${esc(title)}</b><small>${esc(desc)}</small></div>`;
+    list.appendChild(el);
+  });
+}
+
 async function build(prompt){
-  prompt=(prompt||"").trim();if(!prompt)return;addMessage("user",prompt);promptEl.value="";sendBtn.disabled=true;$("engineStatus").textContent="Veyra building…";
+  prompt=(prompt||"").trim();
+  if(!prompt)return;
+
+  addMessage("user",prompt);
+  promptEl.value="";
+  sendBtn.disabled=true;
+  $("engineStatus").textContent="Veyra is thinking…";
+  setTyping(true,"Designing your update…");
+
   try{
-    const res=await fetch("/api/build",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,current:{html:state.html,css:state.css,js:state.js}})});
-    const data=await res.json();if(!res.ok||data.ok===false)throw new Error(data.error||"Build failed");
-    state.title=data.title||state.title;state.html=data.html||"";state.css=data.css||"";state.js=data.js||"";renderPreview();setQuality(data.quality);syncUI();
-    addMessage("assistant",data.assistant_message||"Done — I updated the project.",state.title);$("engineStatus").textContent=data.engine||"Veyra AI";
-  }catch(e){addMessage("assistant","Build failed: "+e.message);$("engineStatus").textContent="Build error";}finally{sendBtn.disabled=false;}
+    const res=await fetch("/api/build",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({prompt,current:{html:state.html,css:state.css,js:state.js}})
+    });
+    const data=await res.json();
+    if(!res.ok||data.ok===false)throw new Error(data.error||"Build failed");
+
+    state.title=data.title||state.title;
+    state.html=data.html||"";
+    state.css=data.css||"";
+    state.js=data.js||"";
+    state.dirty=true;
+
+    renderPreview();
+    setQuality(data.quality);
+    syncUI();
+
+    setTyping(false);
+    addMessage(
+      "assistant",
+      data.assistant_message||"Done — I updated the project.",
+      state.title,
+      ["Analyzed your request","Updated project files","Rendered live preview"]
+    );
+    $("engineStatus").textContent=data.engine||"Veyra AI";
+  }catch(e){
+    setTyping(false);
+    addMessage("assistant","I couldn’t finish that build: "+e.message);
+    $("engineStatus").textContent="Build error";
+  }finally{
+    sendBtn.disabled=false;
+  }
 }
+
 async function save(){
-  const res=await fetch("/api/projects/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({project_id:state.project_id,title:state.title,description:"Built with Veyra",html:state.html,css:state.css,js:state.js})});
-  const data=await res.json();if(!res.ok||data.ok===false)throw new Error(data.error||"Save failed");state.project_id=data.project_id;syncUI();return data;
+  const res=await fetch("/api/projects/save",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      project_id:state.project_id,
+      title:state.title,
+      description:"Built with Veyra",
+      html:state.html,css:state.css,js:state.js
+    })
+  });
+  const data=await res.json();
+  if(!res.ok||data.ok===false)throw new Error(data.error||"Save failed");
+  state.project_id=data.project_id;
+  state.dirty=false;
+  syncUI();
+  return data;
 }
+
 async function publish(){
-  if(!state.project_id)await save();
-  const res=await fetch("/api/projects/publish",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({project_id:state.project_id})});
-  const data=await res.json();if(!res.ok||data.ok===false)throw new Error(data.error||"Publish failed");state.published_url=data.url;syncUI();addMessage("assistant","Published successfully. Your live URL is "+data.url);
+  if(!state.project_id||state.dirty)await save();
+  const res=await fetch("/api/projects/publish",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({project_id:state.project_id})
+  });
+  const data=await res.json();
+  if(!res.ok||data.ok===false)throw new Error(data.error||"Publish failed");
+  state.published_url=data.url;
+  syncUI();
+  addMessage("assistant","Your site is live. I published the current saved version successfully.");
 }
+
 async function loadProject(id){
-  const res=await fetch("/api/projects/"+id);const data=await res.json();if(!res.ok||!data.ok)throw new Error(data.error||"Project load failed");
-  const p=data.project;state.project_id=p.id;state.title=p.name||state.title;state.html=p.html||"";state.css=p.css||"";state.js=p.js||"";state.access_role=p.access_role||"viewer";renderPreview();syncUI();addMessage("assistant","Loaded "+state.title+".");
+  const res=await fetch("/api/projects/"+id);
+  const data=await res.json();
+  if(!res.ok||!data.ok)throw new Error(data.error||"Project load failed");
+  const p=data.project;
+  state.project_id=p.id;
+  state.title=p.name||state.title;
+  state.html=p.html||"";
+  state.css=p.css||"";
+  state.js=p.js||"";
+  state.access_role=p.access_role||"viewer";
+  state.dirty=false;
+  renderPreview();
+  syncUI();
+  addMessage("assistant","Loaded "+state.title+". You can keep working from where you left off.");
 }
+
 async function doExport(){
-  const res=await fetch("/api/projects/export",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title:state.title,html:state.html,css:state.css,js:state.js})});
-  if(!res.ok)throw new Error("Export failed");const blob=await res.blob();const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=(state.title||"veyra-project").replace(/[^a-z0-9_-]+/gi,"-").toLowerCase()+".zip";a.click();URL.revokeObjectURL(a.href);
+  const res=await fetch("/api/projects/export",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({title:state.title,html:state.html,css:state.css,js:state.js})
+  });
+  if(!res.ok)throw new Error("Export failed");
+  const blob=await res.blob();
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=(state.title||"veyra-project").replace(/[^a-z0-9_-]+/gi,"-").toLowerCase()+".zip";
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
-sendBtn.onclick=()=>build(promptEl.value);promptEl.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();build(promptEl.value)}});
+
+sendBtn.onclick=()=>build(promptEl.value);
+promptEl.addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();build(promptEl.value)}
+});
 document.querySelectorAll("[data-prompt]").forEach(b=>b.onclick=()=>build(b.dataset.prompt));
-$("saveBtn").onclick=async()=>{try{await save();addMessage("assistant","Project saved.");}catch(e){addMessage("assistant",e.message)}};
-$("publishBtn").onclick=$("sidePublish").onclick=async()=>{try{await publish()}catch(e){addMessage("assistant",e.message)}};
-$("exportBtn").onclick=async()=>{try{await doExport()}catch(e){addMessage("assistant",e.message)}};
+
+$("saveBtn").onclick=async()=>{
+  try{await save();addMessage("assistant","Saved. Your latest project version is stored.");}
+  catch(e){addMessage("assistant",e.message)}
+};
+$("publishBtn").onclick=$("sidePublish").onclick=async()=>{
+  try{await publish()}
+  catch(e){addMessage("assistant",e.message)}
+};
+$("exportBtn").onclick=async()=>{
+  try{await doExport()}
+  catch(e){addMessage("assistant",e.message)}
+};
+$("shareBtn").onclick=async()=>{
+  if(!state.project_id){
+    addMessage("assistant","Save the project first, then you can add members to this project.");
+    return;
+  }
+  location.href="/app/projects/"+state.project_id+"/members";
+};
+$("membersBtn").onclick=()=>{
+  if(state.project_id)location.href="/app/projects/"+state.project_id+"/members";
+};
+
 $("refreshBtn").onclick=renderPreview;
-$("previewTab").onclick=()=>{canvas.classList.remove("code");$("previewTab").classList.add("active");$("codeTab").classList.remove("active")};
-$("codeTab").onclick=()=>{canvas.classList.add("code");$("codeTab").classList.add("active");$("previewTab").classList.remove("active");$("codeEditor").value=state[codeType]||""};
-document.querySelectorAll("[data-code]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-code]").forEach(x=>x.classList.remove("active"));b.classList.add("active");codeType=b.dataset.code;$("codeEditor").value=state[codeType]||""});
-$("applyCode").onclick=()=>{state[codeType]=$("codeEditor").value;renderPreview();addMessage("assistant",codeType.toUpperCase()+" updated from the code editor.")};
-const qp=new URLSearchParams(location.search);if(qp.get("project"))loadProject(qp.get("project")).catch(e=>addMessage("assistant",e.message));
-syncUI();
-</script></body></html>
+$("openLiveBtn").onclick=()=>{
+  if(state.published_url)window.open(state.published_url,"_blank");
+  else addMessage("assistant","Publish the project first and I’ll open the live URL here.");
+};
+
+$("previewTab").onclick=()=>{
+  canvas.classList.remove("code");
+  $("previewTab").classList.add("active");
+  $("codeTab").classList.remove("active");
+};
+$("codeTab").onclick=()=>{
+  canvas.classList.add("code");
+  $("codeTab").classList.add("active");
+  $("previewTab").classList.remove("active");
+  $("codeEditor").value=state[codeType]||"";
+};
+document.querySelectorAll("[data-code]").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("[data-code]").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+  codeType=b.dataset.code;
+  $("codeEditor").value=state[codeType]||"";
+});
+$("applyCode").onclick=()=>{
+  state[codeType]=$("codeEditor").value;
+  state.dirty=true;
+  renderPreview();
+  syncUI();
+  addMessage("assistant",codeType.toUpperCase()+" changes applied to the live preview.");
+};
+
+document.querySelectorAll("[data-width]").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("[data-width]").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+  viewportWidth=b.dataset.width;
+  $("viewportLabel").textContent=viewportWidth==="100%"?"Desktop":viewportWidth==="820px"?"Tablet":"Mobile";
+  renderPreview();
+});
+
+window.addEventListener("beforeunload",e=>{
+  if(state.dirty){e.preventDefault();e.returnValue=""}
+});
+
+const qp=new URLSearchParams(location.search);
+if(qp.get("project")){
+  loadProject(qp.get("project")).catch(e=>addMessage("assistant",e.message));
+}else{
+  syncUI();
+}
+</script>
+</body>
+</html>
