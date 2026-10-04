@@ -422,6 +422,11 @@ def init_db():
                 status TEXT NOT NULL DEFAULT 'ready',
                 created_at TEXT NOT NULL
             )''')
+            c.execute('ALTER TABLE deployments ADD COLUMN IF NOT EXISTS user_id BIGINT')
+            c.execute('ALTER TABLE deployments ADD COLUMN IF NOT EXISTS project_id BIGINT')
+            c.execute("ALTER TABLE deployments ADD COLUMN IF NOT EXISTS url TEXT DEFAULT ''")
+            c.execute("ALTER TABLE deployments ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ready'")
+            c.execute('ALTER TABLE deployments ADD COLUMN IF NOT EXISTS created_at TEXT')
             c.execute('''CREATE TABLE IF NOT EXISTS analytics_events(
                 id BIGSERIAL PRIMARY KEY,
                 user_id BIGINT NOT NULL,
@@ -2230,36 +2235,74 @@ def get_project(project_id):
 @login_required
 def publish_project():
     payload=request.get_json(silent=True) or {}
-    project_id=payload.get('project_id')
-    if not project_id:
-        return jsonify({'ok':False,'error':'Save the project before publishing.'}),400
+    raw_project_id=payload.get('project_id')
+
+    try:
+        project_id=int(raw_project_id)
+    except Exception:
+        return jsonify({
+            'ok':False,
+            'error':'Save the project before publishing.'
+        }),400
 
     u=current_user()
     project=_project_for_owner(project_id,u['id'])
     if not project:
-        return jsonify({'ok':False,'error':'Only the project owner can publish.'}),403
+        return jsonify({
+            'ok':False,
+            'error':'Only the project owner can publish this project.'
+        }),403
 
-    public_path=f"/p/{int(project_id)}"
-    public_url=public_url(public_path)
+    public_path=f'/p/{project_id}'
+    public_url_value=public_url(public_path)
 
-    with db() as c:
-        existing=c.execute(
-            'SELECT id FROM deployments WHERE project_id=? AND user_id=? ORDER BY id DESC LIMIT 1',
-            (project_id,u['id'])
-        ).fetchone()
-        if existing:
-            c.execute(
-                "UPDATE deployments SET url=?,status='ready',created_at=? WHERE id=?",
-                (public_url,now(),existing['id'])
-            )
-        else:
-            c.execute(
-                'INSERT INTO deployments(user_id,project_id,url,status,created_at) VALUES(?,?,?,?,?)',
-                (u['id'],project_id,public_url,'ready',now())
-            )
-        c.commit()
+    try:
+        with db() as c:
+            # Make Publish safe even if an older deployments table exists.
+            existing=c.execute(
+                'SELECT id FROM deployments WHERE project_id=? AND user_id=? ORDER BY id DESC LIMIT 1',
+                (project_id,u['id'])
+            ).fetchone()
 
-    return jsonify({'ok':True,'url':public_url,'project_id':int(project_id)})
+            if existing:
+                c.execute(
+                    "UPDATE deployments SET url=?,status=?,created_at=? WHERE id=?",
+                    (public_url_value,'ready',now(),existing['id'])
+                )
+            else:
+                c.execute(
+                    'INSERT INTO deployments(user_id,project_id,url,status,created_at) VALUES(?,?,?,?,?)',
+                    (u['id'],project_id,public_url_value,'ready',now())
+                )
+
+            # Record publish activity, but never let analytics break publishing.
+            try:
+                c.execute(
+                    'INSERT INTO analytics_events(user_id,project_id,event_type,created_at) VALUES(?,?,?,?)',
+                    (u['id'],project_id,'published',now())
+                )
+            except Exception:
+                pass
+
+            c.commit()
+
+        return jsonify({
+            'ok':True,
+            'url':public_url_value,
+            'project_id':project_id,
+            'message':'Your project is live.'
+        })
+
+    except Exception as exc:
+        app.logger.exception(
+            'Project publish failed | project_id=%s | user_id=%s | error=%s',
+            project_id,u.get('id'),type(exc).__name__
+        )
+        return jsonify({
+            'ok':False,
+            'error':'Veyra could not publish this project yet. Your project is still saved safely.',
+            'code':'PUBLISH_FAILED'
+        }),500
 
 
 @app.get('/p/<int:project_id>')

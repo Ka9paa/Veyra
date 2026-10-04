@@ -1702,16 +1702,30 @@ async function save(quiet=false){
 
 async function publish(){
   if(!state.project_id||state.dirty)await save();
+
   const res=await fetch("/api/projects/publish",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({project_id:state.project_id})
   });
-  const data=await res.json();
-  if(!res.ok||data.ok===false)throw new Error(data.error||"Publish failed");
+
+  const data=await readJsonResponse(res);
+
+  if(!res.ok||data.ok===false){
+    throw new Error(data.error||data.code||"Publish failed");
+  }
+
   state.published_url=data.url;
   syncUI();
-  addMessage("assistant","Your site is live. I published the current saved version successfully.");
+
+  addMessage(
+    "assistant",
+    "Your site is live. The current saved version was published successfully.\n\nLive URL: "+data.url
+  );
+
+  try{
+    window.open(data.url,"_blank","noopener");
+  }catch(_){}
 }
 
 async function loadProject(id){
