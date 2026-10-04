@@ -45,7 +45,7 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
 .shell{
   height:100vh;
   display:grid;
-  grid-template-columns:76px 382px minmax(520px,1fr) 304px;
+  grid-template-columns:64px 352px minmax(620px,1fr);
   grid-template-rows:64px minmax(0,1fr);
   background:
     radial-gradient(circle at 42% -10%,rgba(113,76,255,.14),transparent 25%),
@@ -379,9 +379,28 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
 
 /* ---------- RIGHT ---------- */
 .inspector{
-  grid-row:2;min-height:0;overflow:auto;
-  padding:10px;border-left:1px solid var(--line);
-  background:#07101a;
+  position:fixed;
+  top:72px;
+  right:12px;
+  bottom:12px;
+  width:308px;
+  z-index:80;
+  overflow:auto;
+  padding:10px;
+  border:1px solid var(--line2);
+  border-radius:16px;
+  background:rgba(7,16,26,.97);
+  backdrop-filter:blur(20px);
+  box-shadow:0 24px 80px rgba(0,0,0,.46);
+  transform:translateX(calc(100% + 28px));
+  opacity:0;
+  pointer-events:none;
+  transition:transform .22s ease,opacity .22s ease;
+}
+.inspector.open{
+  transform:translateX(0);
+  opacity:1;
+  pointer-events:auto;
 }
 .card{
   border:1px solid #1c2a43;border-radius:14px;
@@ -825,6 +844,52 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
 }
 .message:hover .message-meta time{color:#8090a8}
 
+
+/* =========================================================
+   VEYRA STUDIO R4 — project-first large preview workspace
+   ========================================================= */
+.inspector-close{
+  position:sticky;top:0;float:right;z-index:3;
+  width:31px;height:31px;border:1px solid #2a3a57;border-radius:9px;
+  background:#0c1524;color:#8d9cb3;font-size:18px;
+}
+.inspector-close:hover{color:#fff;border-color:#4b5e80}
+.workspace{min-width:0}
+.canvas{background:#060b14}
+.preview{border-radius:11px}
+.browserbar{padding-left:12px;padding-right:12px}
+.address{background:#08111e}
+.chat{min-width:0}
+.messages{padding-bottom:18px}
+.project-switch{max-width:245px}
+.saved-indicator{min-width:112px;justify-content:flex-end}
+.saved-indicator.saving .cloud{
+  background:#8e5cff;
+  box-shadow:0 0 11px rgba(142,92,255,.65);
+  animation:savePulse .9s infinite ease-in-out;
+}
+.saved-indicator.error .cloud{background:#ff6f89}
+@keyframes savePulse{50%{opacity:.35}}
+.autosave-toast{
+  position:absolute;right:16px;bottom:15px;z-index:12;
+  height:30px;padding:0 10px;border:1px solid #2b3c59;border-radius:9px;
+  background:rgba(8,17,30,.88);backdrop-filter:blur(10px);
+  display:flex;align-items:center;gap:7px;color:#7687a1;font-size:9px;
+  opacity:0;transform:translateY(5px);pointer-events:none;
+  transition:.2s ease;
+}
+.autosave-toast.show{opacity:1;transform:none}
+.autosave-toast i{width:6px;height:6px;border-radius:50%;background:#45dfae}
+@media(max-width:1300px){
+  .shell{grid-template-columns:60px 330px minmax(520px,1fr)}
+}
+@media(max-width:900px){
+  .shell{grid-template-columns:58px 1fr;grid-template-rows:58px minmax(540px,auto) 620px}
+  .chat{grid-column:2;grid-row:2}
+  .workspace{grid-column:1/-1;grid-row:3}
+  .inspector{top:66px;right:8px;bottom:8px;width:min(320px,calc(100vw - 16px))}
+}
+
 </style>
 </head>
 <body>
@@ -849,11 +914,11 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
     <button class="view-tab" id="codeTab">Code</button>
   </div>
 
-  <div class="saved-indicator" id="savedIndicator"><span class="cloud"></span><span id="savedText">Not saved</span></div>
+  <div class="saved-indicator" id="savedIndicator"><span class="cloud"></span><span id="savedText">Autosave ready</span></div>
 
   <div class="studio-credit-pill"><span></span><b id="studioCreditCount">{{user.credits or 0}}</b> credits</div>
   <div class="top-actions">
-    <button class="top-btn" id="saveBtn">Save</button>
+    <button class="top-btn" id="saveBtn">Save</button><button class="top-btn" id="inspectBtn">Inspect</button>
     <button class="top-btn share" id="shareBtn">Share</button>
     <button class="top-btn export" id="exportBtn">Export</button>
     <button class="top-btn primary" id="publishBtn">Publish</button>
@@ -955,7 +1020,7 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
     <button class="device" id="openLiveBtn">↗</button>
   </div>
 
-  <div class="canvas" id="canvas">
+  <div class="canvas" id="canvas"><div class="autosave-toast" id="autosaveToast"><i></i><span>Project saved</span></div>
     <iframe class="preview" id="preview"></iframe>
 
     <div class="empty-preview">
@@ -995,7 +1060,7 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
   </div>
 </main>
 
-<aside class="inspector">
+<aside class="inspector" id="inspector"><button class="inspector-close" id="inspectorClose" aria-label="Close inspector">×</button>
   <div class="card">
     <div class="card-head"><h3>Project</h3><span class="badge" id="accessBadge">owner</span></div>
     <div class="info-row"><span>Name</span><strong id="sideName">Untitled Project</strong></div>
@@ -1228,6 +1293,85 @@ function updateSuggestions(q){
   });
 }
 
+
+async function readJsonResponse(res){
+  const raw=await res.text();
+  if(!raw){
+    throw new Error(`Empty server response (HTTP ${res.status})`);
+  }
+  try{
+    return JSON.parse(raw);
+  }catch(_){
+    const clean=raw.replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();
+    const preview=clean.slice(0,140);
+    throw new Error(
+      preview
+        ? `Server returned non-JSON (HTTP ${res.status}): ${preview}`
+        : `Server returned non-JSON (HTTP ${res.status})`
+    );
+  }
+}
+
+let autosaveTimer=null;
+let saveInFlight=null;
+
+function setSaveState(mode,label){
+  const indicator=$("savedIndicator");
+  if(!indicator)return;
+  indicator.classList.remove("saved","saving","error");
+  if(mode)indicator.classList.add(mode);
+  $("savedText").textContent=label;
+}
+
+function showAutosaveToast(label="Project saved"){
+  const toast=$("autosaveToast");
+  if(!toast)return;
+  const span=toast.querySelector("span");
+  if(span)span.textContent=label;
+  toast.classList.add("show");
+  clearTimeout(showAutosaveToast.timer);
+  showAutosaveToast.timer=setTimeout(()=>toast.classList.remove("show"),1600);
+}
+
+function updateProjectUrl(){
+  if(!state.project_id)return;
+  const url=new URL(location.href);
+  url.searchParams.set("project",state.project_id);
+  history.replaceState({}, "", url);
+}
+
+async function autosave(reason="Autosaved"){
+  if(state.access_role==="viewer")return null;
+  if(!state.html&&!state.css&&!state.js)return null;
+
+  clearTimeout(autosaveTimer);
+  if(saveInFlight){
+    try{await saveInFlight}catch(_){}
+  }
+
+  setSaveState("saving","Saving…");
+  saveInFlight=save(true);
+
+  try{
+    const data=await saveInFlight;
+    updateProjectUrl();
+    setSaveState("saved",`Saved ${messageTimestamp()}`);
+    showAutosaveToast(reason);
+    return data;
+  }catch(e){
+    setSaveState("error","Save failed");
+    console.error("Veyra autosave failed",e);
+    return null;
+  }finally{
+    saveInFlight=null;
+  }
+}
+
+function scheduleAutosave(reason="Changes autosaved"){
+  clearTimeout(autosaveTimer);
+  autosaveTimer=setTimeout(()=>autosave(reason),850);
+}
+
 async function build(prompt){
   prompt=(prompt||"").trim();
   if(!prompt)return;
@@ -1244,8 +1388,8 @@ async function build(prompt){
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({prompt,current:{html:state.html,css:state.css,js:state.js}})
     });
-    const data=await res.json();
-    if(!res.ok||data.ok===false)throw new Error(data.error||"Build failed");
+    const data=await readJsonResponse(res);
+    if(!res.ok||data.ok===false)throw new Error(data.error||data.code||"Build failed");
 
     state.title=data.title||state.title;
     state.html=data.html||"";
@@ -1288,6 +1432,7 @@ async function build(prompt){
         diagnostic.classList.remove("show");
       }
     }
+    await autosave(data.diagnostic_code ? "Fallback preview saved" : "AI build autosaved");
   }catch(e){
     setTyping(false);
     addMessage("assistant","I couldn’t finish that build: "+e.message);
@@ -1297,7 +1442,7 @@ async function build(prompt){
   }
 }
 
-async function save(){
+async function save(quiet=false){
   const res=await fetch("/api/projects/save",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -1308,8 +1453,8 @@ async function save(){
       html:state.html,css:state.css,js:state.js
     })
   });
-  const data=await res.json();
-  if(!res.ok||data.ok===false)throw new Error(data.error||"Save failed");
+  const data=await readJsonResponse(res);
+  if(!res.ok||data.ok===false)throw new Error(data.error||data.code||"Save failed");
   state.project_id=data.project_id;
   state.dirty=false;
   syncUI();
@@ -1370,8 +1515,16 @@ document.querySelectorAll("[data-prompt]").forEach(b=>b.onclick=()=>build(b.data
 document.querySelectorAll("[data-empty-prompt]").forEach(b=>b.onclick=()=>build(b.dataset.emptyPrompt));
 
 $("saveBtn").onclick=async()=>{
-  try{await save();addMessage("assistant","Saved. Your latest project version is stored.");}
-  catch(e){addMessage("assistant",e.message)}
+  try{
+    setSaveState("saving","Saving…");
+    await save();
+    updateProjectUrl();
+    setSaveState("saved",`Saved ${messageTimestamp()}`);
+    showAutosaveToast("Project saved");
+  }catch(e){
+    setSaveState("error","Save failed");
+    addMessage("assistant",e.message);
+  }
 };
 $("publishBtn").onclick=$("sidePublish").onclick=async()=>{
   try{await publish()}
@@ -1429,6 +1582,7 @@ $("applyCode").onclick=()=>{
   renderPreview();
   syncUI();
   addMessage("assistant",codeType.toUpperCase()+" changes applied to the live preview.");
+  scheduleAutosave("Code changes autosaved");
 };
 
 document.querySelectorAll("[data-width]").forEach(b=>b.onclick=()=>{
@@ -1441,6 +1595,12 @@ document.querySelectorAll("[data-width]").forEach(b=>b.onclick=()=>{
 
 window.addEventListener("beforeunload",e=>{
   if(state.dirty){e.preventDefault();e.returnValue=""}
+});
+
+$("inspectBtn").onclick=()=>$("inspector").classList.toggle("open");
+$("inspectorClose").onclick=()=>$("inspector").classList.remove("open");
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape")$("inspector").classList.remove("open");
 });
 
 const qp=new URLSearchParams(location.search);

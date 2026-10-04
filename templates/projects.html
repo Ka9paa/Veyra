@@ -1,7 +1,40 @@
-{% extends 'app_base.html' %}{% block title %}Projects — Veyra{% endblock %}{% block top_title %}Projects{% endblock %}
+{% extends 'app_base.html' %}
+{% block title %}Projects — Veyra{% endblock %}{% block top_title %}Projects{% endblock %}
 {% block content %}
-<div class="hero-row"><div><div class="eyebrow">Workspace</div><h1 class="title">Projects</h1><p class="subtitle">Everything you own or have been invited to, with the real access level shown.</p></div><a class="btn primary" href="{{url_for('studio')}}">＋ New project</a></div>
-{% if projects %}<div class="list">{% for p in projects %}
-<div class="list-row"><div class="row-main"><div class="emblem"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 9h16"/></svg></div><div class="row-copy"><strong>{{p.name}}</strong><span class="muted">{{p.description or 'No description yet'}}</span></div></div><div style="display:flex;align-items:center;gap:7px"><span class="tag">{{p.access_role or 'owner'}}</span><a class="btn" href="{{url_for('studio')}}?project={{p.id}}">Open</a>{% if (p.access_role or 'owner')=='owner' %}<a class="btn" href="{{url_for('project_members_page',project_id=p.id)}}">Members</a>{% endif %}</div></div>
-{% endfor %}</div>{% else %}<div class="empty"><div class="empty-icon">◇</div><h3>No projects yet</h3><p>Nothing appears here until you actually create or join a project.</p><a class="btn primary" href="{{url_for('studio')}}">Create your first project</a></div>{% endif %}
+<style>
+.vx-project-head{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:22px}
+.vx-project-head h1{font-size:36px;letter-spacing:-.045em;margin:5px 0}.vx-project-head p{color:var(--muted);margin:0}
+.vx-project-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.vx-project-card{border:1px solid var(--line);border-radius:17px;background:linear-gradient(180deg,#0d1625,#09121f);overflow:hidden;text-decoration:none;color:inherit;transition:.18s ease}
+.vx-project-card:hover{transform:translateY(-2px);border-color:#344968;box-shadow:0 18px 48px rgba(0,0,0,.18)}
+.vx-project-preview{height:180px;background:radial-gradient(circle at 70% 10%,rgba(132,86,255,.16),transparent 30%),linear-gradient(145deg,#0b1322,#070d18);padding:16px;position:relative;overflow:hidden}
+.vx-project-browser{height:100%;border:1px solid #243653;border-radius:11px;background:#080f1b;overflow:hidden}
+.vx-project-browser header{height:25px;border-bottom:1px solid #1b2941;display:flex;align-items:center;gap:4px;padding:0 8px}
+.vx-project-browser header i{width:5px;height:5px;border-radius:50%;background:#30415d}
+.vx-project-browser main{padding:15px}.vx-project-browser main span,.vx-project-browser main b{display:block;border-radius:5px;background:#17253d;margin-bottom:8px}
+.vx-project-browser main span{width:35%;height:7px;background:#33265e}.vx-project-browser main b:nth-child(2){width:72%;height:18px}.vx-project-browser main b:nth-child(3){width:55%;height:8px}.vx-project-browser main b:nth-child(4){width:85%;height:48px;margin-top:16px;background:#101b2e}
+.vx-project-meta{padding:14px}.vx-project-title{display:flex;align-items:center;gap:8px}.vx-project-title strong{font-size:14px}.vx-project-title .tag{margin-left:auto}
+.vx-project-meta p{color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:7px 0 10px}
+.vx-project-foot{display:flex;align-items:center;justify-content:space-between;color:#60718b;font-size:10px}.vx-project-foot span:last-child{color:#6ee3b4}
+.vx-new-project{display:grid;place-items:center;min-height:275px;border:1px dashed #30415f;border-radius:17px;background:radial-gradient(circle at 50% 20%,rgba(129,82,255,.08),transparent 35%),#09111e;text-decoration:none;color:inherit}
+.vx-new-project>div{text-align:center}.vx-new-project i{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;margin:auto;background:#14182f;border:1px solid #3d3473;color:#ae87ff;font-size:23px;font-style:normal}.vx-new-project b{display:block;margin-top:12px}.vx-new-project span{display:block;color:var(--muted);font-size:11px;margin-top:4px;max-width:250px}
+@media(max-width:1100px){.vx-project-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:650px){.vx-project-grid{grid-template-columns:1fr}.vx-project-head{align-items:flex-start;flex-direction:column}}
+</style>
+<div class="vx-project-head">
+  <div><div class="eyebrow">AUTOSAVED WORKSPACE</div><h1>Every build becomes a project.</h1><p>Veyra saves generated products automatically so you can leave Studio and continue later.</p></div>
+  <a class="btn primary" href="{{url_for('studio')}}">＋ New project</a>
+</div>
+<div class="vx-project-grid">
+  <a class="vx-new-project" href="{{url_for('studio')}}"><div><i>＋</i><b>Start a new project</b><span>Describe it in Studio. Veyra creates the project on the first generated build.</span></div></a>
+  {% for p in projects %}
+  <a class="vx-project-card" href="{{url_for('studio')}}?project={{p.id}}">
+    <div class="vx-project-preview"><div class="vx-project-browser"><header><i></i><i></i><i></i></header><main><span></span><b></b><b></b><b></b></main></div></div>
+    <div class="vx-project-meta">
+      <div class="vx-project-title"><strong>{{p.name}}</strong><span class="tag">{{p.access_role or 'owner'}}</span></div>
+      <p>{{p.description or 'Built with Veyra'}}</p>
+      <div class="vx-project-foot"><span>Updated {{p.updated_at}}</span><span>Autosaved ✓</span></div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
 {% endblock %}
