@@ -813,6 +813,18 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
 .inspector .card{transition:border-color .18s ease,transform .18s ease}.inspector .card:hover{border-color:#304463}
 
 .ai-diagnostic{display:none;margin-left:6px;padding:3px 6px;border:1px solid #5b3546;border-radius:999px;color:#ff9bad;background:#21121a;font-size:9px;font-weight:800}.ai-diagnostic.show{display:inline-flex}
+
+/* Veyra chat timestamps */
+.message-meta time{
+  margin-left:auto;
+  color:#596a84;
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.01em;
+  white-space:nowrap;
+}
+.message:hover .message-meta time{color:#8090a8}
+
 </style>
 </head>
 <body>
@@ -894,7 +906,7 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
         <img class="real-logo small" src="{{ url_for('static', filename='veyra-mark.png') }}" alt="">
       </div>
       <div class="message-body">
-        <div class="message-meta"><b>Veyra Assistant</b><time>ready</time></div>
+        <div class="message-meta"><b>Veyra Assistant</b><time class="initial-message-time">—</time></div>
         <p>Tell me what you want to build. I can design, code, refine, debug, and prepare the same project for launch as we work.</p>
       </div>
     </div>
@@ -1052,6 +1064,30 @@ function esc(v){
   return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 }
 
+function messageTimestamp(date=new Date()){
+  return date.toLocaleTimeString([],{
+    hour:"numeric",
+    minute:"2-digit"
+  });
+}
+
+function messageTimestampTitle(date=new Date()){
+  return date.toLocaleString([],{
+    month:"short",
+    day:"numeric",
+    year:"numeric",
+    hour:"numeric",
+    minute:"2-digit"
+  });
+}
+
+
+document.querySelectorAll(".initial-message-time").forEach(el=>{
+  const now=new Date();
+  el.textContent=messageTimestamp(now);
+  el.title=messageTimestampTitle(now);
+});
+
 function scrollChat(){
   requestAnimationFrame(()=>messages.scrollTop=messages.scrollHeight);
 }
@@ -1113,7 +1149,7 @@ function addMessage(role,text,card=null,steps=null){
     buildCard=`<div class="build-card"><div class="build-card-head"><div class="build-mini">V</div><div><b>${esc(card)}</b><div class="small-note">Live project update</div></div><span class="done">Updated</span></div>${stepHtml?`<div class="build-steps">${stepHtml}</div>`:""}</div>`;
   }
 
-  wrap.innerHTML=`${avatar}<div class="message-body"><div class="message-meta"><b>${role==="assistant"?"Veyra Assistant":"You"}</b><time>now</time></div><p>${esc(text)}</p>${buildCard}</div>`;
+  wrap.innerHTML=`${avatar}<div class="message-body"><div class="message-meta"><b>${role==="assistant"?"Veyra Assistant":"You"}</b><time title="${esc(messageTimestampTitle())}">${esc(messageTimestamp())}</time></div><p>${esc(text)}</p>${buildCard}</div>`;
   messages.insertBefore(wrap,typingRow);
   scrollChat();
 }
