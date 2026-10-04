@@ -810,6 +810,7 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
 .canvas{box-shadow:0 34px 90px rgba(0,0,0,.45),0 0 0 1px rgba(126,88,255,.05) inset}
 .inspector .card{transition:border-color .18s ease,transform .18s ease}.inspector .card:hover{border-color:#304463}
 
+.ai-diagnostic{display:none;margin-left:6px;padding:3px 6px;border:1px solid #5b3546;border-radius:999px;color:#ff9bad;background:#21121a;font-size:9px;font-weight:800}.ai-diagnostic.show{display:inline-flex}
 </style>
 </head>
 <body>
@@ -920,7 +921,7 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
         <textarea id="prompt" placeholder="Ask Veyra to build, edit, redesign, debug, or improve anything..."></textarea>
         <div class="compose-actions">
           <button class="tool-pill">＋</button>
-          <span class="engine-label" id="engineStatus">Veyra AI</span>
+          <span class="engine-label" id="engineStatus">Veyra AI</span><span class="ai-diagnostic" id="aiDiagnostic"></span>
           <button class="send" id="sendBtn">➜</button>
         </div>
       </div>
@@ -1239,6 +1240,16 @@ async function build(prompt){
       ["Analyzed your request","Updated project files","Rendered live preview"]
     );
     $("engineStatus").textContent=data.engine||"Veyra AI";
+    const diagnostic=$("aiDiagnostic");
+    if(diagnostic){
+      if(data.diagnostic_code){
+        diagnostic.textContent=data.diagnostic_code;
+        diagnostic.classList.add("show");
+      }else{
+        diagnostic.textContent="";
+        diagnostic.classList.remove("show");
+      }
+    }
   }catch(e){
     setTyping(false);
     addMessage("assistant","I couldn’t finish that build: "+e.message);
