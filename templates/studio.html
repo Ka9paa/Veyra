@@ -959,6 +959,176 @@ body{
   .rail,.chat,.workspace{height:auto}
 }
 
+
+/* =========================================================
+   VEYRA STUDIO R10 — HARD FULL-SCREEN LAYOUT
+   Grid sizing is intentionally bypassed on desktop so the
+   Studio can never collapse to content height.
+   ========================================================= */
+:root{
+  --studio-top:54px;
+  --studio-rail:60px;
+  --studio-chat:330px;
+}
+html,body{
+  margin:0 !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:100% !important;
+  overflow:hidden !important;
+}
+body{
+  position:fixed !important;
+  inset:0 !important;
+  min-height:100vh !important;
+  min-height:100dvh !important;
+}
+.shell{
+  display:block !important;
+  position:fixed !important;
+  inset:0 !important;
+  width:auto !important;
+  height:auto !important;
+  min-height:0 !important;
+  max-height:none !important;
+  overflow:hidden !important;
+}
+.topbar{
+  position:absolute !important;
+  z-index:30 !important;
+  left:0 !important;
+  right:0 !important;
+  top:0 !important;
+  height:var(--studio-top) !important;
+  min-height:var(--studio-top) !important;
+  box-sizing:border-box !important;
+}
+.rail{
+  position:absolute !important;
+  z-index:10 !important;
+  left:0 !important;
+  top:var(--studio-top) !important;
+  bottom:0 !important;
+  width:var(--studio-rail) !important;
+  height:auto !important;
+  min-height:0 !important;
+  box-sizing:border-box !important;
+  overflow:hidden !important;
+}
+.chat{
+  position:absolute !important;
+  z-index:10 !important;
+  left:var(--studio-rail) !important;
+  top:var(--studio-top) !important;
+  bottom:0 !important;
+  width:var(--studio-chat) !important;
+  height:auto !important;
+  min-height:0 !important;
+  box-sizing:border-box !important;
+  display:grid !important;
+  grid-template-rows:70px minmax(0,1fr) auto !important;
+  overflow:hidden !important;
+}
+.workspace{
+  position:absolute !important;
+  z-index:10 !important;
+  left:calc(var(--studio-rail) + var(--studio-chat)) !important;
+  right:0 !important;
+  top:var(--studio-top) !important;
+  bottom:0 !important;
+  width:auto !important;
+  height:auto !important;
+  min-width:0 !important;
+  min-height:0 !important;
+  display:block !important;
+  overflow:hidden !important;
+}
+.browserbar{
+  position:absolute !important;
+  left:0 !important;
+  right:0 !important;
+  top:0 !important;
+  height:54px !important;
+  box-sizing:border-box !important;
+}
+.canvas{
+  position:absolute !important;
+  left:12px !important;
+  right:12px !important;
+  top:64px !important;
+  bottom:12px !important;
+  width:auto !important;
+  height:auto !important;
+  min-height:0 !important;
+  margin:0 !important;
+  box-sizing:border-box !important;
+}
+.preview,
+.empty-preview,
+.codeview,
+.loading-shroud{
+  width:100%;
+  height:100%;
+  min-height:0;
+}
+.inspector{
+  z-index:60 !important;
+}
+
+@media(min-width:1301px){
+  :root{
+    --studio-rail:60px;
+    --studio-chat:330px;
+  }
+}
+@media(min-width:901px) and (max-width:1300px){
+  :root{
+    --studio-rail:60px;
+    --studio-chat:330px;
+  }
+}
+@media(max-width:900px){
+  html,body{
+    position:static !important;
+    height:auto !important;
+    min-height:100dvh !important;
+    overflow:auto !important;
+  }
+  .shell{
+    display:grid !important;
+    position:relative !important;
+    inset:auto !important;
+    width:100% !important;
+    height:auto !important;
+    min-height:100dvh !important;
+    overflow:visible !important;
+    grid-template-columns:58px minmax(0,1fr) !important;
+    grid-template-rows:58px minmax(540px,auto) 620px !important;
+  }
+  .topbar,.rail,.chat,.workspace{
+    position:relative !important;
+    inset:auto !important;
+    width:auto !important;
+    height:auto !important;
+  }
+  .topbar{grid-column:1/-1;grid-row:1}
+  .rail{grid-column:1;grid-row:2}
+  .chat{grid-column:2;grid-row:2}
+  .workspace{
+    grid-column:1/-1;
+    grid-row:3;
+    display:grid !important;
+    grid-template-rows:54px minmax(0,1fr) !important;
+  }
+  .browserbar,.canvas{
+    position:relative !important;
+    inset:auto !important;
+    width:auto !important;
+    height:auto !important;
+  }
+  .canvas{margin:10px 12px 12px !important}
+}
+
 </style>
 </head>
 <body>
