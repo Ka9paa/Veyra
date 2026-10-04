@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Veyra Studio</title>
+<link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static',filename='favicon-32.png') }}">
+<link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static',filename='apple-touch-icon.png') }}">
 <style>
 :root{
   --bg:#050914;
@@ -456,15 +458,15 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
 
 /* Real logo assets */
 .real-logo{
-  width:27px;
-  height:27px;
+  width:31px;
+  height:23px;
   object-fit:contain;
   display:block;
   filter:drop-shadow(0 0 12px rgba(139,92,246,.48));
   transition:transform .24s ease,filter .24s ease;
 }
-.real-logo.small{width:19px;height:19px}
-.real-logo.hero-logo{width:68px;height:68px}
+.real-logo.small{width:23px;height:17px}
+.real-logo.hero-logo{width:76px;height:54px}
 .brand-mark:hover .real-logo,
 .veyra-badge:hover .real-logo,
 .avatar-ai:hover .real-logo{
@@ -819,7 +821,7 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
 <header class="topbar">
   <div class="brand">
     <div class="brand-mark">
-      <img class="real-logo" src="{{ url_for('static', filename='veyra-mark.svg') }}" alt="Veyra">
+      <img class="real-logo" src="{{ url_for('static', filename='veyra-mark.png') }}" alt="Veyra">
     </div>
     <div class="brand-name">Veyra Studio</div>
   </div>
@@ -880,7 +882,7 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
 <section class="chat">
   <div class="chat-head">
     <div class="veyra-badge">
-      <img class="real-logo" src="{{ url_for('static', filename='veyra-mark.svg') }}" alt="Veyra">
+      <img class="real-logo" src="{{ url_for('static', filename='veyra-mark.png') }}" alt="Veyra">
     </div>
     <div><h3>Veyra Assistant <span class="online"></span></h3><small id="projectTitle">Build, iterate, and launch with AI.</small></div>
     <button class="head-more">•••</button>
@@ -889,7 +891,7 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
   <div class="messages" id="messages">
     <div class="message assistant">
       <div class="avatar-ai">
-        <img class="real-logo small" src="{{ url_for('static', filename='veyra-mark.svg') }}" alt="">
+        <img class="real-logo small" src="{{ url_for('static', filename='veyra-mark.png') }}" alt="">
       </div>
       <div class="message-body">
         <div class="message-meta"><b>Veyra Assistant</b><time>ready</time></div>
@@ -899,7 +901,7 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
 
     <div class="message assistant typing-row" id="typingRow">
       <div class="avatar-ai">
-        <img class="real-logo small" src="{{ url_for('static', filename='veyra-mark.svg') }}" alt="">
+        <img class="real-logo small" src="{{ url_for('static', filename='veyra-mark.png') }}" alt="">
       </div>
       <div class="typing-bubble"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>
     </div>
@@ -947,7 +949,7 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
     <div class="empty-preview">
       <div class="empty-preview-inner">
         <div class="empty-logo">
-          <img class="real-logo hero-logo" src="{{ url_for('static', filename='veyra-mark.svg') }}" alt="Veyra">
+          <img class="real-logo hero-logo" src="{{ url_for('static', filename='veyra-mark.png') }}" alt="Veyra">
         </div>
         <div class="empty-kicker">VEYRA CANVAS</div>
         <h1>Build something worth shipping.</h1>
@@ -1102,7 +1104,7 @@ function addMessage(role,text,card=null,steps=null){
   const wrap=document.createElement("div");
   wrap.className="message "+(role==="assistant"?"assistant":"user");
   const avatar=role==="assistant"
-    ? `<div class="avatar-ai"><img class="real-logo small" src="{{ url_for('static', filename='veyra-mark.svg') }}" alt=""></div>`
+    ? `<div class="avatar-ai"><img class="real-logo small" src="{{ url_for('static', filename='veyra-mark.png') }}" alt=""></div>`
     : `<div class="avatar-user">{{ (user.name or user.email or 'VE')[:2]|upper if user else 'VE' }}</div>`;
 
   let buildCard="";

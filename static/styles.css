@@ -869,3 +869,22 @@ button:active,a:active{transform:translateY(1px)}
   .vx-section,.vx-workflow{padding:45px 18px 70px}.vx-section-head{display:block}.vx-section-head h2,.vx-workflow h2,.vx-trust-section h2,.vx-final h2{font-size:38px}.vx-section-head p{margin-top:13px}.vx-bento{grid-template-columns:1fr}.vx-bento-main{grid-column:auto}.vx-steps{grid-template-columns:1fr}.vx-trust-section{margin:0 14px 70px;padding:26px}.vx-final{margin:0 15px 70px;padding:62px 16px}.vx-final>div:last-child{flex-direction:column}.vx-footer{padding-inline:18px}.vx-footer-main{grid-template-columns:1fr 1fr}.vx-footer-brand{grid-column:1/-1}.vx-footer-main>div:nth-child(n+4){display:grid}
   .vx-plan-grid,.vx-credit-grid,.vx-price-note{grid-template-columns:1fr}.vx-pricing{padding:60px 18px}.vx-pricing-head h1{font-size:48px}.vx-auth-card{width:calc(100% - 30px)}.vx-oauth{grid-template-columns:1fr}.vx-auth-copy h1{font-size:38px}.vx-auth-brand{left:18px}
 }
+
+
+/* Veyra new dimensional mark */
+.vx-brand img,
+.vx-auth-brand img,
+.vx-demo-brand img,
+.vx-demo-ai img,
+.vx-final>img,
+.vx-support-fab img{
+  object-fit:contain;
+  object-position:center;
+}
+.vx-brand img{width:34px;height:28px}
+.vx-auth-brand img{width:35px;height:29px}
+.vx-auth-art-copy>img{width:74px;height:54px;object-fit:contain}
+.vx-demo-brand img{width:29px;height:21px}
+.vx-demo-ai img{width:31px;height:22px}
+.vx-final>img{width:78px;height:56px;object-fit:contain}
+.vx-support-fab img{width:30px;height:22px}
