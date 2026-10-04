@@ -422,11 +422,6 @@ def init_db():
                 status TEXT NOT NULL DEFAULT 'ready',
                 created_at TEXT NOT NULL
             )''')
-            c.execute('ALTER TABLE deployments ADD COLUMN IF NOT EXISTS user_id BIGINT')
-            c.execute('ALTER TABLE deployments ADD COLUMN IF NOT EXISTS project_id BIGINT')
-            c.execute("ALTER TABLE deployments ADD COLUMN IF NOT EXISTS url TEXT DEFAULT ''")
-            c.execute("ALTER TABLE deployments ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ready'")
-            c.execute('ALTER TABLE deployments ADD COLUMN IF NOT EXISTS created_at TEXT')
             c.execute('''CREATE TABLE IF NOT EXISTS analytics_events(
                 id BIGSERIAL PRIMARY KEY,
                 user_id BIGINT NOT NULL,
@@ -760,15 +755,15 @@ def pricing():return render_template('pricing.html')
 
 PUBLIC_PAGES={
  'faq':{
-   'eyebrow':'HELP CENTER','title':'Questions, answered.','intro':'Straight answers about Veyra beta, credits, building, exports, support, and account access.',
+   'eyebrow':'HELP CENTER','title':'Questions, answered.','intro':'Straight answers about Veyra, credits, building, exports, support, and account access.',
    'sections':[
       ('What is Veyra?','Veyra is an AI software-building workspace that turns prompts into working front-end projects and helps you refine, inspect, test, save, and export them.'),
-      ('Is Veyra still in beta?','Yes. The public beta is where we are testing the product with real builders before the full Veyra 1.0 release.'),
+      ('Is Veyra publicly available?','Yes. Veyra is publicly available and continues to improve as new features, integrations, and reliability updates are released.'),
       ('What are credits?','Credits represent usage inside Veyra. Builds, major edits, repair actions, and agent work may use credits depending on the plan.'),
       ('Can I export my project?','Yes. Studio can export the generated HTML, CSS, and JavaScript as a ZIP so you can keep or deploy your project elsewhere.'),
-      ('Does Deploy work yet?','Direct hosting integrations are still beta. Veyra clearly labels unfinished deployment integrations instead of pretending a deployment happened.'),
+      ('Does Deploy work yet?','Direct hosting integrations are still limited. Veyra clearly labels unfinished deployment integrations instead of pretending a deployment happened.'),
       ('How do I get support?','Use the support bot in the bottom-right corner, visit the Support page, or contact the Veyra team if the bot cannot solve your issue.'),
-      ('Can I submit a vouch?','Signed-in beta users can submit a vouch. It remains private until a Veyra admin approves it.'),
+      ('Can I submit a vouch?','Signed-in users can submit a vouch. It remains private until a Veyra admin approves it.'),
       ('Can I cancel a paid plan?','When paid billing is enabled through Stripe, subscription management will be handled through the billing portal associated with the checkout account.')
    ]
  },
@@ -780,11 +775,11 @@ PUBLIC_PAGES={
       ('3. Refine with context','Ask for changes naturally. The current HTML, CSS, and JavaScript remain in project context so follow-up edits can build on the existing product.'),
       ('4. Inspect the result','Use Preview, Code, Structure, Data, responsive device modes, the Quality panel, and Auto QA.'),
       ('5. Save and export','Veyra can save projects to your account and export a project ZIP containing index.html, styles.css, and app.js.'),
-      ('6. Report beta issues','If something breaks, include the prompt, what you expected, what happened, and a screenshot when possible. The support bot can help collect this information.')
+      ('6. Report issues','If something breaks, include the prompt, what you expected, what happened, and a screenshot when possible. The support bot can help collect this information.')
    ]
  },
  'roadmap':{
-   'eyebrow':'ROADMAP','title':'Where Veyra is going.','intro':'The beta roadmap focuses on making the builder more reliable before adding unnecessary noise.',
+   'eyebrow':'ROADMAP','title':'Where Veyra is going.','intro':'The product roadmap focuses on making the builder more reliable before adding unnecessary noise.',
    'sections':[
       ('Now — Builder reliability','Generation quality, preview stability, project persistence, QA, repair workflows, mobile polish, and better error states.'),
       ('Next — Real deployment connections','Hosting providers, environment configuration, deployment history, rollback, and custom domains.'),
@@ -794,33 +789,33 @@ PUBLIC_PAGES={
    ]
  },
  'changelog':{
-   'eyebrow':'CHANGELOG','title':'What changed in Veyra.','intro':'Major beta improvements without hiding the rough edges.',
+   'eyebrow':'CHANGELOG','title':'What changed in Veyra.','intro':'Major Veyra improvements without hiding the rough edges.',
    'sections':[
-      ('V27 — Future Beta UI','New futuristic public UI, verified vouch archive, FAQ/docs/support/status/security pages, support bot, and Stripe-ready purchasing flow.'),
+      ('V27 — Interface overhaul','New futuristic public UI, verified vouch archive, FAQ/docs/support/status/security pages, support bot, and Stripe-ready purchasing flow.'),
       ('V26 — UI Rebuild','Unified visual system across Studio, dashboard, public pages, navigation, cards, typography, and interaction states.'),
       ('V25 — Preview Repair','Added preview loading skeletons, QA progress states, fixed NaN quality output, and improved failure messaging.'),
-      ('V24 — Beta Drop','Added real project saving, ZIP export, honest beta messaging, and preview focus mode.'),
+      ('V24 — Product update','Added real project saving, ZIP export, honest beta messaging, and preview focus mode.'),
       ('V23 — Launch Candidate','Added collapsible workspace panels and redesigned projects/pricing pages.')
    ]
  },
  'security':{
-   'eyebrow':'TRUST & SECURITY','title':'Built to earn trust.','intro':'Veyra is still in beta, so security claims stay specific instead of exaggerated.',
+   'eyebrow':'TRUST & SECURITY','title':'Built to earn trust.','intro':'Veyra keeps security claims specific instead of exaggerated.',
    'sections':[
       ('Authentication','Email/password accounts use hashed passwords. Google and Discord OAuth can be configured through environment variables.'),
       ('Sessions','Session cookies are HTTP-only and SameSite=Lax in the current Flask application.'),
       ('Preview isolation','Generated previews run inside a sandboxed iframe with script permission instead of executing directly inside the main Veyra UI.'),
       ('Secrets','API keys and OAuth secrets belong in environment variables and should never be hard-coded into the front-end.'),
-      ('Beta reporting','If you discover a security issue, contact the Veyra team privately rather than posting exploit details publicly.')
+      ('Security reporting','If you discover a security issue, contact the Veyra team privately rather than posting exploit details publicly.')
    ]
  },
  'status':{
-   'eyebrow':'SYSTEM STATUS','title':'Veyra status.','intro':'Current beta systems and what each one actually means.',
+   'eyebrow':'SYSTEM STATUS','title':'Veyra status.','intro':'Current Veyra systems and what each one actually means.',
    'sections':[
       ('Web application','Operational when this page is reachable.'),
       ('Veyra AI','Depends on the configured OpenAI API key and provider availability.'),
-      ('Project storage','Local SQLite storage in this beta build.'),
+      ('Project storage','Application database storage for user and project records.'),
       ('OAuth','Google/Discord availability depends on your configured OAuth applications.'),
-      ('Direct deployment','Limited beta — use project export until deployment integrations are connected.')
+      ('Direct deployment','Limited — use project export until deployment integrations are connected.')
    ]
  },
  'about':{
@@ -828,11 +823,11 @@ PUBLIC_PAGES={
    'sections':[
       ('The goal','Make it dramatically faster to move from a product idea to something real enough to test, show, and improve.'),
       ('The approach','Combine an AI builder with live preview, project memory, code access, responsive views, QA, repair, and export.'),
-      ('The beta','The current release is intentionally labeled beta. Real user feedback decides what becomes Veyra 1.0.')
+      ('The current release','The current release continues to evolve based on real user feedback and product reliability.')
    ]
  },
  'contact':{
-   'eyebrow':'CONTACT','title':'Talk to the Veyra team.','intro':'Use the support bot first for common issues. For account, partnership, or beta feedback questions, use your community support channel.',
+   'eyebrow':'CONTACT','title':'Talk to the Veyra team.','intro':'Use the support bot first for common issues. For account, partnership, or product feedback questions, use your community support channel.',
    'sections':[
       ('Product support','Open the support bot and describe what you were doing, what you expected, and what happened.'),
       ('Billing support','Include the email on the purchase and the plan name. Never send card numbers or sensitive payment credentials.'),
@@ -864,9 +859,9 @@ PUBLIC_PAGES={
    ]
  },
  'privacy':{
-   'eyebrow':'LEGAL','title':'Privacy — Beta notice.','intro':'This starter text must be replaced with a complete attorney-reviewed privacy policy before a full production launch.',
+   'eyebrow':'LEGAL','title':'Privacy notice.','intro':'This starter text must be replaced with a complete attorney-reviewed privacy policy before a full production launch.',
    'sections':[
-      ('Account information','The beta stores account identifiers such as name, email, provider, credits, and project records in its application database.'),
+      ('Account information','The current release stores account identifiers such as name, email, provider, credits, and project records in its application database.'),
       ('Project content','Prompts and project files may be processed by configured AI services to provide generation and editing features.'),
       ('Authentication providers','Google and Discord OAuth may process information under their own privacy terms when those sign-in options are used.'),
       ('Payments','When Stripe payment links are enabled, payment information is handled by Stripe rather than being stored directly by this application.')
@@ -1283,7 +1278,7 @@ def buy_credits(amount):
 SUPPORT_FAQ=[
  ('credits',['credit','credits','balance'],'Credits represent Veyra usage. Your balance appears in the app. Pro includes 3,000 monthly credits and Max includes 7,500 monthly credits. Extra credit packs are available from the Pricing page.'),
  ('export',['export','download','zip'],'Open Studio and use Export to download the current generated project as a ZIP with HTML, CSS, and JavaScript.'),
- ('deploy',['deploy','deployment','hosting'],'Direct deployment integrations are still beta. Export your project ZIP for now instead of relying on a fake success state.'),
+ ('deploy',['deploy','deployment','hosting'],'Direct deployment integrations are still limited. Export your project ZIP for now instead of relying on a fake success state.'),
  ('login',['login','sign in','google','discord','oauth'],'You can sign in with email/password. Google and Discord require OAuth credentials to be configured by the Veyra administrator.'),
  ('billing',['pay','payment','billing','purchase','buy','card'],'Paid checkout is designed to use Stripe Payment Links. Choose Pro, Max, or an extra credit pack on Pricing; configured purchases open Stripe secure hosted checkout.'),
  ('bug',['bug','broken','error','not working'],'Tell me what page you were on, what you clicked, what you expected, what happened instead, and any error message you saw.'),
@@ -1312,7 +1307,7 @@ def support_api():
                 model=support_model,
                 instructions=(
                     'You are Veyra Support. Be concise, helpful, and honest. '
-                    'Veyra is in public beta. Never claim an unfinished feature works. '
+                    'Never claim an unfinished feature works. '
                     'For payment issues never ask for full card numbers. '
                     'Explain that paid checkout uses Stripe Payment Links when configured. '
                     'If the user reports a bug, ask for reproducible steps, expected behavior, '
@@ -2235,74 +2230,36 @@ def get_project(project_id):
 @login_required
 def publish_project():
     payload=request.get_json(silent=True) or {}
-    raw_project_id=payload.get('project_id')
-
-    try:
-        project_id=int(raw_project_id)
-    except Exception:
-        return jsonify({
-            'ok':False,
-            'error':'Save the project before publishing.'
-        }),400
+    project_id=payload.get('project_id')
+    if not project_id:
+        return jsonify({'ok':False,'error':'Save the project before publishing.'}),400
 
     u=current_user()
     project=_project_for_owner(project_id,u['id'])
     if not project:
-        return jsonify({
-            'ok':False,
-            'error':'Only the project owner can publish this project.'
-        }),403
+        return jsonify({'ok':False,'error':'Only the project owner can publish.'}),403
 
-    public_path=f'/p/{project_id}'
-    public_url_value=public_url(public_path)
+    public_path=f"/p/{int(project_id)}"
+    public_url=public_url(public_path)
 
-    try:
-        with db() as c:
-            # Make Publish safe even if an older deployments table exists.
-            existing=c.execute(
-                'SELECT id FROM deployments WHERE project_id=? AND user_id=? ORDER BY id DESC LIMIT 1',
-                (project_id,u['id'])
-            ).fetchone()
+    with db() as c:
+        existing=c.execute(
+            'SELECT id FROM deployments WHERE project_id=? AND user_id=? ORDER BY id DESC LIMIT 1',
+            (project_id,u['id'])
+        ).fetchone()
+        if existing:
+            c.execute(
+                "UPDATE deployments SET url=?,status='ready',created_at=? WHERE id=?",
+                (public_url,now(),existing['id'])
+            )
+        else:
+            c.execute(
+                'INSERT INTO deployments(user_id,project_id,url,status,created_at) VALUES(?,?,?,?,?)',
+                (u['id'],project_id,public_url,'ready',now())
+            )
+        c.commit()
 
-            if existing:
-                c.execute(
-                    "UPDATE deployments SET url=?,status=?,created_at=? WHERE id=?",
-                    (public_url_value,'ready',now(),existing['id'])
-                )
-            else:
-                c.execute(
-                    'INSERT INTO deployments(user_id,project_id,url,status,created_at) VALUES(?,?,?,?,?)',
-                    (u['id'],project_id,public_url_value,'ready',now())
-                )
-
-            # Record publish activity, but never let analytics break publishing.
-            try:
-                c.execute(
-                    'INSERT INTO analytics_events(user_id,project_id,event_type,created_at) VALUES(?,?,?,?)',
-                    (u['id'],project_id,'published',now())
-                )
-            except Exception:
-                pass
-
-            c.commit()
-
-        return jsonify({
-            'ok':True,
-            'url':public_url_value,
-            'project_id':project_id,
-            'message':'Your project is live.'
-        })
-
-    except Exception as exc:
-        app.logger.exception(
-            'Project publish failed | project_id=%s | user_id=%s | error=%s',
-            project_id,u.get('id'),type(exc).__name__
-        )
-        return jsonify({
-            'ok':False,
-            'error':'Veyra could not publish this project yet. Your project is still saved safely.',
-            'code':'PUBLISH_FAILED'
-        }),500
+    return jsonify({'ok':True,'url':public_url,'project_id':int(project_id)})
 
 
 @app.get('/p/<int:project_id>')
@@ -2683,7 +2640,7 @@ def export_project():
         z.writestr('index.html',full_html)
         z.writestr('styles.css',css)
         z.writestr('app.js',js)
-        z.writestr('README.txt','Exported from Veyra Beta — buildveyra.xyz')
+        z.writestr('README.txt','Exported from Veyra — buildveyra.xyz')
     mem.seek(0)
     return send_file(
         mem,

@@ -9,16 +9,16 @@
   <meta property="og:title" content="{% block og_title %}Veyra — Build software from an idea{% endblock %}">
   <meta property="og:description" content="{% block og_description %}Build, preview, refine, save, export, and ship real products with Veyra.{% endblock %}">
   <meta property="og:url" content="{{ request.url_root.rstrip('/') }}">
-  <meta property="og:image" content="{{ url_for('static', filename='veyra-social-preview.gif', _external=True) }}">
-  <meta property="og:image:secure_url" content="{{ url_for('static', filename='veyra-social-preview.gif', _external=True) }}">
-  <meta property="og:image:type" content="image/gif">
-  <meta property="og:image:width" content="640">
-  <meta property="og:image:height" content="336">
+  <meta property="og:image" content="{{ url_for('static', filename='veyra-social-card.png', _external=True) }}">
+  <meta property="og:image:secure_url" content="{{ url_for('static', filename='veyra-social-card.png', _external=True) }}">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="Veyra AI software builder showcase">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{% block twitter_title %}Veyra — Build software from an idea{% endblock %}">
   <meta name="twitter:description" content="{% block twitter_description %}Build, preview, refine, save, export, and ship real products with Veyra.{% endblock %}">
-  <meta name="twitter:image" content="{{ url_for('static', filename='veyra-social-preview.gif', _external=True) }}">
+  <meta name="twitter:image" content="{{ url_for('static', filename='veyra-social-card.png', _external=True) }}">
 
   <meta name="theme-color" content="#050812">
   <meta name="color-scheme" content="dark">
@@ -39,7 +39,7 @@
 
   <aside class="v27-support-panel hidden" id="supportPanel">
     <header>
-      <div><span class="v27-support-orb">✦</span><div><b>Veyra Support</b><small><i></i> Beta assistant</small></div></div>
+      <div><span class="v27-support-orb">✦</span><div><b>Veyra Support</b><small><i></i> Veyra assistant</small></div></div>
       <button id="supportClose">×</button>
     </header>
     <div class="v27-support-messages" id="supportMessages">
@@ -51,7 +51,7 @@
       <button data-support="How do I export my project?">Export</button>
     </div>
     <form id="supportForm"><textarea id="supportInput" placeholder="Describe what you need help with…"></textarea><button>→</button></form>
-    <footer><a href="/support">Support center</a><span>Veyra Public Beta</span></footer>
+    <footer><a href="/support">Support center</a><span>Veyra</span></footer>
   </aside>
 
   <script src="{{ url_for('static',filename='app.js') }}"></script>
