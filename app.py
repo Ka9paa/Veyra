@@ -82,22 +82,85 @@ def classify_ai_error(exc):
     return 'OPENAI_UNKNOWN'
 
 
-def run_veyra_response(client, *, model, instructions, input_text, max_output_tokens=5500, reasoning=None):
-    """Use the current OpenAI Responses API.
+def veyra_project_schema():
+    # Structured Outputs prevents malformed/truncated prose from reaching the
+    # Studio parser as OPENAI_RESPONSE.
+    return {
+        'type':'object',
+        'additionalProperties':False,
+        'properties':{
+            'assistant_message':{'type':'string'},
+            'title':{'type':'string'},
+            'html':{'type':'string'},
+            'css':{'type':'string'},
+            'js':{'type':'string'},
+            'files':{
+                'type':'array',
+                'items':{'type':'string'}
+            },
+            'changed_files':{
+                'type':'array',
+                'items':{
+                    'type':'object',
+                    'additionalProperties':False,
+                    'properties':{
+                        'file':{'type':'string'},
+                        'action':{'type':'string'},
+                        'details':{'type':'string'},
+                    },
+                    'required':['file','action','details'],
+                },
+            },
+            'next_steps':{
+                'type':'array',
+                'items':{'type':'string'},
+            },
+            'quality':{
+                'type':'object',
+                'additionalProperties':False,
+                'properties':{
+                    'accessibility':{'type':['integer','string']},
+                    'performance':{'type':['integer','string']},
+                    'responsive':{'type':'string'},
+                    'security':{'type':'string'},
+                },
+                'required':['accessibility','performance','responsive','security'],
+            },
+        },
+        'required':[
+            'assistant_message','title','html','css','js','files',
+            'changed_files','next_steps','quality'
+        ],
+    }
 
-    output_text is the SDK's convenience accessor for text returned by the model.
-    """
+
+def run_veyra_response(client, *, model, instructions, input_text, max_output_tokens=7000, reasoning=None):
+    """Use Responses API with a strict project JSON contract."""
     kwargs={
         'model':model,
         'instructions':instructions,
         'input':input_text,
         'max_output_tokens':max_output_tokens,
         'store':False,
+        'text':{
+            'format':{
+                'type':'json_schema',
+                'name':'veyra_project',
+                'strict':True,
+                'schema':veyra_project_schema(),
+            }
+        },
     }
     if reasoning:
         kwargs['reasoning']={'effort':reasoning}
 
     response=client.responses.create(**kwargs)
+
+    status=str(getattr(response,'status','') or '')
+    if status and status != 'completed':
+        details=getattr(response,'incomplete_details',None)
+        raise ValueError(f'Incomplete Veyra response: status={status}; details={details}')
+
     output=(getattr(response,'output_text',None) or '').strip()
     if not output:
         raise ValueError('Empty Veyra AI response')
@@ -1887,7 +1950,7 @@ def api_build():
         "The object must contain: assistant_message,title,html,css,js,files,changed_files,next_steps,quality. "
         "html must be body markup only. css must be complete CSS. js must be browser-safe vanilla JavaScript. "
         "Keep editing the supplied current project instead of restarting unless the user explicitly requests a rebuild. "
-        "Build polished, responsive, usable products rather than generic placeholder layouts. "
+        "Build polished, responsive, usable products rather than generic placeholder layouts. ""Keep generated HTML/CSS/JS concise and production-minded; do not repeat code or add explanatory prose inside code fields. "
         "Preserve existing functionality unless the user asks to change it. "
         "The assistant_message should briefly explain what changed and why. "
         "files must contain the real project files you changed or maintained. "
@@ -1932,7 +1995,7 @@ def api_build():
                 model=model,
                 instructions=system,
                 input_text=json.dumps(payload,separators=(',',':')),
-                max_output_tokens=5500,
+                max_output_tokens=7000,
                 reasoning=None,
             )
 
