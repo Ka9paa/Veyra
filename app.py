@@ -5,6 +5,10 @@ import sqlite3
 import io
 import zipfile
 import secrets
+import base64
+import hashlib
+import hmac
+import time
 from urllib.parse import urlencode
 from urllib.request import Request as UrlRequest, urlopen
 from urllib.error import HTTPError, URLError
@@ -439,6 +443,19 @@ def init_db():
             c.execute('CREATE INDEX IF NOT EXISTS idx_project_members_project ON project_members(project_id)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_project_members_user ON project_members(user_id)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_analytics_project ON analytics_events(project_id)')
+            c.execute("""CREATE TABLE IF NOT EXISTS stripe_fulfillments(
+                session_id TEXT PRIMARY KEY,
+                event_id TEXT,
+                user_id BIGINT NOT NULL,
+                purchase_type TEXT NOT NULL,
+                plan TEXT,
+                credits_added INTEGER NOT NULL DEFAULT 0,
+                customer_id TEXT,
+                subscription_id TEXT,
+                created_at TEXT NOT NULL
+            )""")
+            c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT')
+            c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT')
         else:
             c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 50,created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
             c.execute('''CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)''')
@@ -471,6 +488,20 @@ def init_db():
             c.execute('''CREATE TABLE IF NOT EXISTS project_databases(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER,name TEXT NOT NULL,provider TEXT NOT NULL DEFAULT 'Postgres',status TEXT NOT NULL DEFAULT 'connected',created_at TEXT NOT NULL)''')
             c.execute('''CREATE TABLE IF NOT EXISTS deployments(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER NOT NULL,url TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'ready',created_at TEXT NOT NULL)''')
             c.execute('''CREATE TABLE IF NOT EXISTS analytics_events(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER NOT NULL,event_type TEXT NOT NULL,created_at TEXT NOT NULL)''')
+            c.execute("""CREATE TABLE IF NOT EXISTS stripe_fulfillments(
+                session_id TEXT PRIMARY KEY,
+                event_id TEXT,
+                user_id INTEGER NOT NULL,
+                purchase_type TEXT NOT NULL,
+                plan TEXT,
+                credits_added INTEGER NOT NULL DEFAULT 0,
+                customer_id TEXT,
+                subscription_id TEXT,
+                created_at TEXT NOT NULL
+            )""")
+            user_cols={r['name'] for r in c.execute('PRAGMA table_info(users)').fetchall()}
+            if 'stripe_customer_id' not in user_cols: c.execute('ALTER TABLE users ADD COLUMN stripe_customer_id TEXT')
+            if 'stripe_subscription_id' not in user_cols: c.execute('ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT')
             c.execute('''CREATE TABLE IF NOT EXISTS login_events(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,provider TEXT NOT NULL,email TEXT,account_name TEXT,discord_id TEXT,created_at TEXT NOT NULL,delivered INTEGER NOT NULL DEFAULT 0)''')
         c.commit()
 
@@ -881,27 +912,275 @@ def review_vouch(vid,action):
         c.execute('UPDATE vouches SET status=?,reviewed_at=? WHERE id=?',(status,now(),vid));c.commit()
     return redirect('/admin/vouches')
 
+
+# ---------------------------
+# Account-bound Stripe billing
+# ---------------------------
+
+PLAN_CONFIG={
+    'pro':{'name':'Veyra Pro','credits':3000,'price_cents_env':'STRIPE_PRO_PRICE_CENTS','default_price_cents':1999},
+    'max':{'name':'Veyra Max','credits':7500,'price_cents_env':'STRIPE_MAX_PRICE_CENTS','default_price_cents':3499},
+}
+CREDIT_PACKS={1000:899,2500:1999,5000:3499,10000:5999}
+
+def _stripe_secret():
+    return (os.getenv('STRIPE_SECRET_KEY') or '').strip()
+
+def _stripe_api(path,data=None,method='POST'):
+    secret=_stripe_secret()
+    if not secret:
+        raise RuntimeError('Stripe is not configured')
+    auth=base64.b64encode((secret+':').encode()).decode()
+    headers={'Authorization':'Basic '+auth,'Accept':'application/json','User-Agent':'Veyra/1.0'}
+    body=None
+    if data is not None:
+        body=urlencode(data).encode()
+        headers['Content-Type']='application/x-www-form-urlencoded'
+    req=UrlRequest('https://api.stripe.com/v1'+path,data=body,headers=headers,method=method)
+    try:
+        with urlopen(req,timeout=15) as res:
+            return json.loads(res.read().decode())
+    except HTTPError as exc:
+        detail=''
+        try:
+            payload=json.loads(exc.read().decode('utf-8','replace'))
+            detail=((payload.get('error') or {}).get('message') or '')[:300]
+        except Exception:
+            pass
+        raise RuntimeError('Stripe request failed'+(f': {detail}' if detail else '')) from exc
+
+def _trusted_public_base():
+    forwarded=(request.headers.get('X-Forwarded-Host') or '').split(',')[0].strip()
+    raw_host=forwarded or (request.host or '')
+    host=raw_host.split(':')[0].lower()
+    if host in {'buildveyra.xyz','www.buildveyra.xyz'}:
+        return f'https://{host}'
+    return (os.getenv('OAUTH_BASE_URL') or 'https://buildveyra.xyz').rstrip('/')
+
+def _billing_login_required_message():
+    flash('Please sign in to your Veyra account before continuing to secure checkout. This ensures your purchase is applied to the correct account.','error')
+
+def _create_checkout_for_user(user,purchase_type,plan=None,credits=0):
+    if not user or not user.get('id'):
+        raise ValueError('A signed-in Veyra account is required')
+    email=(user.get('email') or '').strip()
+    if not email:
+        raise ValueError('Your Veyra account needs an email address before checkout can begin')
+    uid=str(user['id'])
+    base=_trusted_public_base()
+    common={
+        'client_reference_id':uid,
+        'customer_email':email,
+        'success_url':base+'/billing/success?session_id={CHECKOUT_SESSION_ID}',
+        'cancel_url':base+'/billing?checkout=cancelled',
+        'metadata[veyra_user_id]':uid,
+        'metadata[purchase_type]':purchase_type,
+        'billing_address_collection':'auto',
+    }
+    if purchase_type=='plan':
+        cfg=PLAN_CONFIG[plan]
+        try:
+            amount=max(50,int(os.getenv(cfg['price_cents_env']) or cfg['default_price_cents']))
+        except Exception:
+            amount=cfg['default_price_cents']
+        data={
+            **common,
+            'mode':'subscription',
+            'metadata[plan]':plan,
+            'subscription_data[metadata][veyra_user_id]':uid,
+            'subscription_data[metadata][plan]':plan,
+            'line_items[0][quantity]':'1',
+            'line_items[0][price_data][currency]':'usd',
+            'line_items[0][price_data][unit_amount]':str(amount),
+            'line_items[0][price_data][recurring][interval]':'month',
+            'line_items[0][price_data][product_data][name]':cfg['name'],
+        }
+    else:
+        if credits not in CREDIT_PACKS:
+            raise ValueError('Invalid credit pack')
+        data={
+            **common,
+            'mode':'payment',
+            'metadata[credits]':str(credits),
+            'line_items[0][quantity]':'1',
+            'line_items[0][price_data][currency]':'usd',
+            'line_items[0][price_data][unit_amount]':str(CREDIT_PACKS[credits]),
+            'line_items[0][price_data][product_data][name]':f'Veyra {credits:,} Credit Pack',
+        }
+    checkout=_stripe_api('/checkout/sessions',data,'POST')
+    url=(checkout.get('url') or '').strip()
+    if not url:
+        raise RuntimeError('Stripe did not return a checkout URL')
+    return checkout
+
+def _fulfill_checkout_session(checkout,event_id=''):
+    session_id=str(checkout.get('id') or '').strip()
+    if not session_id:
+        raise ValueError('Missing Stripe Checkout Session ID')
+    if str(checkout.get('payment_status') or '').lower() not in {'paid','no_payment_required'}:
+        return False,'Payment is not complete yet'
+    metadata=checkout.get('metadata') or {}
+    uid_raw=checkout.get('client_reference_id') or metadata.get('veyra_user_id')
+    uid=int(uid_raw)
+    purchase_type=str(metadata.get('purchase_type') or '').lower()
+    plan=str(metadata.get('plan') or '').lower()
+    credits=int(metadata.get('credits') or 0)
+    if purchase_type=='plan' and plan not in PLAN_CONFIG:
+        raise ValueError('Invalid Veyra plan in Stripe purchase')
+    if purchase_type=='credits' and credits not in CREDIT_PACKS:
+        raise ValueError('Invalid Veyra credit pack in Stripe purchase')
+    customer_id=str(checkout.get('customer') or '')
+    subscription_id=str(checkout.get('subscription') or '')
+    credits_to_add=PLAN_CONFIG[plan]['credits'] if purchase_type=='plan' else credits
+    with db() as c:
+        if not c.execute('SELECT id FROM users WHERE id=?',(uid,)).fetchone():
+            raise ValueError('Veyra account for this purchase no longer exists')
+        claimed=c.execute(
+            """INSERT INTO stripe_fulfillments(
+                session_id,event_id,user_id,purchase_type,plan,credits_added,
+                customer_id,subscription_id,created_at
+            ) VALUES(?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(session_id) DO NOTHING""",
+            (session_id,event_id or '',uid,purchase_type,plan or None,int(credits_to_add),customer_id or None,subscription_id or None,now())
+        )
+        if claimed.rowcount != 1:
+            return False,'Purchase was already applied'
+        if purchase_type=='plan':
+            c.execute('UPDATE users SET plan=?,credits=?,stripe_customer_id=?,stripe_subscription_id=? WHERE id=?',
+                      (plan,int(credits_to_add),customer_id or None,subscription_id or None,uid))
+        else:
+            c.execute('UPDATE users SET credits=credits+?,stripe_customer_id=COALESCE(?,stripe_customer_id) WHERE id=?',
+                      (int(credits),customer_id or None,uid))
+        c.commit()
+    return True,'Purchase applied successfully'
+
+def _verify_stripe_signature(payload,signature_header):
+    secret=(os.getenv('STRIPE_WEBHOOK_SECRET') or '').strip()
+    if not secret:
+        return False
+    parts={}
+    for chunk in (signature_header or '').split(','):
+        if '=' in chunk:
+            k,v=chunk.split('=',1)
+            parts.setdefault(k.strip(),[]).append(v.strip())
+    try:
+        timestamp=int((parts.get('t') or ['0'])[0])
+    except Exception:
+        return False
+    if abs(int(time.time())-timestamp)>300:
+        return False
+    signed=(str(timestamp)+'.').encode()+payload
+    expected=hmac.new(secret.encode(),signed,hashlib.sha256).hexdigest()
+    return any(hmac.compare_digest(expected,sig) for sig in parts.get('v1',[]))
+
+@app.route('/billing')
+@login_required
+def billing_page():
+    u=current_user()
+    return render_template(
+        'billing.html',
+        user=u,
+        active='billing',
+        stripe_ready=bool(_stripe_secret()),
+        pro_cents=max(50,int(os.getenv('STRIPE_PRO_PRICE_CENTS') or 1999)),
+        max_cents=max(50,int(os.getenv('STRIPE_MAX_PRICE_CENTS') or 3499)),
+    )
+
+@app.route('/billing/start/<plan>')
+@login_required
+def billing_start_plan(plan):
+    if plan not in PLAN_CONFIG:
+        return redirect(url_for('billing_page'))
+    u=current_user()
+    try:
+        checkout=_create_checkout_for_user(u,'plan',plan=plan)
+        return redirect(checkout['url'])
+    except Exception:
+        app.logger.exception('Stripe plan checkout failed | plan=%s | user_id=%s',plan,u.get('id'))
+        flash('Secure checkout could not be started. Please try again in a moment.','error')
+        return redirect(url_for('billing_page'))
+
+@app.route('/billing/start/credits/<int:amount>')
+@login_required
+def billing_start_credits(amount):
+    if amount not in CREDIT_PACKS:
+        return redirect(url_for('billing_page'))
+    u=current_user()
+    try:
+        checkout=_create_checkout_for_user(u,'credits',credits=amount)
+        return redirect(checkout['url'])
+    except Exception:
+        app.logger.exception('Stripe credit checkout failed | credits=%s | user_id=%s',amount,u.get('id'))
+        flash('Secure checkout could not be started. Please try again in a moment.','error')
+        return redirect(url_for('billing_page'))
+
+@app.route('/billing/success')
+@login_required
+def billing_success():
+    session_id=(request.args.get('session_id') or '').strip()
+    if not re.fullmatch(r'cs_(?:test_)?[A-Za-z0-9_]+',session_id):
+        flash('We could not verify that Stripe checkout session.','error')
+        return redirect(url_for('billing_page'))
+    try:
+        checkout=_stripe_api('/checkout/sessions/'+session_id,None,'GET')
+        expected_uid=str(current_user()['id'])
+        checkout_uid=str(checkout.get('client_reference_id') or (checkout.get('metadata') or {}).get('veyra_user_id') or '')
+        if checkout_uid != expected_uid:
+            raise ValueError('Checkout session belongs to a different Veyra account')
+        applied,_=_fulfill_checkout_session(checkout,'success-page')
+        flash('Payment confirmed — your Veyra account has been updated.' if applied else 'Payment confirmed — this purchase is already active on your account.','success')
+    except Exception:
+        app.logger.exception('Stripe success verification failed | session_id=%s',session_id)
+        flash('Your payment may have succeeded, but Veyra could not verify the account update yet. Please refresh shortly or contact support.','error')
+    return redirect(url_for('billing_page'))
+
+@app.post('/stripe/webhook')
+def stripe_webhook():
+    payload=request.get_data(cache=False)
+    if not _verify_stripe_signature(payload,request.headers.get('Stripe-Signature','')):
+        return jsonify({'ok':False,'error':'Invalid signature'}),400
+    try:
+        event=json.loads(payload.decode())
+    except Exception:
+        return jsonify({'ok':False,'error':'Invalid payload'}),400
+    event_type=str(event.get('type') or '')
+    obj=((event.get('data') or {}).get('object') or {})
+    if event_type in {'checkout.session.completed','checkout.session.async_payment_succeeded'}:
+        try:
+            _fulfill_checkout_session(obj,str(event.get('id') or ''))
+        except Exception:
+            app.logger.exception('Stripe fulfillment failed | event_id=%s | type=%s',event.get('id'),event_type)
+            return jsonify({'ok':False}),500
+    return jsonify({'ok':True})
+
 @app.route('/checkout/<plan>')
 def checkout(plan):
-    plans={'pro':{'name':'Veyra Pro','price':'$19.99','credits':'3,000'},'max':{'name':'Veyra Max','price':'$34.99','credits':'7,500'}}
-    if plan not in plans:return redirect('/pricing')
-    return render_template('checkout.html',plan=plan,info=plans[plan],configured=bool(os.getenv(f'STRIPE_{plan.upper()}_PAYMENT_LINK','').strip()))
+    if plan not in PLAN_CONFIG:
+        return redirect('/pricing')
+    if not current_user():
+        _billing_login_required_message()
+        return redirect(url_for('login'))
+    return redirect(url_for('billing_page'))
 
 @app.route('/buy/<plan>')
 def buy(plan):
-    if plan=='free':return redirect('/signup')
-    if plan not in {'pro','max'}:return redirect('/pricing')
-    link=os.getenv(f'STRIPE_{plan.upper()}_PAYMENT_LINK','').strip()
-    if link:return redirect(link)
-    return redirect(f'/checkout/{plan}')
+    if plan=='free':
+        return redirect('/dashboard' if current_user() else '/signup')
+    if plan not in PLAN_CONFIG:
+        return redirect('/pricing')
+    if not current_user():
+        _billing_login_required_message()
+        return redirect(url_for('login'))
+    return redirect(url_for('billing_start_plan',plan=plan))
 
 @app.route('/buy/credits/<int:amount>')
 def buy_credits(amount):
-    allowed={1000,2500,5000,10000}
-    if amount not in allowed:return redirect('/pricing')
-    link=os.getenv(f'STRIPE_CREDITS_{amount}_LINK','').strip()
-    if link:return redirect(link)
-    return redirect('/pricing#credit-packs')
+    if amount not in CREDIT_PACKS:
+        return redirect('/pricing')
+    if not current_user():
+        _billing_login_required_message()
+        return redirect(url_for('login'))
+    return redirect(url_for('billing_start_credits',amount=amount))
 
 SUPPORT_FAQ=[
  ('credits',['credit','credits','balance'],'Credits represent Veyra usage. Your balance appears in the app. Pro includes 3,000 monthly credits and Max includes 7,500 monthly credits. Extra credit packs are available from the Pricing page.'),

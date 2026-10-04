@@ -1,0 +1,44 @@
+{% extends "base.html" %}{% set active='billing' %}
+{% block title %}Plans & Billing — Veyra{% endblock %}
+{% block body %}
+<div class="v21-dash-app">
+  {% include '_sidebar.html' %}
+  <main class="v21-dash-main">
+    <header class="v21-dash-top">
+      <div><small>ACCOUNT</small><h1>Plans & Billing</h1></div>
+      <div style="color:#9aacbf">{{(user.plan or 'free')|upper}} · <b style="color:white">{{user.credits or 0}}</b> credits</div>
+    </header>
+    <section style="padding:28px 34px;max-width:1200px">
+      {% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}
+      <div style="margin-bottom:16px;padding:13px 15px;border:1px solid {{'#79404b' if category=='error' else '#286353'}};border-radius:12px;background:#0b1422;color:#edf3ff">{{message}}</div>
+      {% endfor %}{% endwith %}
+      <div style="display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:24px">
+        <div><small style="color:#8a74ff;font-weight:900;letter-spacing:.14em">VEYRA PLANS</small><h2 style="font-size:32px;color:#fff;margin:7px 0">Build more when you need to.</h2><p style="color:#8190a8;max-width:720px">Checkout starts from your signed-in Veyra account, so successful purchases are attached to the correct account automatically.</p></div>
+        <div style="border:1px solid #25344a;border-radius:12px;padding:12px 14px;color:#8ea0b9">🔒 Secure checkout · <b style="color:#fff">Stripe</b></div>
+      </div>
+      <div class="vb-grid">
+        {% for key,name,credits,price in [('free','Free',50,0),('pro','Pro',3000,pro_cents),('max','Max',7500,max_cents)] %}
+        <article class="vb-card {{'featured' if key=='pro' else ''}}">
+          <div style="display:flex;justify-content:space-between"><b>{{name|upper}}</b>{% if (user.plan or 'free')==key %}<span class="pill">CURRENT</span>{% endif %}</div>
+          <h3>{% if price %}${{'%.2f'|format(price/100)}}<small>/mo</small>{% else %}$0{% endif %}</h3>
+          <p>{{credits}} {{'starter' if key=='free' else 'monthly'}} credits</p>
+          <ul><li>AI Studio + live preview</li><li>Projects and exports</li>{% if key!='free' %}<li>Higher Veyra usage</li><li>Advanced workflows</li>{% endif %}</ul>
+          {% if key=='free' %}<a class="btn" href="/studio">Keep building</a>
+          {% elif stripe_ready %}<a class="btn primary" href="/billing/start/{{key}}">Choose {{name}} →</a>
+          {% else %}<span class="btn disabled">Billing unavailable</span>{% endif %}
+        </article>
+        {% endfor %}
+      </div>
+      <h2 style="color:#fff;margin-top:34px">Credit top-ups</h2>
+      <div class="vb-credit">
+        {% for amount,price in [(1000,'8.99'),(2500,'19.99'),(5000,'34.99'),(10000,'59.99')] %}
+        <article><b>{{"{:,}".format(amount)}}</b><span>credits</span><strong>${{price}}</strong>{% if stripe_ready %}<a href="/billing/start/credits/{{amount}}">Buy →</a>{% endif %}</article>
+        {% endfor %}
+      </div>
+    </section>
+  </main>
+</div>
+<style>
+.vb-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.vb-card{border:1px solid #223149;background:#091321;border-radius:18px;padding:22px;color:#dce5f4;min-height:330px;display:flex;flex-direction:column}.vb-card.featured{border-color:#7358ff}.vb-card h3{font-size:34px;color:#fff;margin:24px 0 8px}.vb-card h3 small{font-size:13px;color:#7f8da4}.vb-card p{color:#8391a7}.vb-card ul{padding-left:18px;color:#c5cfdf;line-height:1.9}.pill{font-size:10px;color:#78e9c8;border:1px solid #285b50;border-radius:999px;padding:4px 7px}.btn{margin-top:auto;text-decoration:none;text-align:center;padding:12px;border-radius:11px;border:1px solid #2a3a52;color:#fff}.btn.primary{background:linear-gradient(135deg,#8257ff,#526cff);border:0}.btn.disabled{opacity:.5}.vb-credit{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.vb-credit article{border:1px solid #223149;background:#091321;border-radius:14px;padding:17px;display:grid;gap:5px;color:#fff}.vb-credit span{color:#7f90a8}.vb-credit strong{color:#b7a5ff}.vb-credit a{color:#fff;text-decoration:none;font-weight:800;margin-top:6px}@media(max-width:950px){.vb-grid{grid-template-columns:1fr}.vb-credit{grid-template-columns:1fr 1fr}}@media(max-width:600px){.vb-credit{grid-template-columns:1fr}}
+</style>
+{% endblock %}
