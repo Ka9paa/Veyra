@@ -4,6 +4,10 @@ import os
 import sqlite3
 import io
 import zipfile
+import secrets
+from urllib.parse import urlencode
+from urllib.request import Request as UrlRequest, urlopen
+from urllib.error import HTTPError, URLError
 from pathlib import Path
 from datetime import datetime, timezone
 from functools import wraps
@@ -13,6 +17,7 @@ from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
 from openai import OpenAI
 from werkzeug.security import generate_password_hash, check_password_hash
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 def extract_json_object(text):
     """Extract the first valid JSON object from model text."""
@@ -955,48 +960,105 @@ def google_callback():
         return redirect(url_for('login'))
 @app.route('/auth/discord')
 def auth_discord():
-    if not os.getenv('DISCORD_CLIENT_ID') or not os.getenv('DISCORD_CLIENT_SECRET'):
+    client_id=(os.getenv('DISCORD_CLIENT_ID') or '').strip()
+    client_secret=(os.getenv('DISCORD_CLIENT_SECRET') or '').strip()
+    if not client_id or not client_secret:
         return render_template('oauth_missing.html',provider='Discord'),503
 
-    # Keep the EXACT redirect_uri used for this authorization attempt.
-    # Discord requires the token exchange redirect_uri to be byte-for-byte
-    # identical to the one sent on the authorize request.
+    # Build the callback once and bind the exact value into signed OAuth state.
+    # That same callback is reused during the code exchange after Discord returns.
     redirect_uri=oauth_request_url('/auth/discord/callback')
-    session['discord_oauth_redirect_uri']=redirect_uri
-    session.modified=True
+    serializer=URLSafeTimedSerializer(app.secret_key, salt='veyra-discord-oauth-v1')
+    state=serializer.dumps({
+        'redirect_uri': redirect_uri,
+        'nonce': secrets.token_urlsafe(18),
+    })
+
+    params={
+        'client_id': client_id,
+        'response_type': 'code',
+        'redirect_uri': redirect_uri,
+        'scope': 'identify email',
+        'state': state,
+        'prompt': 'consent',
+    }
+    authorize_url='https://discord.com/oauth2/authorize?' + urlencode(params)
 
     app.logger.info(
-        'Starting Discord OAuth | client_id=%s | redirect_uri=%s | host=%s | forwarded_host=%s',
-        os.getenv('DISCORD_CLIENT_ID'),
+        'Starting Discord OAuth direct flow | redirect_uri=%s | host=%s | forwarded_host=%s',
         redirect_uri,
         request.host,
         request.headers.get('X-Forwarded-Host')
     )
-    return discord_oauth.authorize_redirect(
-        redirect_uri=redirect_uri,
-        scope='identify email'
-    )
+    return redirect(authorize_url)
 
 
 @app.route('/auth/discord/callback')
 def discord_callback():
-    # Reuse the exact URI from /auth/discord instead of recomputing it after
-    # Discord redirects back. This prevents apex/www or proxy host changes from
-    # producing Discord's redirect_uri mismatch error during token exchange.
-    redirect_uri=(
-        session.pop('discord_oauth_redirect_uri', None)
-        or oauth_request_url('/auth/discord/callback')
-    )
-    session.modified=True
+    client_id=(os.getenv('DISCORD_CLIENT_ID') or '').strip()
+    client_secret=(os.getenv('DISCORD_CLIENT_SECRET') or '').strip()
+    code=(request.args.get('code') or '').strip()
+    raw_state=(request.args.get('state') or '').strip()
+    provider_error=(request.args.get('error') or '').strip()
+
+    if provider_error:
+        detail=(request.args.get('error_description') or provider_error).strip()
+        app.logger.warning('Discord OAuth denied before exchange | error=%s', detail[:300])
+        flash('Discord sign-in was cancelled or denied.','error')
+        return redirect(url_for('login'))
+
+    if not code or not raw_state:
+        flash('Discord sign-in did not return a valid authorization code. Please try again.','error')
+        return redirect(url_for('login'))
 
     try:
-        token=discord_oauth.authorize_access_token(redirect_uri=redirect_uri)
-        response=discord_oauth.get('users/@me',token=token)
+        serializer=URLSafeTimedSerializer(app.secret_key, salt='veyra-discord-oauth-v1')
+        state_data=serializer.loads(raw_state, max_age=600)
+        redirect_uri=str(state_data.get('redirect_uri') or '').strip()
 
-        if response.status_code != 200:
-            raise RuntimeError(f'Discord profile request returned HTTP {response.status_code}')
+        if redirect_uri not in {
+            'https://buildveyra.xyz/auth/discord/callback',
+            'https://www.buildveyra.xyz/auth/discord/callback',
+        }:
+            raise ValueError('Untrusted Discord callback URL in OAuth state')
 
-        profile=response.json()
+        token_body=urlencode({
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': redirect_uri,
+        }).encode('utf-8')
+
+        token_req=UrlRequest(
+            'https://discord.com/api/oauth2/token',
+            data=token_body,
+            headers={
+                'Content-Type':'application/x-www-form-urlencoded',
+                'Accept':'application/json',
+                'User-Agent':'Veyra/1.0',
+            },
+            method='POST',
+        )
+        with urlopen(token_req, timeout=12) as token_res:
+            token_payload=json.loads(token_res.read().decode('utf-8'))
+
+        access_token=str(token_payload.get('access_token') or '').strip()
+        if not access_token:
+            raise RuntimeError('Discord did not return an access token')
+
+        user_req=UrlRequest(
+            'https://discord.com/api/users/@me',
+            headers={
+                'Authorization':f'Bearer {access_token}',
+                'Accept':'application/json',
+                'User-Agent':'Veyra/1.0',
+            },
+            method='GET',
+        )
+        with urlopen(user_req, timeout=12) as user_res:
+            profile=json.loads(user_res.read().decode('utf-8'))
+
         discord_id=str(profile.get('id') or '').strip()
         if not discord_id:
             raise ValueError('Discord did not return a user ID')
@@ -1011,32 +1073,49 @@ def discord_callback():
 
         uid=upsert_oauth('discord',discord_id,email,name,avatar)
         _finish_login(uid,remember=True)
+
+        app.logger.info('Discord OAuth login completed | user_id=%s | discord_id=%s',uid,discord_id)
         return redirect(url_for('dashboard'))
 
-    except Exception as exc:
-        error_type=type(exc).__name__
-        error_text=str(exc or '')
+    except SignatureExpired:
+        app.logger.warning('Discord OAuth state expired')
+        flash('Discord sign-in took too long. Please try again.','error')
+        return redirect(url_for('login'))
+    except BadSignature:
+        app.logger.warning('Discord OAuth state signature was invalid')
+        flash('Discord sign-in session could not be verified. Please try again.','error')
+        return redirect(url_for('login'))
+    except HTTPError as exc:
+        body=''
+        try:
+            body=exc.read().decode('utf-8','replace')
+        except Exception:
+            pass
         app.logger.exception(
-            'Discord OAuth callback failed | client_id=%s | redirect_uri=%s | error=%s | detail=%s',
-            os.getenv('DISCORD_CLIENT_ID'),
-            redirect_uri,
-            error_type,
-            error_text[:500]
+            'Discord OAuth HTTP failure | status=%s | redirect_uri=%s | body=%s',
+            getattr(exc,'code',None),
+            locals().get('redirect_uri'),
+            body[:500]
         )
-
-        lower=error_text.lower()
-        if 'state' in lower:
-            msg='Discord sign-in session expired or changed domains. Please try again.'
-        elif 'invalid_client' in lower or '401' in lower:
-            msg='Discord rejected the configured Client ID or Client Secret.'
-        elif 'redirect_uri' in lower or 'redirect uri' in lower:
-            msg='Discord rejected the OAuth redirect URI. The exact URI used has been logged safely in Vercel.'
-        else:
-            msg=f'Discord sign-in failed ({error_type}). Check Vercel logs for the exact cause.'
-
+        msg='Discord sign-in failed while finishing authorization.'
+        if getattr(exc,'code',None)==401:
+            msg='Discord rejected the configured OAuth client credentials.'
+        elif 'redirect_uri' in body.lower():
+            msg='Discord rejected the OAuth callback URL configured for this app.'
         flash(msg,'error')
         return redirect(url_for('login'))
-
+    except (URLError, TimeoutError) as exc:
+        app.logger.exception('Discord OAuth network failure | error=%s',type(exc).__name__)
+        flash('Discord could not be reached to finish sign-in. Please try again.','error')
+        return redirect(url_for('login'))
+    except Exception as exc:
+        app.logger.exception(
+            'Discord OAuth callback failed | error=%s | detail=%s',
+            type(exc).__name__,
+            str(exc)[:500]
+        )
+        flash('Discord sign-in could not be completed. Check the Vercel function log for the exact cause.','error')
+        return redirect(url_for('login'))
 
 
 @app.get('/auth/status')
