@@ -477,10 +477,9 @@ def current_user():
     if not uid:
         return None
 
-    cached=session.get('user_cache')
-    if isinstance(cached,dict) and str(cached.get('id'))==str(uid):
-        return dict(cached)
-
+    # Neon/Postgres is authoritative. Re-read the account each request so
+    # Discord bot changes (plan, credits, blacklist, Discord link, admin grant)
+    # show on the website immediately after refresh/navigation.
     try:
         with db() as c:
             r=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
@@ -491,7 +490,13 @@ def current_user():
     except Exception:
         app.logger.exception('current_user database lookup failed')
 
+    # Short-lived session cache is only an outage fallback, not the source of truth.
+    cached=session.get('user_cache')
+    if isinstance(cached,dict) and str(cached.get('id'))==str(uid):
+        return dict(cached)
+
     return None
+
 
 def is_admin(user=None):
     user=user or current_user()
@@ -546,7 +551,12 @@ def login_required(fn):
     return w
 
 @app.context_processor
-def inject():return {'current_user':current_user()}
+def inject():
+    user=current_user()
+    return {
+        'current_user':user,
+        'current_is_admin':is_admin(user) if user else False,
+    }
 
 def upsert_oauth(provider,pid,email,name,avatar):
     provider=(provider or '').strip().lower()
@@ -1037,6 +1047,28 @@ def oauth_status():
     })
 
 
+@app.get('/api/account/sync')
+@login_required
+def account_sync_status():
+    user=current_user()
+    discord_id=str(
+        user.get('discord_id')
+        or (user.get('provider_user_id') if user.get('provider')=='discord' else '')
+        or ''
+    ).strip()
+
+    return jsonify({
+        'ok':True,
+        'user_id':user.get('id'),
+        'email':user.get('email'),
+        'plan':user.get('plan') or 'free',
+        'credits':int(user.get('credits') or 0),
+        'discord_linked':bool(discord_id),
+        'discord_id':discord_id or None,
+        'website_admin':is_admin(user),
+    })
+
+
 @app.route('/admin')
 @login_required
 def admin_dashboard():
@@ -1083,27 +1115,35 @@ def admin_dashboard():
         row['summary']=row.get('details') or ''
         audit_rows.append(row)
 
+    with db() as c:
+        total_credits=c.execute(
+            'SELECT COALESCE(SUM(credits),0) AS n FROM users'
+        ).fetchone()['n']
+        total_logins=c.execute(
+            'SELECT COUNT(*) AS n FROM login_events'
+        ).fetchone()['n']
+        admin_count=c.execute(
+            'SELECT COUNT(*) AS n FROM site_admins'
+        ).fetchone()['n']
+        discord_linked=c.execute(
+            "SELECT COUNT(*) AS n FROM users WHERE COALESCE(discord_id,'')<>'' OR lower(COALESCE(provider,''))='discord'"
+        ).fetchone()['n']
+
     stats={
-        'total_users':total_users,
-        'paid_users':paid_users,
-        'projects':project_count,
-        'restricted':restricted,
+        'total_users':int(total_users or 0),
+        'paid_users':int(paid_users or 0),
+        'projects':int(project_count or 0),
+        'restricted':int(restricted or 0),
         'open_support':len(support_threads),
-        'credits_used':0,
-        'monthly_revenue':'$0',
-        'builds':0,
-        'edits':0,
-        'exports':0,
-        'avg_session':'—',
-        'uptime':'99.98%',
-        'website_status':'Operational',
-        'ai_status':'Operational' if os.getenv('OPENAI_API_KEY','').strip() else 'Local',
-        'db_status':'Operational',
-        'discord_status':'Operational',
+        'total_credits':int(total_credits or 0),
+        'total_logins':int(total_logins or 0),
+        'admin_count':int(admin_count or 0),
+        'discord_linked':int(discord_linked or 0),
+        'ai_status':'Ready' if os.getenv('OPENAI_API_KEY','').strip() else 'Local mode',
         'stripe_status':'Configured' if (
             os.getenv('STRIPE_PRO_PAYMENT_LINK','').strip()
             or os.getenv('STRIPE_MAX_PAYMENT_LINK','').strip()
-        ) else 'Not configured'
+        ) else 'Not configured',
     }
 
     return render_template(
