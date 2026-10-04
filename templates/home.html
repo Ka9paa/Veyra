@@ -1,129 +1,147 @@
 {% extends "base.html" %}
-{% block title %}Veyra — Build websites & web apps with AI{% endblock %}
+{% block title %}Veyra — Build software from an idea{% endblock %}
 {% block body %}
-<div class="v29-public">
-  <div class="v29-grid"></div>
+<div class="vx-public">
+  <div class="vx-ambient"></div>
   {% include '_public_nav.html' %}
   <main>
-    <section class="v29-hero">
-      <div class="v29-copy">
-        <div class="v29-badge"><i></i> VEYRA PUBLIC BETA <span>buildveyra.xyz</span></div>
-        <h1>Build websites &<br><em>web apps with AI.</em></h1>
-        <p class="v29-lead">Describe what you want. Veyra plans the product, writes the code, previews it live, helps you refine it, and gets it ready to export.</p>
-        <div class="v29-actions">
-          <a class="v29-primary" href="/signup">Start building free <span>→</span></a>
-          <a class="v29-secondary" href="#how">See how it works</a>
+    <section class="vx-hero">
+      <div class="vx-hero-copy">
+        <div class="vx-pill"><i></i> Public beta · AI software builder</div>
+        <h1>From a sentence to a<br><em>product you can shape.</em></h1>
+        <p>Build, preview, edit, save, export, and publish in one workspace. Veyra keeps the project in context so every follow-up moves the same product forward.</p>
+        <div class="vx-hero-actions">
+          <a class="vx-solidbtn large" href="/signup">Build your first project <span>→</span></a>
+          <a class="vx-ghostbtn large" href="/docs">See the workflow</a>
         </div>
-        <div class="v29-proof">
-          <div><b>150</b><span>starter credits</span></div>
-          <div><b>25</b><span>new AI build</span></div>
-          <div><b>10</b><span>follow-up edit</span></div>
-          <div><b>ZIP</b><span>code export</span></div>
+        <div class="vx-proof">
+          <span><b>Live</b> preview</span>
+          <span><b>Real</b> projects</span>
+          <span><b>ZIP</b> export</span>
+          <span><b>Project</b> members</span>
         </div>
       </div>
 
-      <div class="v29-demo">
-        <div class="v29-window">
-          <header>
-            <div class="v29-dots"><i></i><i></i><i></i></div>
-            <div class="v29-window-title">Veyra Studio</div>
-            <div class="v29-live"><i></i> Live</div>
-          </header>
-          <div class="v29-workspace">
-            <aside class="v29-demo-side">
-              <div class="v29-project"><small>PROJECT</small><b>Atelier No. 7</b></div>
-              <button class="active">✦ <span>Build</span></button>
-              <button>▣ <span>Files</span></button>
-              <button>◇ <span>Components</span></button>
-              <button>✓ <span>Quality</span></button>
+      <div class="vx-hero-stage">
+        <div class="vx-stage-glow"></div>
+        <div class="vx-studio-demo">
+          <div class="vx-demo-top">
+            <div class="vx-demo-brand"><img src="{{url_for('static',filename='veyra-mark.svg')}}" alt=""><b>Veyra Studio</b></div>
+            <div class="vx-demo-tabs"><span class="on">Preview</span><span>Code</span></div>
+            <button>Publish</button>
+          </div>
+          <div class="vx-demo-body">
+            <aside class="vx-demo-nav">
+              <i class="on">✦</i><i>◇</i><i>⌁</i><i>↗</i>
             </aside>
-            <section class="v29-canvas">
-              <div class="v29-prompt">
-                <span>Build a premium fashion storefront with editorial typography.</span>
-                <button>Build</button>
-              </div>
-              <div class="v29-preview">
-                <div class="v29-site-nav"><b>ATELIER</b><span>New&nbsp;&nbsp; Shop&nbsp;&nbsp; Journal</span><button>Bag 0</button></div>
-                <div class="v29-site-hero">
-                  <small>SS / 2026</small>
-                  <h3>Quiet form.<br>Strong presence.</h3>
-                  <p>Modern essentials designed for everyday movement.</p>
-                  <button>Explore collection</button>
-                </div>
-                <div class="v29-products">
-                  <article><i></i><b>Form Jacket</b><span>$148</span></article>
-                  <article><i></i><b>Column Trouser</b><span>$112</span></article>
-                  <article><i></i><b>Studio Knit</b><span>$96</span></article>
-                </div>
+            <section class="vx-demo-chat">
+              <div class="vx-demo-ai"><img src="{{url_for('static',filename='veyra-mark.svg')}}"><div><b>Veyra Assistant</b><p>What do you want to build?</p></div></div>
+              <div class="vx-demo-user">Create a premium launch page for an AI workflow product.</div>
+              <div class="vx-demo-typing"><i></i><i></i><i></i></div>
+              <div class="vx-demo-compose">Ask Veyra to change anything… <span>→</span></div>
+            </section>
+            <section class="vx-demo-canvas">
+              <div class="vx-demo-browser"><i></i><span>Live preview</span><b>↗</b></div>
+              <div class="vx-demo-site">
+                <small>WORK FASTER</small><h3>Automate the work<br>between the work.</h3>
+                <p>One connected system for modern teams.</p>
+                <button>Start free</button>
+                <div class="vx-demo-cards"><i></i><i></i><i></i></div>
               </div>
             </section>
-            <aside class="v29-quality">
-              <small>QUALITY</small><strong>97</strong>
-              <div class="v29-score"><i></i></div>
-              <p><span>Accessibility</span><b>98</b></p>
-              <p><span>Performance</span><b>95</b></p>
-              <p><span>Responsive</span><b>Ready</b></p>
-              <button>Auto Fix</button>
-            </aside>
           </div>
         </div>
-        <div class="v29-status"><span>✦</span><div><b>Veyra is building</b><small>Creating layout, styles, and interactions</small></div><em><i></i><i></i><i></i></em></div>
+        <div class="vx-float vx-float-a"><span>✓</span><div><b>Build ready</b><small>Preview updated</small></div></div>
+        <div class="vx-float vx-float-b"><span>✦</span><div><b>Veyra is thinking</b><small>Refining the same project</small></div><em><i></i><i></i><i></i></em></div>
       </div>
     </section>
 
-    <section class="v29-build-types">
-      <p>BUILD ALMOST ANYTHING</p>
+    <section class="vx-signal">
+      <span>Built for people who ship</span>
+      <b>Founders</b><i></i><b>Developers</b><i></i><b>Designers</b><i></i><b>Creators</b><i></i><b>Small teams</b>
+    </section>
+
+    <section class="vx-section" id="product">
+      <div class="vx-section-kicker">THE VEYRA WAY</div>
+      <div class="vx-section-head">
+        <h2>One project. One context.<br><em>Less restarting.</em></h2>
+        <p>The product is designed around iteration: generate once, then keep shaping what already exists.</p>
+      </div>
+
+      <div class="vx-bento">
+        <article class="vx-bento-main">
+          <div class="vx-num">01</div>
+          <h3>Build with continuity.</h3>
+          <p>Follow-up edits use the project already on screen instead of pretending every prompt is a brand-new idea.</p>
+          <div class="vx-context-demo">
+            <div><span>You</span><p>Make the dashboard more premium and improve mobile.</p></div>
+            <div class="ai"><span>Veyra</span><p>Updating hierarchy, responsive layout, spacing, and interactions while preserving your existing project.</p></div>
+          </div>
+        </article>
+
+        <article>
+          <div class="vx-num">02</div>
+          <h3>Preview immediately.</h3>
+          <p>See the generated HTML, CSS, and JavaScript inside a responsive live preview.</p>
+          <div class="vx-mini-window"><header></header><main><i></i><i></i><i></i></main></div>
+        </article>
+
+        <article>
+          <div class="vx-num">03</div>
+          <h3>Edit the code.</h3>
+          <p>Switch between preview and code without losing the project you are working on.</p>
+          <div class="vx-code-lines"><i></i><i></i><i></i><i></i><i></i></div>
+        </article>
+
+        <article>
+          <div class="vx-num">04</div>
+          <h3>Save what is real.</h3>
+          <p>Projects, members, deployments, analytics events, and account data stay empty until something actually exists.</p>
+          <div class="vx-reality"><span>NO FAKE DATA</span><b>Real state only</b></div>
+        </article>
+
+        <article>
+          <div class="vx-num">05</div>
+          <h3>Ship the files.</h3>
+          <p>Save the project, export a ZIP, or publish the current version from the Studio.</p>
+          <div class="vx-files"><span>HTML</span><span>CSS</span><span>JS</span></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="vx-workflow">
+      <div class="vx-section-kicker">WORKFLOW</div>
+      <h2>Prompt → preview → refine → ship.</h2>
+      <div class="vx-steps">
+        <div><span>1</span><b>Describe it</b><p>Give Veyra the product, layout, behavior, or change you want.</p></div>
+        <div><span>2</span><b>Watch it build</b><p>Veyra updates the project and renders a live preview.</p></div>
+        <div><span>3</span><b>Keep refining</b><p>Follow-up requests edit the same files and existing direction.</p></div>
+        <div><span>4</span><b>Save or ship</b><p>Store the project, collaborate, export, or publish.</p></div>
+      </div>
+    </section>
+
+    <section class="vx-trust-section">
       <div>
-        <span>Business websites</span><span>Landing pages</span><span>Portfolios</span><span>Stores</span><span>Dashboards</span><span>SaaS apps</span><span>Admin panels</span><span>Web tools</span>
+        <div class="vx-section-kicker">BUILT TO FEEL TRUSTWORTHY</div>
+        <h2>If there is no data,<br>Veyra shows no data.</h2>
+        <p>No fake analytics cards, fake team members, imaginary deployments, or decorative account numbers. The product should earn trust by reflecting the real state of your workspace.</p>
+        <a class="vx-ghostbtn large" href="/security">How Veyra handles trust →</a>
+      </div>
+      <div class="vx-trust-panel">
+        <header><span>Workspace state</span><b>Live</b></header>
+        <div><i class="green"></i><span>Projects</span><b>Database-backed</b></div>
+        <div><i class="green"></i><span>Credits</span><b>Server-enforced</b></div>
+        <div><i class="green"></i><span>Members</span><b>Project-specific</b></div>
+        <div><i></i><span>Analytics</span><b>Empty until recorded</b></div>
       </div>
     </section>
 
-    <section class="v29-how" id="how">
-      <div class="v29-section-copy">
-        <small>ONE SIMPLE WORKFLOW</small>
-        <h2>From prompt to working product.</h2>
-        <p>No complicated setup. Build, inspect, refine, and export in one focused workspace.</p>
-      </div>
-      <div class="v29-steps">
-        <article><span>01</span><div><h3>Describe it</h3><p>Tell Veyra what you want in normal language, including the look, pages, and interactions.</p></div></article>
-        <article><span>02</span><div><h3>Watch it build</h3><p>Veyra creates the HTML, CSS, and JavaScript while a live preview updates beside your prompt.</p></div></article>
-        <article><span>03</span><div><h3>Refine anything</h3><p>Ask for changes without starting over. Veyra keeps the current project in context.</p></div></article>
-        <article><span>04</span><div><h3>Ship your code</h3><p>Save your work, inspect changed files, and export the project as a ZIP when it is ready.</p></div></article>
-      </div>
-    </section>
-
-    <section class="v29-feature-section" id="product">
-      <div class="v29-section-copy">
-        <small>WHAT VEYRA ACTUALLY DOES</small>
-        <h2>More than a prompt box.</h2>
-        <p>The builder stays focused on the things you need to turn an idea into a usable website or web app.</p>
-      </div>
-      <div class="v29-feature-cards">
-        <article><div class="icon">✦</div><h3>AI Builder</h3><p>Turns product ideas into real working front-end files.</p></article>
-        <article><div class="icon">◫</div><h3>Live Preview</h3><p>See what Veyra is building without leaving the workspace.</p></article>
-        <article><div class="icon">↻</div><h3>Follow-up Editing</h3><p>Change layouts, colors, sections, interactions, or responsive behavior naturally.</p></article>
-        <article><div class="icon">✓</div><h3>QA & Repair</h3><p>Review responsive quality, accessibility, and broken states before shipping.</p></article>
-        <article><div class="icon">▣</div><h3>Project Memory</h3><p>Continue working from the project you already built instead of restarting.</p></article>
-        <article><div class="icon">↓</div><h3>Code Export</h3><p>Download the generated HTML, CSS, and JavaScript as a project ZIP.</p></article>
-      </div>
-    </section>
-
-    <section class="v29-credit-explainer">
-      <div>
-        <small>FAIR CREDIT USAGE</small>
-        <h2>Know the cost before you build.</h2>
-        <p>Credits are only used when Veyra successfully completes a live AI generation. Failed live AI requests and local fallback previews do not consume credits.</p>
-      </div>
-      <div class="v29-credit-boxes">
-        <article><span>NEW BUILD</span><b>25</b><small>credits</small></article>
-        <article><span>FOLLOW-UP EDIT</span><b>10</b><small>credits</small></article>
-        <article><span>FREE ACCOUNT</span><b>150</b><small>starter credits</small></article>
-      </div>
-    </section>
-
-    <section class="v29-final">
-      <div><small>START WITH A SENTENCE</small><h2>Build something real with Veyra.</h2><p>Start free, create your first project, and refine it in the same workspace.</p></div>
-      <a class="v29-primary" href="/signup">Start building free <span>→</span></a>
+    <section class="vx-final">
+      <img src="{{url_for('static',filename='veyra-mark.svg')}}" alt="Veyra">
+      <div class="vx-section-kicker">START WITH A SENTENCE</div>
+      <h2>Build the thing you keep thinking about.</h2>
+      <p>Veyra is in public beta. Start with a project, shape it in context, and ship when it is ready.</p>
+      <div><a class="vx-solidbtn large" href="/signup">Start building <span>→</span></a><a class="vx-ghostbtn large" href="/pricing">View pricing</a></div>
     </section>
   </main>
   {% include '_public_footer.html' %}

@@ -7,7 +7,6 @@ import zipfile
 from pathlib import Path
 from datetime import datetime, timezone
 from functools import wraps
-from urllib.parse import urlparse
 
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for, flash, send_file
 from authlib.integrations.flask_client import OAuth
@@ -53,14 +52,20 @@ def oauth_url(path):
     path='/' + str(path or '').lstrip('/')
     return f"{OAUTH_BASE_URL}{path}"
 
-def _oauth_on_canonical_host():
-    target=urlparse(OAUTH_BASE_URL)
-    current_host=(request.host or '').split(':')[0].lower()
-    target_host=(target.hostname or '').lower()
-    return bool(target_host and current_host==target_host)
+def oauth_request_url(path):
+    """Build OAuth callback on the hostname the browser is actually using.
 
-def _canonical_oauth_start(path):
-    return redirect(oauth_url(path),code=302)
+    This avoids a redirect loop when Vercel/DNS canonicalizes apex <-> www.
+    Only the two production Veyra hosts are trusted; anything else falls back
+    to OAUTH_BASE_URL.
+    """
+    path='/' + str(path or '').lstrip('/')
+    host=(request.host or '').split(':')[0].lower()
+
+    if host in {'buildveyra.xyz','www.buildveyra.xyz'}:
+        return f"https://{host}{path}"
+
+    return oauth_url(path)
 # Production uses the same Neon/Postgres database as the Discord admin bot.
 # SQLite remains only as a local-development fallback.
 DATABASE_URL=(os.getenv('DATABASE_URL') or '').strip()
@@ -792,19 +797,15 @@ def auth_google():
     if not os.getenv('GOOGLE_CLIENT_ID') or not os.getenv('GOOGLE_CLIENT_SECRET'):
         return render_template('oauth_missing.html',provider='Google'),503
 
-    # OAuth state must be created on the SAME hostname that receives the callback.
-    # This prevents www -> apex session/state loss on Safari and other browsers.
-    if not _oauth_on_canonical_host():
-        return _canonical_oauth_start('/auth/google')
-
-    redirect_uri=oauth_url('/auth/google/callback')
+    # Keep OAuth state and callback on the hostname the browser is already using.
+    redirect_uri=oauth_request_url('/auth/google/callback')
     app.logger.info('Starting Google OAuth | redirect_uri=%s',redirect_uri)
     return google.authorize_redirect(redirect_uri)
 
 
 @app.route('/auth/google/callback')
 def google_callback():
-    redirect_uri=oauth_url('/auth/google/callback')
+    redirect_uri=oauth_request_url('/auth/google/callback')
     try:
         token=google.authorize_access_token(redirect_uri=redirect_uri)
         info=token.get('userinfo')
@@ -841,11 +842,8 @@ def auth_discord():
     if not os.getenv('DISCORD_CLIENT_ID') or not os.getenv('DISCORD_CLIENT_SECRET'):
         return render_template('oauth_missing.html',provider='Discord'),503
 
-    # Keep the auth-start session cookie and callback on the same hostname.
-    if not _oauth_on_canonical_host():
-        return _canonical_oauth_start('/auth/discord')
-
-    redirect_uri=oauth_url('/auth/discord/callback')
+    # Keep OAuth state and callback on the hostname the browser is already using.
+    redirect_uri=oauth_request_url('/auth/discord/callback')
     app.logger.info(
         'Starting Discord OAuth | client_id=%s | redirect_uri=%s',
         os.getenv('DISCORD_CLIENT_ID'),
@@ -859,7 +857,7 @@ def auth_discord():
 
 @app.route('/auth/discord/callback')
 def discord_callback():
-    redirect_uri=oauth_url('/auth/discord/callback')
+    redirect_uri=oauth_request_url('/auth/discord/callback')
     try:
         token=discord_oauth.authorize_access_token(redirect_uri=redirect_uri)
         response=discord_oauth.get('users/@me',token=token)
@@ -917,12 +915,20 @@ def oauth_status():
         'google':{
             'configured':bool(os.getenv('GOOGLE_CLIENT_ID') and os.getenv('GOOGLE_CLIENT_SECRET')),
             'client_id':os.getenv('GOOGLE_CLIENT_ID') or None,
-            'redirect_uri':oauth_url('/auth/google/callback'),
+            'redirect_uri':oauth_request_url('/auth/google/callback'),
+            'allowed_redirects':[
+                'https://buildveyra.xyz/auth/google/callback',
+                'https://www.buildveyra.xyz/auth/google/callback',
+            ],
         },
         'discord':{
             'configured':bool(os.getenv('DISCORD_CLIENT_ID') and os.getenv('DISCORD_CLIENT_SECRET')),
             'client_id':os.getenv('DISCORD_CLIENT_ID') or None,
-            'redirect_uri':oauth_url('/auth/discord/callback'),
+            'redirect_uri':oauth_request_url('/auth/discord/callback'),
+            'allowed_redirects':[
+                'https://buildveyra.xyz/auth/discord/callback',
+                'https://www.buildveyra.xyz/auth/discord/callback',
+            ],
         },
     })
 

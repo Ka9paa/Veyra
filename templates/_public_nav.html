@@ -1,1 +1,28 @@
-<nav class="v27-nav"><a class="v27-brand" href="/"><img src="{{url_for('static',filename='veyra-mark.svg')}}"><span><b>VEYRA</b><small>PUBLIC BETA</small></span></a><div class="v27-navlinks"><a href="/#product">Product</a><a href="/vouches">Vouches</a><a href="/docs">Docs</a><a href="/faq">FAQ</a><a href="/roadmap">Roadmap</a><a href="/pricing">Pricing</a></div><div class="v27-navactions">{% if current_user %}<a class="ghost" href="/dashboard">Dashboard</a>{% else %}<a class="ghost" href="/login">Log in</a>{% endif %}<a class="primary" href="/signup">Start building <span>→</span></a></div></nav>
+<nav class="vx-nav">
+  <a class="vx-brand" href="/">
+    <img src="{{url_for('static',filename='veyra-mark.svg')}}" alt="Veyra">
+    <span>VEYRA</span><em>BETA</em>
+  </a>
+  <div class="vx-navlinks">
+    <a href="/#product">Product</a>
+    <a href="/pricing">Pricing</a>
+    <a href="/docs">Docs</a>
+    <a href="/roadmap">Roadmap</a>
+    <a href="/status">Status</a>
+  </div>
+  <div class="vx-navactions">
+    {% if current_user %}
+      <a class="vx-linkbtn" href="/dashboard">Dashboard</a>
+      <a class="vx-solidbtn" href="/studio">Open Studio <span>↗</span></a>
+    {% else %}
+      <a class="vx-linkbtn" href="/login">Log in</a>
+      <a class="vx-solidbtn" href="/signup">Start building <span>→</span></a>
+    {% endif %}
+  </div>
+  <button class="vx-menu-btn" data-vx-menu aria-label="Open menu">☰</button>
+</nav>
+<div class="vx-mobile-menu">
+  <a href="/#product">Product</a><a href="/pricing">Pricing</a><a href="/docs">Docs</a>
+  <a href="/roadmap">Roadmap</a><a href="/status">Status</a>
+  {% if current_user %}<a href="/dashboard">Dashboard</a>{% else %}<a href="/login">Log in</a><a href="/signup">Start building</a>{% endif %}
+</div>
