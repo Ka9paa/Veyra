@@ -961,6 +961,11 @@ def _stripe_mode():
     if secret.startswith('sk_test_'): return 'test'
     return 'unknown'
 
+def _require_live_billing():
+    host=((request.headers.get('X-Forwarded-Host') or request.host or '').split(',')[0].split(':')[0].lower())
+    if host in {'buildveyra.xyz','www.buildveyra.xyz'} and _stripe_mode()!='live':
+        raise RuntimeError('Live billing is not configured. Connect buildveyra.xyz to the live Stripe secret key.')
+
 def _stripe_get(path,params=None):
     suffix=('?'+urlencode(params)) if params else ''
     return _stripe_api(path+suffix,None,'GET')
@@ -1036,6 +1041,7 @@ def _billing_login_required_message():
     flash('Please sign in to your Veyra account before continuing to secure checkout. This ensures your purchase is applied to the correct account.','error')
 
 def _create_checkout_for_user(user,purchase_type,plan=None,credits=0):
+    _require_live_billing()
     if not user or not user.get('id'):
         raise ValueError('A signed-in Veyra account is required')
     email=(user.get('email') or '').strip()
@@ -1178,7 +1184,10 @@ def billing_start_plan(plan):
         return redirect(checkout['url'])
     except Exception:
         app.logger.exception('Stripe plan checkout failed | plan=%s | user_id=%s',plan,u.get('id'))
-        flash('Secure checkout could not be started. Please try again in a moment.','error')
+        if _stripe_mode()!='live':
+            flash('Live Stripe billing is not connected yet. Veyra checkout is unavailable until the live Stripe account is connected.','error')
+        else:
+            flash('Secure checkout could not be started. Please try again in a moment.','error')
         return redirect(url_for('billing_page'))
 
 @app.route('/billing/start/credits/<int:amount>')
@@ -1192,7 +1201,10 @@ def billing_start_credits(amount):
         return redirect(checkout['url'])
     except Exception:
         app.logger.exception('Stripe credit checkout failed | credits=%s | user_id=%s',amount,u.get('id'))
-        flash('Secure checkout could not be started. Please try again in a moment.','error')
+        if _stripe_mode()!='live':
+            flash('Live Stripe billing is not connected yet. Veyra checkout is unavailable until the live Stripe account is connected.','error')
+        else:
+            flash('Secure checkout could not be started. Please try again in a moment.','error')
         return redirect(url_for('billing_page'))
 
 @app.route('/billing/success')
