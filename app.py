@@ -82,7 +82,7 @@ def classify_ai_error(exc):
     return 'OPENAI_UNKNOWN'
 
 
-def run_veyra_response(client, *, model, instructions, input_text, max_output_tokens=7000, reasoning='low'):
+def run_veyra_response(client, *, model, instructions, input_text, max_output_tokens=5500, reasoning=None):
     """Use the current OpenAI Responses API.
 
     output_text is the SDK's convenience accessor for text returned by the model.
@@ -1908,11 +1908,11 @@ def api_build():
         },
     }
 
-    # Keep the upstream AI request shorter than Vercel's function limit.
-    # If the live model is slow, Flask can still return Veyra's JSON fallback.
+    # Give Veyra enough time to generate a complete site while still keeping a
+    # bounded upstream timeout. R11's 18-second cutoff was too short for real builds.
     client=OpenAI(
         api_key=key,
-        timeout=18.0,
+        timeout=55.0,
         max_retries=0,
     )
     attempts=[]
@@ -1932,8 +1932,8 @@ def api_build():
                 model=model,
                 instructions=system,
                 input_text=json.dumps(payload,separators=(',',':')),
-                max_output_tokens=7000,
-                reasoning='low',
+                max_output_tokens=5500,
+                reasoning=None,
             )
 
             data=extract_json_object(output)
