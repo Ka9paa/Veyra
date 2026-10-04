@@ -890,6 +890,75 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
   .inspector{top:66px;right:8px;bottom:8px;width:min(320px,calc(100vw - 16px))}
 }
 
+
+/* =========================================================
+   VEYRA STUDIO R9 — FULL VIEWPORT / NO DEAD BOTTOM GAP
+   ========================================================= */
+html,body{
+  width:100%;
+  height:100%;
+  min-height:100%;
+  overflow:hidden;
+}
+body{
+  min-height:100dvh;
+}
+.shell{
+  position:fixed;
+  inset:0;
+  width:100vw;
+  height:100vh !important;
+  height:100dvh !important;
+  min-height:100vh;
+  min-height:100dvh;
+  max-height:100dvh;
+  grid-template-rows:54px minmax(0,1fr) !important;
+  overflow:hidden;
+}
+.topbar{
+  min-height:0;
+}
+.rail,
+.chat,
+.workspace{
+  min-height:0;
+  height:100%;
+  align-self:stretch;
+  overflow:hidden;
+}
+.workspace{
+  grid-row:2;
+  display:grid;
+  grid-template-rows:54px minmax(0,1fr) !important;
+  height:100%;
+  min-height:0;
+}
+.canvas{
+  min-height:0;
+  height:auto !important;
+  align-self:stretch;
+  margin:10px 12px 12px;
+}
+.preview,
+.empty-preview,
+.codeview,
+.loading-shroud{
+  min-height:0;
+}
+@media(max-width:900px){
+  html,body{overflow:auto}
+  .shell{
+    position:relative;
+    width:100%;
+    height:auto !important;
+    max-height:none;
+    min-height:100dvh;
+    grid-template-rows:58px minmax(540px,auto) 620px !important;
+    overflow:visible;
+  }
+  .rail,.chat,.workspace{height:auto}
+}
+
 </style>
 </head>
 <body>
