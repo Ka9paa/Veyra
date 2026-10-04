@@ -1,13 +1,258 @@
-{% extends 'app_base.html' %}
-{% block title %}Dashboard — Veyra{% endblock %}{% block top_title %}Dashboard{% endblock %}
-{% block content %}
-<div class="hero-row"><div><div class="eyebrow">Workspace</div><h1 class="title">Build, ship, repeat.</h1><p class="subtitle">Your real Veyra activity in one place — projects, deployments, usage, and nothing made up.</p></div><div class="hero-actions"><a class="btn primary" href="{{url_for('studio')}}">＋ New project</a></div></div>
-<div class="grid">
-  <div class="metric-card"><div class="metric-label">Projects</div><div class="metric-value">{{stats.projects}}</div><div class="metric-note">Owned projects</div></div>
-  <div class="metric-card"><div class="metric-label">Deployments</div><div class="metric-value">{{stats.deployments}}</div><div class="metric-note">Published releases</div></div>
-  <div class="metric-card"><div class="metric-label">Credits</div><div class="metric-value">{{stats.credits}}</div><div class="metric-note">{{stats.plan|upper}} plan</div></div>
+{% extends "base.html" %}{% set active='dashboard' %}
+{% block title %}Dashboard — Veyra{% endblock %}
+{% block body %}
+<div class="v16-app">
+  {% include '_sidebar.html' %}
+
+  <main class="v16-main">
+    <header class="v16-top">
+      <div class="v16-top-left">
+        <div class="v16-eyebrow">WORKSPACE OVERVIEW</div>
+        <h1>Dashboard</h1>
+      </div>
+      <div class="v16-top-actions">
+        <a class="v16-home" href="/">← Back to home</a>
+        <a class="v16-secondary" href="/app/projects">Projects</a>
+        <a class="v16-primary" href="/studio">＋ New project</a>
+      </div>
+    </header>
+
+    <section class="v16-content">
+      {% with messages=get_flashed_messages(with_categories=true) %}
+        {% for category,message in messages %}
+          <div class="v16-alert {{category}}">{{message}}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <section class="v16-hero">
+        <div class="v16-hero-copy">
+          <div class="v16-kicker">
+            <span class="v16-live-dot"></span>
+            VEYRA WORKSPACE
+          </div>
+          <h2>Welcome back{% if user.name %}, {{user.name.split(' ')[0]}}{% endif %}.</h2>
+          <p>Your projects, credits, deployments, account status, and recent activity — all real data from your Veyra workspace.</p>
+          <div class="v16-hero-buttons">
+            <a class="v16-primary big" href="/studio">Open Veyra Studio →</a>
+            <a class="v16-secondary big" href="/app/templates">Browse templates</a>
+          </div>
+        </div>
+
+        <div class="v16-command-card">
+          <div class="v16-command-head">
+            <span>Workspace status</span>
+            <b>{{stats.plan|upper}}</b>
+          </div>
+          <div class="v16-credit-row">
+            <div>
+              <small>CREDITS AVAILABLE</small>
+              <strong>{{"{:,}".format(stats.credits)}}</strong>
+            </div>
+            <a href="/billing">Manage plan →</a>
+          </div>
+          <div class="v16-progress">
+            <i style="width:{{stats.credit_percent}}%"></i>
+          </div>
+          <div class="v16-command-foot">
+            {% if stats.plan_allowance %}
+              <span>{{"{:,}".format(stats.credits)}} of {{"{:,}".format(stats.plan_allowance)}} plan credits</span>
+            {% else %}
+              <span>Custom credit balance</span>
+            {% endif %}
+            <span>{{stats.credit_percent}}%</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="v16-stat-grid">
+        <a href="/app/projects" class="v16-stat">
+          <div class="v16-stat-icon">▣</div>
+          <div><small>PROJECTS</small><strong>{{stats.projects}}</strong><span>Saved in your workspace</span></div>
+          <em>→</em>
+        </a>
+        <a href="/app/deploy" class="v16-stat">
+          <div class="v16-stat-icon">◇</div>
+          <div><small>DEPLOYMENTS</small><strong>{{stats.deployments}}</strong><span>Recorded deployment runs</span></div>
+          <em>→</em>
+        </a>
+        <a href="/app/analytics" class="v16-stat">
+          <div class="v16-stat-icon">⌁</div>
+          <div><small>ACTIVITY EVENTS</small><strong>{{stats.analytics}}</strong><span>Real project activity</span></div>
+          <em>→</em>
+        </a>
+        <a href="/app/members" class="v16-stat">
+          <div class="v16-stat-icon">♙</div>
+          <div><small>PROJECT MEMBERS</small><strong>{{stats.members}}</strong><span>Across projects you own</span></div>
+          <em>→</em>
+        </a>
+      </section>
+
+      <section class="v16-quick">
+        <a href="/studio"><span>＋</span><b>Start a new build</b><small>Describe an idea and let Veyra build it.</small></a>
+        <a href="/app/templates"><span>▦</span><b>Use a template</b><small>Start faster from a polished base.</small></a>
+        <a href="/billing"><span>◎</span><b>Plans & billing</b><small>Upgrade or add more credits.</small></a>
+        <a href="/app/settings"><span>⚙</span><b>Workspace settings</b><small>Manage your Veyra experience.</small></a>
+      </section>
+
+      <div class="v16-two-col">
+        <section class="v16-panel">
+          <header class="v16-panel-head">
+            <div><small>RECENT</small><h3>Your projects</h3></div>
+            <a href="/app/projects">View all →</a>
+          </header>
+          <div class="v16-projects">
+            {% for p in projects %}
+            <article>
+              <div class="v16-thumb"><span>V</span></div>
+              <div class="v16-project-copy">
+                <b>{{p.name}}</b>
+                <span>{{p.description or 'No description yet.'}}</span>
+                <small>Updated {{p.updated_at}}</small>
+              </div>
+              <a href="/studio?project={{p.id}}">Open →</a>
+            </article>
+            {% else %}
+            <div class="v16-empty">
+              <div>＋</div>
+              <b>No projects yet</b>
+              <span>Your first generated build will appear here automatically.</span>
+              <a href="/studio">Create your first project →</a>
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="v16-panel">
+          <header class="v16-panel-head">
+            <div><small>ACCOUNT</small><h3>Workspace health</h3></div>
+            <a href="/account">Account →</a>
+          </header>
+
+          <div class="v16-health">
+            <div>
+              <span class="ok"></span>
+              <div><b>Account session</b><small>Signed in and connected to Veyra</small></div>
+              <em>Ready</em>
+            </div>
+            <div>
+              <span class="{{'ok' if user.email else 'warn'}}"></span>
+              <div><b>Email</b><small>{{user.email or 'No email connected'}}</small></div>
+              <em>{{'Connected' if user.email else 'Missing'}}</em>
+            </div>
+            <div>
+              <span class="{{'ok' if user.discord_id else 'muted'}}"></span>
+              <div><b>Discord</b><small>{{'Discord account linked' if user.discord_id else 'Not linked to this account'}}</small></div>
+              <em>{{'Linked' if user.discord_id else 'Optional'}}</em>
+            </div>
+            <div>
+              <span class="ok"></span>
+              <div><b>Current plan</b><small>{{stats.plan|capitalize}} workspace access</small></div>
+              <em>{{stats.plan|upper}}</em>
+            </div>
+            {% if latest_login %}
+            <div>
+              <span class="ok"></span>
+              <div><b>Latest sign in</b><small>{{latest_login.provider|capitalize}} · {{latest_login.created_at}}</small></div>
+              <em>Verified</em>
+            </div>
+            {% endif %}
+          </div>
+        </section>
+      </div>
+
+      <div class="v16-two-col lower">
+        <section class="v16-panel">
+          <header class="v16-panel-head">
+            <div><small>SHIP</small><h3>Recent deployments</h3></div>
+            <a href="/app/deploy">Deployments →</a>
+          </header>
+          <div class="v16-deploy-list">
+            {% for d in recent_deployments %}
+            <article>
+              <span class="v16-status {{d.status|lower}}"></span>
+              <div>
+                <b>{{d.project_name or ('Project #' ~ d.project_id)}}</b>
+                <small>{{d.created_at}}</small>
+              </div>
+              <em>{{d.status|capitalize}}</em>
+              {% if d.url %}<a href="{{d.url}}" target="_blank" rel="noopener">Open ↗</a>{% endif %}
+            </article>
+            {% else %}
+            <div class="v16-empty compact">
+              <b>No deployments yet</b>
+              <span>When Publish is connected and a deployment is recorded, it will show here.</span>
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="v16-panel">
+          <header class="v16-panel-head">
+            <div><small>ACTIVITY</small><h3>Recent project events</h3></div>
+            <a href="/app/analytics">Analytics →</a>
+          </header>
+          <div class="v16-activity">
+            {% for item in recent_activity %}
+            <article>
+              <i></i>
+              <div><b>{{item.event_type.replace('_',' ')|title}}</b><small>Project #{{item.project_id}} · {{item.created_at}}</small></div>
+            </article>
+            {% else %}
+            <div class="v16-empty compact">
+              <b>No activity recorded yet</b>
+              <span>Veyra will show real project events here as you use the workspace.</span>
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+      </div>
+
+      <section class="v16-launch-strip">
+        <div>
+          <small>NEXT STEP</small>
+          <h3>Ready to build something?</h3>
+          <p>Open Studio and continue an existing project or start from a fresh idea.</p>
+        </div>
+        <div>
+          <a href="/" class="v16-secondary">← Go back home</a>
+          <a href="/studio" class="v16-primary big">Launch Studio →</a>
+        </div>
+      </section>
+    </section>
+  </main>
 </div>
-<div class="section"><div class="section-head"><h2>Recent projects</h2><a class="btn" href="{{url_for('projects_page')}}">View all</a></div>
-{% if projects %}<div class="list">{% for p in projects %}<div class="list-row"><div class="row-main"><div class="emblem"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 9h16"/></svg></div><div class="row-copy"><strong>{{p.name}}</strong><span class="muted">Updated {{p.updated_at}}</span></div></div><div style="display:flex;gap:7px"><a class="btn" href="{{url_for('studio')}}?project={{p.id}}">Open</a><a class="btn" href="{{url_for('project_members_page',project_id=p.id)}}">Members</a></div></div>{% endfor %}</div>
-{% else %}<div class="empty"><div class="empty-icon">✦</div><h3>Your first project starts here</h3><p>Describe what you want to build and Veyra will turn it into a working preview.</p><a class="btn primary" href="{{url_for('studio')}}">Start building</a></div>{% endif %}</div>
+
+<style>
+:root{--d-bg:#050b14;--d-panel:#091322;--d-panel2:#0c1727;--d-border:#1e2e45;--d-text:#f4f7ff;--d-muted:#8392aa;--d-purple:#7b5cff;--d-blue:#5578ff;--d-green:#45dbac}
+.v16-app{min-height:100vh;background:var(--d-bg);color:var(--d-text)}
+.v16-main{margin-left:var(--sidebar-w,228px);min-height:100vh}
+.v16-top{height:76px;padding:0 30px;border-bottom:1px solid #17253a;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:rgba(5,11,20,.92);backdrop-filter:blur(14px);z-index:15}
+.v16-eyebrow,.v16-panel-head small,.v16-kicker{font-size:10px;letter-spacing:.16em;font-weight:900;color:#8d79ff}.v16-top h1{margin:2px 0 0;font-size:24px}
+.v16-top-actions,.v16-hero-buttons,.v16-launch-strip>div:last-child{display:flex;gap:9px;align-items:center}
+.v16-top-actions a,.v16-hero-buttons a,.v16-launch-strip a{text-decoration:none}
+.v16-home,.v16-secondary{border:1px solid #273750;background:#0a1422;color:#c6d1e2;padding:10px 13px;border-radius:10px;font-weight:800;font-size:13px}
+.v16-primary{background:linear-gradient(135deg,var(--d-purple),var(--d-blue));color:white;padding:10px 14px;border-radius:10px;font-weight:900;font-size:13px;border:1px solid transparent}
+.v16-primary.big,.v16-secondary.big{padding:12px 16px}
+.v16-content{max-width:1450px;padding:28px 30px 70px}
+.v16-alert{padding:13px 15px;border-radius:12px;border:1px solid #31435f;background:#0c1727;margin-bottom:16px}.v16-alert.error{border-color:#743947;background:#2a111a;color:#ff9caf}.v16-alert.success{border-color:#285f50;background:#0d231d;color:#90efd3}
+.v16-hero{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(320px,.7fr);gap:18px}
+.v16-hero-copy,.v16-command-card{border:1px solid var(--d-border);border-radius:18px;background:radial-gradient(circle at 8% 0%,rgba(123,92,255,.12),transparent 34%),linear-gradient(180deg,#0a1423,#07101c);padding:28px}
+.v16-kicker{display:flex;align-items:center;gap:8px}.v16-live-dot{width:8px;height:8px;border-radius:50%;background:var(--d-green);box-shadow:0 0 14px var(--d-green)}
+.v16-hero h2{font-size:40px;letter-spacing:-.035em;margin:12px 0 10px}.v16-hero p{color:var(--d-muted);font-size:15px;line-height:1.65;max-width:760px}.v16-hero-buttons{margin-top:22px}
+.v16-command-head,.v16-credit-row,.v16-command-foot{display:flex;justify-content:space-between;gap:15px;align-items:center}.v16-command-head span{color:#92a1b9}.v16-command-head b{font-size:11px;padding:5px 8px;border:1px solid #4b3b88;border-radius:999px;background:#171431;color:#b9a8ff}
+.v16-credit-row{margin-top:28px}.v16-credit-row small{display:block;color:#73849e;font-size:10px;letter-spacing:.11em}.v16-credit-row strong{display:block;font-size:34px;margin-top:3px}.v16-credit-row a{color:#b9abff;text-decoration:none;font-weight:800;font-size:12px}
+.v16-progress{height:7px;background:#111e30;border-radius:999px;margin:18px 0 10px;overflow:hidden}.v16-progress i{display:block;height:100%;background:linear-gradient(90deg,var(--d-purple),#5f7cff);border-radius:999px}.v16-command-foot{color:#718099;font-size:11px}
+.v16-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}.v16-stat{text-decoration:none;color:inherit;border:1px solid var(--d-border);border-radius:15px;background:#081220;padding:17px;display:grid;grid-template-columns:42px 1fr auto;gap:13px;align-items:center;transition:.18s}.v16-stat:hover{border-color:#3a4d6e;transform:translateY(-1px)}.v16-stat-icon{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;background:#141630;color:#9b87ff;font-size:18px}.v16-stat small{display:block;color:#73839b;font-size:9px;letter-spacing:.12em;font-weight:900}.v16-stat strong{display:block;color:#fff;font-size:25px;margin:2px 0}.v16-stat span{color:#718098;font-size:11px}.v16-stat em{font-style:normal;color:#677791}
+.v16-quick{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}.v16-quick a{text-decoration:none;border:1px solid var(--d-border);background:#081220;border-radius:14px;padding:15px;display:grid;grid-template-columns:34px 1fr;column-gap:10px;color:#fff}.v16-quick a>span{grid-row:1/3;width:34px;height:34px;border-radius:9px;background:#121a30;color:#9d8aff;display:grid;place-items:center}.v16-quick b{font-size:13px}.v16-quick small{color:#74839a;line-height:1.35;margin-top:3px}
+.v16-two-col{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,.65fr);gap:16px;margin-top:16px}.v16-two-col.lower{grid-template-columns:1fr 1fr}
+.v16-panel{border:1px solid var(--d-border);border-radius:17px;background:#081220;overflow:hidden}.v16-panel-head{padding:18px 20px;border-bottom:1px solid #18283e;display:flex;justify-content:space-between;align-items:end}.v16-panel-head h3{margin:4px 0 0;font-size:18px}.v16-panel-head a{color:#9b8cff;text-decoration:none;font-size:12px;font-weight:800}
+.v16-projects{padding:6px 12px}.v16-projects article{display:grid;grid-template-columns:48px 1fr auto;gap:12px;align-items:center;padding:12px 8px;border-bottom:1px solid #142339}.v16-projects article:last-child{border-bottom:0}.v16-thumb{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#221b4e,#5f43e5);display:grid;place-items:center;color:#fff;font-weight:900}.v16-project-copy b,.v16-project-copy span,.v16-project-copy small{display:block}.v16-project-copy span{color:#8190a6;font-size:12px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:580px}.v16-project-copy small{color:#586981;font-size:10px;margin-top:4px}.v16-projects article>a{color:#a99aff;text-decoration:none;font-weight:800;font-size:12px}
+.v16-health{padding:8px 14px}.v16-health>div{display:grid;grid-template-columns:10px 1fr auto;gap:11px;align-items:center;padding:13px 5px;border-bottom:1px solid #142339}.v16-health>div:last-child{border-bottom:0}.v16-health span{width:8px;height:8px;border-radius:50%;background:#506079}.v16-health span.ok{background:#44d9ac;box-shadow:0 0 10px #44d9ac55}.v16-health span.warn{background:#ffbd5a}.v16-health b,.v16-health small{display:block}.v16-health small{color:#74839a;margin-top:3px}.v16-health em{font-style:normal;color:#91a0b7;font-size:11px}
+.v16-deploy-list,.v16-activity{padding:8px 14px}.v16-deploy-list article{display:grid;grid-template-columns:10px 1fr auto auto;gap:11px;align-items:center;padding:13px 5px;border-bottom:1px solid #142339}.v16-deploy-list article:last-child{border-bottom:0}.v16-status{width:8px;height:8px;border-radius:50%;background:#64748b}.v16-status.ready,.v16-status.success,.v16-status.live{background:#44d9ac}.v16-status.failed,.v16-status.error{background:#ff7087}.v16-deploy-list b,.v16-deploy-list small{display:block}.v16-deploy-list small{color:#73839a;margin-top:3px}.v16-deploy-list em{font-style:normal;color:#98a8bf;font-size:11px}.v16-deploy-list a{color:#a99aff;text-decoration:none;font-size:11px;font-weight:800}
+.v16-activity article{display:grid;grid-template-columns:9px 1fr;gap:11px;padding:13px 5px;border-bottom:1px solid #142339}.v16-activity article:last-child{border-bottom:0}.v16-activity i{width:7px;height:7px;border-radius:50%;background:#866cff;margin-top:5px}.v16-activity b,.v16-activity small{display:block}.v16-activity small{color:#718098;margin-top:4px}
+.v16-empty{padding:30px 15px;text-align:center;color:#718098}.v16-empty>div{width:46px;height:46px;border-radius:12px;background:#15172f;color:#9d8aff;display:grid;place-items:center;margin:0 auto 12px}.v16-empty b{display:block;color:#eaf0fb}.v16-empty span{display:block;margin:5px auto 12px;max-width:420px}.v16-empty a{color:#a999ff;text-decoration:none;font-weight:800}.v16-empty.compact{padding:26px 10px}
+.v16-launch-strip{margin-top:16px;border:1px solid #2e325b;background:radial-gradient(circle at 20% 50%,rgba(123,92,255,.14),transparent 35%),#0a1221;border-radius:17px;padding:22px 24px;display:flex;justify-content:space-between;align-items:center;gap:20px}.v16-launch-strip small{color:#8c76ff;letter-spacing:.14em;font-weight:900}.v16-launch-strip h3{font-size:22px;margin:5px 0}.v16-launch-strip p{color:#7f8fa6;margin:0}
+@media(max-width:1100px){.v16-stat-grid,.v16-quick{grid-template-columns:1fr 1fr}.v16-hero,.v16-two-col,.v16-two-col.lower{grid-template-columns:1fr}}
+@media(max-width:760px){.v16-main{margin-left:0}.v16-top{height:auto;min-height:76px;padding:14px 16px;align-items:flex-start;gap:12px}.v16-top-actions{flex-wrap:wrap;justify-content:flex-end}.v16-content{padding:20px 16px 50px}.v16-stat-grid,.v16-quick{grid-template-columns:1fr}.v16-hero h2{font-size:31px}.v16-launch-strip{align-items:flex-start;flex-direction:column}}
+</style>
 {% endblock %}

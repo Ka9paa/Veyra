@@ -1897,17 +1897,87 @@ def _visible_projects(uid):
 def dashboard():
     u=current_user(); uid=u['id']
     with db() as c:
-        rows=c.execute('SELECT * FROM projects WHERE user_id=? ORDER BY updated_at DESC LIMIT 6',(uid,)).fetchall()
-        project_count=c.execute('SELECT COUNT(*) AS n FROM projects WHERE user_id=?',(uid,)).fetchone()['n']
-        deployment_count=c.execute('SELECT COUNT(*) AS n FROM deployments WHERE user_id=?',(uid,)).fetchone()['n']
-        analytics_count=c.execute('SELECT COUNT(*) AS n FROM analytics_events WHERE user_id=?',(uid,)).fetchone()['n']
-    return render_template('dashboard.html',user=u,projects=[dict(r) for r in rows],stats={
-        'projects':int(project_count or 0),
-        'deployments':int(deployment_count or 0),
-        'analytics':int(analytics_count or 0),
-        'credits':int(u.get('credits') or 0),
-        'plan':(u.get('plan') or 'free').lower(),
-    })
+        rows=c.execute(
+            'SELECT * FROM projects WHERE user_id=? ORDER BY updated_at DESC LIMIT 6',
+            (uid,)
+        ).fetchall()
+
+        project_count=c.execute(
+            'SELECT COUNT(*) AS n FROM projects WHERE user_id=?',
+            (uid,)
+        ).fetchone()['n']
+
+        deployment_count=c.execute(
+            'SELECT COUNT(*) AS n FROM deployments WHERE user_id=?',
+            (uid,)
+        ).fetchone()['n']
+
+        analytics_count=c.execute(
+            'SELECT COUNT(*) AS n FROM analytics_events WHERE user_id=?',
+            (uid,)
+        ).fetchone()['n']
+
+        member_count=c.execute(
+            '''SELECT COUNT(DISTINCT pm.user_id) AS n
+               FROM project_members pm
+               JOIN projects p ON p.id=pm.project_id
+               WHERE p.user_id=?''',
+            (uid,)
+        ).fetchone()['n']
+
+        recent_deployments=c.execute(
+            '''SELECT d.*,p.name AS project_name
+               FROM deployments d
+               LEFT JOIN projects p ON p.id=d.project_id
+               WHERE d.user_id=?
+               ORDER BY d.created_at DESC
+               LIMIT 5''',
+            (uid,)
+        ).fetchall()
+
+        recent_activity=c.execute(
+            '''SELECT event_type,project_id,created_at
+               FROM analytics_events
+               WHERE user_id=?
+               ORDER BY created_at DESC
+               LIMIT 6''',
+            (uid,)
+        ).fetchall()
+
+        latest_login=c.execute(
+            '''SELECT provider,created_at
+               FROM login_events
+               WHERE user_id=?
+               ORDER BY id DESC
+               LIMIT 1''',
+            (uid,)
+        ).fetchone()
+
+    plan=(u.get('plan') or 'free').lower()
+    plan_allowance={'free':50,'pro':3000,'max':7500}.get(plan,0)
+    credits=int(u.get('credits') or 0)
+    usage_percent=0
+    if plan_allowance > 0:
+        usage_percent=max(0,min(100,round((credits/plan_allowance)*100)))
+
+    return render_template(
+        'dashboard.html',
+        user=u,
+        projects=[dict(r) for r in rows],
+        recent_deployments=[dict(r) for r in recent_deployments],
+        recent_activity=[dict(r) for r in recent_activity],
+        latest_login=dict(latest_login) if latest_login else None,
+        stats={
+            'projects':int(project_count or 0),
+            'deployments':int(deployment_count or 0),
+            'analytics':int(analytics_count or 0),
+            'members':int(member_count or 0),
+            'credits':credits,
+            'plan':plan,
+            'plan_allowance':plan_allowance,
+            'credit_percent':usage_percent,
+        }
+    )
 
 
 @app.route('/app/projects')
