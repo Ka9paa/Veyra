@@ -915,26 +915,107 @@ def logout():
 
 @app.route('/auth/google')
 def auth_google():
-    if not os.getenv('GOOGLE_CLIENT_ID') or not os.getenv('GOOGLE_CLIENT_SECRET'):
+    client_id=(os.getenv('GOOGLE_CLIENT_ID') or '').strip()
+    client_secret=(os.getenv('GOOGLE_CLIENT_SECRET') or '').strip()
+    if not client_id or not client_secret:
         return render_template('oauth_missing.html',provider='Google'),503
 
-    # Keep OAuth state and callback on the hostname the browser is already using.
+    # Bind the exact callback URI into signed OAuth state so the callback/token
+    # exchange uses the same URI Google originally approved.
     redirect_uri=oauth_request_url('/auth/google/callback')
-    app.logger.info('Starting Google OAuth | redirect_uri=%s',redirect_uri)
-    return google.authorize_redirect(redirect_uri)
+    serializer=URLSafeTimedSerializer(app.secret_key, salt='veyra-google-oauth-v1')
+    state=serializer.dumps({
+        'redirect_uri': redirect_uri,
+        'nonce': secrets.token_urlsafe(18),
+    })
+
+    params={
+        'client_id': client_id,
+        'response_type': 'code',
+        'redirect_uri': redirect_uri,
+        'scope': 'openid email profile',
+        'state': state,
+        'prompt': 'select_account',
+        'access_type': 'online',
+        'include_granted_scopes': 'true',
+    }
+
+    authorize_url='https://accounts.google.com/o/oauth2/v2/auth?' + urlencode(params)
+
+    app.logger.info(
+        'Starting Google OAuth direct flow | redirect_uri=%s | host=%s | forwarded_host=%s',
+        redirect_uri,
+        request.host,
+        request.headers.get('X-Forwarded-Host')
+    )
+    return redirect(authorize_url)
 
 
 @app.route('/auth/google/callback')
 def google_callback():
-    redirect_uri=oauth_request_url('/auth/google/callback')
+    client_id=(os.getenv('GOOGLE_CLIENT_ID') or '').strip()
+    client_secret=(os.getenv('GOOGLE_CLIENT_SECRET') or '').strip()
+    code=(request.args.get('code') or '').strip()
+    raw_state=(request.args.get('state') or '').strip()
+    provider_error=(request.args.get('error') or '').strip()
+
+    if provider_error:
+        detail=(request.args.get('error_description') or provider_error).strip()
+        app.logger.warning('Google OAuth denied before exchange | error=%s', detail[:300])
+        flash('Google sign-in was cancelled or denied.','error')
+        return redirect(url_for('login'))
+
+    if not code or not raw_state:
+        flash('Google sign-in did not return a valid authorization code. Please try again.','error')
+        return redirect(url_for('login'))
+
     try:
-        token=google.authorize_access_token(redirect_uri=redirect_uri)
-        info=token.get('userinfo')
-        if not info:
-            info=google.get(
-                'https://openidconnect.googleapis.com/v1/userinfo',
-                token=token
-            ).json()
+        serializer=URLSafeTimedSerializer(app.secret_key, salt='veyra-google-oauth-v1')
+        state_data=serializer.loads(raw_state, max_age=600)
+        redirect_uri=str(state_data.get('redirect_uri') or '').strip()
+
+        if redirect_uri not in {
+            'https://buildveyra.xyz/auth/google/callback',
+            'https://www.buildveyra.xyz/auth/google/callback',
+        }:
+            raise ValueError('Untrusted Google callback URL in OAuth state')
+
+        token_body=urlencode({
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': redirect_uri,
+        }).encode('utf-8')
+
+        token_req=UrlRequest(
+            'https://oauth2.googleapis.com/token',
+            data=token_body,
+            headers={
+                'Content-Type':'application/x-www-form-urlencoded',
+                'Accept':'application/json',
+                'User-Agent':'Veyra/1.0',
+            },
+            method='POST',
+        )
+        with urlopen(token_req, timeout=12) as token_res:
+            token_payload=json.loads(token_res.read().decode('utf-8'))
+
+        access_token=str(token_payload.get('access_token') or '').strip()
+        if not access_token:
+            raise RuntimeError('Google did not return an access token')
+
+        user_req=UrlRequest(
+            'https://openidconnect.googleapis.com/v1/userinfo',
+            headers={
+                'Authorization':f'Bearer {access_token}',
+                'Accept':'application/json',
+                'User-Agent':'Veyra/1.0',
+            },
+            method='GET',
+        )
+        with urlopen(user_req, timeout=12) as user_res:
+            info=json.loads(user_res.read().decode('utf-8'))
 
         google_id=str(info.get('sub') or '').strip()
         if not google_id:
@@ -948,16 +1029,53 @@ def google_callback():
             info.get('picture')
         )
         _finish_login(uid,remember=True)
+
+        app.logger.info('Google OAuth login completed | user_id=%s | google_id=%s',uid,google_id)
         return redirect(url_for('dashboard'))
 
+    except SignatureExpired:
+        app.logger.warning('Google OAuth state expired')
+        flash('Google sign-in took too long. Please try again.','error')
+        return redirect(url_for('login'))
+    except BadSignature:
+        app.logger.warning('Google OAuth state signature was invalid')
+        flash('Google sign-in session could not be verified. Please try again.','error')
+        return redirect(url_for('login'))
+    except HTTPError as exc:
+        body=''
+        try:
+            body=exc.read().decode('utf-8','replace')
+        except Exception:
+            pass
+        app.logger.exception(
+            'Google OAuth HTTP failure | status=%s | redirect_uri=%s | body=%s',
+            getattr(exc,'code',None),
+            locals().get('redirect_uri'),
+            body[:500]
+        )
+        msg='Google sign-in failed while finishing authorization.'
+        if getattr(exc,'code',None)==401:
+            msg='Google rejected the configured OAuth client credentials.'
+        elif 'redirect_uri' in body.lower() or 'redirect_uri_mismatch' in body.lower():
+            msg='Google rejected the OAuth callback URL configured for this app.'
+        elif 'invalid_grant' in body.lower():
+            msg='Google rejected the authorization code. Please try signing in again.'
+        flash(msg,'error')
+        return redirect(url_for('login'))
+    except (URLError, TimeoutError) as exc:
+        app.logger.exception('Google OAuth network failure | error=%s',type(exc).__name__)
+        flash('Google could not be reached to finish sign-in. Please try again.','error')
+        return redirect(url_for('login'))
     except Exception as exc:
         app.logger.exception(
-            'Google OAuth callback failed | redirect_uri=%s | error=%s',
-            redirect_uri,
-            type(exc).__name__
+            'Google OAuth callback failed | error=%s | detail=%s',
+            type(exc).__name__,
+            str(exc)[:500]
         )
-        flash('Google sign-in failed. Check the Google OAuth redirect URI and try again.','error')
+        flash('Google sign-in could not be completed. Check the Vercel function log for the exact cause.','error')
         return redirect(url_for('login'))
+
+
 @app.route('/auth/discord')
 def auth_discord():
     client_id=(os.getenv('DISCORD_CLIENT_ID') or '').strip()
