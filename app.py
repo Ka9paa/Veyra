@@ -125,14 +125,16 @@ def oauth_url(path):
     return f"{OAUTH_BASE_URL}{path}"
 
 def oauth_request_url(path):
-    """Build OAuth callback on the hostname the browser is actually using.
+    """Return the exact public callback URL used for an OAuth attempt.
 
-    This avoids a redirect loop when Vercel/DNS canonicalizes apex <-> www.
-    Only the two production Veyra hosts are trusted; anything else falls back
-    to OAUTH_BASE_URL.
+    Vercel/proxies can expose a different internal request host, so prefer the
+    forwarded host when it is one of Veyra's two approved production hosts.
     """
     path='/' + str(path or '').lstrip('/')
-    host=(request.host or '').split(':')[0].lower()
+
+    forwarded=(request.headers.get('X-Forwarded-Host') or '').split(',')[0].strip()
+    raw_host=forwarded or (request.host or '')
+    host=raw_host.split(':')[0].lower()
 
     if host in {'buildveyra.xyz','www.buildveyra.xyz'}:
         return f"https://{host}{path}"
@@ -956,22 +958,37 @@ def auth_discord():
     if not os.getenv('DISCORD_CLIENT_ID') or not os.getenv('DISCORD_CLIENT_SECRET'):
         return render_template('oauth_missing.html',provider='Discord'),503
 
-    # Keep OAuth state and callback on the hostname the browser is already using.
+    # Keep the EXACT redirect_uri used for this authorization attempt.
+    # Discord requires the token exchange redirect_uri to be byte-for-byte
+    # identical to the one sent on the authorize request.
     redirect_uri=oauth_request_url('/auth/discord/callback')
+    session['discord_oauth_redirect_uri']=redirect_uri
+    session.modified=True
+
     app.logger.info(
-        'Starting Discord OAuth | client_id=%s | redirect_uri=%s',
+        'Starting Discord OAuth | client_id=%s | redirect_uri=%s | host=%s | forwarded_host=%s',
         os.getenv('DISCORD_CLIENT_ID'),
-        redirect_uri
+        redirect_uri,
+        request.host,
+        request.headers.get('X-Forwarded-Host')
     )
     return discord_oauth.authorize_redirect(
-        redirect_uri,
+        redirect_uri=redirect_uri,
         scope='identify email'
     )
 
 
 @app.route('/auth/discord/callback')
 def discord_callback():
-    redirect_uri=oauth_request_url('/auth/discord/callback')
+    # Reuse the exact URI from /auth/discord instead of recomputing it after
+    # Discord redirects back. This prevents apex/www or proxy host changes from
+    # producing Discord's redirect_uri mismatch error during token exchange.
+    redirect_uri=(
+        session.pop('discord_oauth_redirect_uri', None)
+        or oauth_request_url('/auth/discord/callback')
+    )
+    session.modified=True
+
     try:
         token=discord_oauth.authorize_access_token(redirect_uri=redirect_uri)
         response=discord_oauth.get('users/@me',token=token)
@@ -1012,8 +1029,8 @@ def discord_callback():
             msg='Discord sign-in session expired or changed domains. Please try again.'
         elif 'invalid_client' in lower or '401' in lower:
             msg='Discord rejected the configured Client ID or Client Secret.'
-        elif 'redirect' in lower:
-            msg='Discord rejected the OAuth redirect URI.'
+        elif 'redirect_uri' in lower or 'redirect uri' in lower:
+            msg='Discord rejected the OAuth redirect URI. The exact URI used has been logged safely in Vercel.'
         else:
             msg=f'Discord sign-in failed ({error_type}). Check Vercel logs for the exact cause.'
 
