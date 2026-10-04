@@ -918,10 +918,15 @@ def review_vouch(vid,action):
 # ---------------------------
 
 PLAN_CONFIG={
-    'pro':{'name':'Veyra Pro','credits':3000,'price_cents_env':'STRIPE_PRO_PRICE_CENTS','default_price_cents':1999},
-    'max':{'name':'Veyra Max','credits':7500,'price_cents_env':'STRIPE_MAX_PRICE_CENTS','default_price_cents':3499},
+    'pro':{'name':'Veyra Pro','credits':3000,'price_id_env':'STRIPE_PRO_PRICE_ID','aliases':['veyra pro','pro']},
+    'max':{'name':'Veyra Max','credits':7500,'price_id_env':'STRIPE_MAX_PRICE_ID','aliases':['veyra max','max']},
 }
-CREDIT_PACKS={1000:899,2500:1999,5000:3499,10000:5999}
+CREDIT_PACKS={
+    1000:{'price_id_env':'STRIPE_CREDITS_1000_PRICE_ID'},
+    2500:{'price_id_env':'STRIPE_CREDITS_2500_PRICE_ID'},
+    5000:{'price_id_env':'STRIPE_CREDITS_5000_PRICE_ID'},
+    10000:{'price_id_env':'STRIPE_CREDITS_10000_PRICE_ID'},
+}
 
 def _stripe_secret():
     return (os.getenv('STRIPE_SECRET_KEY') or '').strip()
@@ -948,6 +953,76 @@ def _stripe_api(path,data=None,method='POST'):
         except Exception:
             pass
         raise RuntimeError('Stripe request failed'+(f': {detail}' if detail else '')) from exc
+
+
+def _stripe_mode():
+    secret=_stripe_secret()
+    if secret.startswith('sk_live_'): return 'live'
+    if secret.startswith('sk_test_'): return 'test'
+    return 'unknown'
+
+def _stripe_get(path,params=None):
+    suffix=('?'+urlencode(params)) if params else ''
+    return _stripe_api(path+suffix,None,'GET')
+
+def _stripe_catalog():
+    if not _stripe_secret():
+        return {'mode':'unknown','plans':{},'credits':{},'products':[]}
+
+    products_resp=_stripe_get('/products',{'active':'true','limit':'100'})
+    prices_resp=_stripe_get('/prices',{'active':'true','limit':'100','expand[]':'data.product'})
+    products=products_resp.get('data') or []
+    prices=prices_resp.get('data') or []
+    normalized=[]
+
+    for price in prices:
+        product=price.get('product') or {}
+        if isinstance(product,str):
+            product=next((p for p in products if p.get('id')==product),{})
+        recurring=price.get('recurring') or {}
+        normalized.append({
+            'price_id':price.get('id'),
+            'product_id':product.get('id'),
+            'name':product.get('name') or '',
+            'description':product.get('description') or '',
+            'amount':int(price.get('unit_amount') or 0),
+            'currency':(price.get('currency') or 'usd').upper(),
+            'recurring':bool(recurring),
+            'interval':recurring.get('interval'),
+            'metadata':product.get('metadata') or {},
+            'price_metadata':price.get('metadata') or {},
+        })
+
+    def env_price(env_name):
+        wanted=(os.getenv(env_name) or '').strip()
+        if not wanted: return None
+        return next((p for p in normalized if p.get('price_id')==wanted),None)
+
+    plans={}
+    for key,cfg in PLAN_CONFIG.items():
+        item=env_price(cfg['price_id_env'])
+        if not item:
+            aliases={x.lower() for x in cfg.get('aliases',[])}
+            item=next((p for p in normalized if p.get('recurring') and (
+                (p.get('name') or '').strip().lower() in aliases
+                or (p.get('metadata') or {}).get('veyra_plan','').lower()==key
+                or (p.get('price_metadata') or {}).get('veyra_plan','').lower()==key
+            )),None)
+        if item: plans[key]=item
+
+    credits={}
+    for amount,cfg in CREDIT_PACKS.items():
+        item=env_price(cfg['price_id_env'])
+        if not item:
+            a=str(amount)
+            item=next((p for p in normalized if not p.get('recurring') and (
+                (p.get('metadata') or {}).get('veyra_credits')==a
+                or (p.get('price_metadata') or {}).get('veyra_credits')==a
+                or a in (p.get('name') or '').replace(',','')
+            )),None)
+        if item: credits[amount]=item
+
+    return {'mode':_stripe_mode(),'plans':plans,'credits':credits,'products':normalized}
 
 def _trusted_public_base():
     forwarded=(request.headers.get('X-Forwarded-Host') or '').split(',')[0].strip()
@@ -977,12 +1052,12 @@ def _create_checkout_for_user(user,purchase_type,plan=None,credits=0):
         'metadata[purchase_type]':purchase_type,
         'billing_address_collection':'auto',
     }
+    catalog=_stripe_catalog()
     if purchase_type=='plan':
         cfg=PLAN_CONFIG[plan]
-        try:
-            amount=max(50,int(os.getenv(cfg['price_cents_env']) or cfg['default_price_cents']))
-        except Exception:
-            amount=cfg['default_price_cents']
+        price=catalog['plans'].get(plan)
+        if not price:
+            raise RuntimeError(f'No active Stripe price mapped to {cfg["name"]}. Set {cfg["price_id_env"]}.')
         data={
             **common,
             'mode':'subscription',
@@ -990,22 +1065,20 @@ def _create_checkout_for_user(user,purchase_type,plan=None,credits=0):
             'subscription_data[metadata][veyra_user_id]':uid,
             'subscription_data[metadata][plan]':plan,
             'line_items[0][quantity]':'1',
-            'line_items[0][price_data][currency]':'usd',
-            'line_items[0][price_data][unit_amount]':str(amount),
-            'line_items[0][price_data][recurring][interval]':'month',
-            'line_items[0][price_data][product_data][name]':cfg['name'],
+            'line_items[0][price]':price['price_id'],
         }
     else:
         if credits not in CREDIT_PACKS:
             raise ValueError('Invalid credit pack')
+        price=catalog['credits'].get(credits)
+        if not price:
+            raise RuntimeError(f'No active Stripe price mapped to {credits:,} credits. Set {CREDIT_PACKS[credits]["price_id_env"]}.')
         data={
             **common,
             'mode':'payment',
             'metadata[credits]':str(credits),
             'line_items[0][quantity]':'1',
-            'line_items[0][price_data][currency]':'usd',
-            'line_items[0][price_data][unit_amount]':str(CREDIT_PACKS[credits]),
-            'line_items[0][price_data][product_data][name]':f'Veyra {credits:,} Credit Pack',
+            'line_items[0][price]':price['price_id'],
         }
     checkout=_stripe_api('/checkout/sessions',data,'POST')
     url=(checkout.get('url') or '').strip()
@@ -1077,13 +1150,21 @@ def _verify_stripe_signature(payload,signature_header):
 @login_required
 def billing_page():
     u=current_user()
+    try:
+        catalog=_stripe_catalog()
+        catalog_error=None
+    except Exception:
+        app.logger.exception('Stripe catalog load failed')
+        catalog={'mode':_stripe_mode(),'plans':{},'credits':{},'products':[]}
+        catalog_error='Stripe product catalog could not be loaded.'
     return render_template(
         'billing.html',
         user=u,
         active='billing',
         stripe_ready=bool(_stripe_secret()),
-        pro_cents=max(50,int(os.getenv('STRIPE_PRO_PRICE_CENTS') or 1999)),
-        max_cents=max(50,int(os.getenv('STRIPE_MAX_PRICE_CENTS') or 3499)),
+        stripe_mode=catalog.get('mode'),
+        stripe_catalog=catalog,
+        catalog_error=catalog_error,
     )
 
 @app.route('/billing/start/<plan>')

@@ -1,44 +1,98 @@
 {% extends "base.html" %}{% set active='billing' %}
 {% block title %}Plans & Billing — Veyra{% endblock %}
 {% block body %}
-<div class="v21-dash-app">
+<div class="bill-shell">
   {% include '_sidebar.html' %}
-  <main class="v21-dash-main">
-    <header class="v21-dash-top">
-      <div><small>ACCOUNT</small><h1>Plans & Billing</h1></div>
-      <div style="color:#9aacbf">{{(user.plan or 'free')|upper}} · <b style="color:white">{{user.credits or 0}}</b> credits</div>
+  <main class="bill-main">
+    <header class="bill-top">
+      <div><span class="eyebrow">ACCOUNT / BILLING</span><h1>Plans & Billing</h1></div>
+      <div class="top-actions">
+        <a href="/dashboard" class="ghost">← Dashboard</a>
+        <a href="/" class="ghost">Home</a>
+        <div class="balance"><b>{{(user.plan or 'free')|upper}}</b><span>{{user.credits or 0}} credits</span></div>
+      </div>
     </header>
-    <section style="padding:28px 34px;max-width:1200px">
-      {% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}
-      <div style="margin-bottom:16px;padding:13px 15px;border:1px solid {{'#79404b' if category=='error' else '#286353'}};border-radius:12px;background:#0b1422;color:#edf3ff">{{message}}</div>
-      {% endfor %}{% endwith %}
-      <div style="display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:24px">
-        <div><small style="color:#8a74ff;font-weight:900;letter-spacing:.14em">VEYRA PLANS</small><h2 style="font-size:32px;color:#fff;margin:7px 0">Build more when you need to.</h2><p style="color:#8190a8;max-width:720px">Checkout starts from your signed-in Veyra account, so successful purchases are attached to the correct account automatically.</p></div>
-        <div style="border:1px solid #25344a;border-radius:12px;padding:12px 14px;color:#8ea0b9">🔒 Secure checkout · <b style="color:#fff">Stripe</b></div>
-      </div>
-      <div class="vb-grid">
-        {% for key,name,credits,price in [('free','Free',50,0),('pro','Pro',3000,pro_cents),('max','Max',7500,max_cents)] %}
-        <article class="vb-card {{'featured' if key=='pro' else ''}}">
-          <div style="display:flex;justify-content:space-between"><b>{{name|upper}}</b>{% if (user.plan or 'free')==key %}<span class="pill">CURRENT</span>{% endif %}</div>
-          <h3>{% if price %}${{'%.2f'|format(price/100)}}<small>/mo</small>{% else %}$0{% endif %}</h3>
-          <p>{{credits}} {{'starter' if key=='free' else 'monthly'}} credits</p>
-          <ul><li>AI Studio + live preview</li><li>Projects and exports</li>{% if key!='free' %}<li>Higher Veyra usage</li><li>Advanced workflows</li>{% endif %}</ul>
-          {% if key=='free' %}<a class="btn" href="/studio">Keep building</a>
-          {% elif stripe_ready %}<a class="btn primary" href="/billing/start/{{key}}">Choose {{name}} →</a>
-          {% else %}<span class="btn disabled">Billing unavailable</span>{% endif %}
+
+    <section class="wrap">
+      {% with messages=get_flashed_messages(with_categories=true) %}
+      {% for category,message in messages %}<div class="alert {{category}}">{{message}}</div>{% endfor %}
+      {% endwith %}
+      {% if catalog_error %}<div class="alert error">{{catalog_error}}</div>{% endif %}
+
+      <section class="hero">
+        <div>
+          <div class="kicker"><i></i> VEYRA BILLING</div>
+          <h2>Simple plans. Real Stripe checkout.</h2>
+          <p>Prices below come from the active Stripe product catalog connected to this Veyra deployment. Purchases stay attached to the signed-in Veyra account.</p>
+        </div>
+        <div class="provider">
+          <div class="stripe-icon">S</div>
+          <div><span>Stripe connection</span><b>{{'LIVE PRODUCT CATALOG' if stripe_mode=='live' else ('TEST PRODUCT CATALOG' if stripe_mode=='test' else 'CONNECTED')}}</b></div>
+          <i class="{{'live' if stripe_mode=='live' else ''}}"></i>
+        </div>
+      </section>
+
+      <section class="plans">
+        <article class="plan {% if (user.plan or 'free')=='free' %}current{% endif %}">
+          <div class="plan-head"><b>FREE</b>{% if (user.plan or 'free')=='free' %}<em>CURRENT</em>{% endif %}</div>
+          <h3>$0</h3><p>Start building with Veyra.</p>
+          <div class="credits"><strong>50</strong><span>starter credits</span></div>
+          <ul><li>AI Studio + live preview</li><li>Project saving</li><li>ZIP export</li></ul>
+          <a href="/studio" class="btn muted">Keep building</a>
         </article>
-        {% endfor %}
-      </div>
-      <h2 style="color:#fff;margin-top:34px">Credit top-ups</h2>
-      <div class="vb-credit">
-        {% for amount,price in [(1000,'8.99'),(2500,'19.99'),(5000,'34.99'),(10000,'59.99')] %}
-        <article><b>{{"{:,}".format(amount)}}</b><span>credits</span><strong>${{price}}</strong>{% if stripe_ready %}<a href="/billing/start/credits/{{amount}}">Buy →</a>{% endif %}</article>
-        {% endfor %}
-      </div>
+
+        {% set pro=stripe_catalog.plans.get('pro') %}
+        <article class="plan featured {% if (user.plan or 'free')=='pro' %}current{% endif %}">
+          <div class="popular">MOST POPULAR</div>
+          <div class="plan-head"><b>PRO</b>{% if (user.plan or 'free')=='pro' %}<em>CURRENT</em>{% endif %}</div>
+          {% if pro %}<h3>${{'%.2f'|format(pro.amount/100)}}<small>/{{pro.interval or 'mo'}}</small></h3>{% else %}<h3>—</h3>{% endif %}
+          <p>{{pro.description if pro and pro.description else 'For creators building regularly.'}}</p>
+          <div class="credits"><strong>3,000</strong><span>monthly credits</span></div>
+          <ul><li>Everything in Free</li><li>Higher Veyra usage</li><li>Project history</li><li>Advanced workflows</li></ul>
+          {% if pro %}<a href="/billing/start/pro" class="btn primary">Upgrade to Pro →</a>{% else %}<span class="btn disabled">Map Stripe Pro price</span>{% endif %}
+        </article>
+
+        {% set maxp=stripe_catalog.plans.get('max') %}
+        <article class="plan {% if (user.plan or 'free')=='max' %}current{% endif %}">
+          <div class="plan-head"><b>MAX</b>{% if (user.plan or 'free')=='max' %}<em>CURRENT</em>{% endif %}</div>
+          {% if maxp %}<h3>${{'%.2f'|format(maxp.amount/100)}}<small>/{{maxp.interval or 'mo'}}</small></h3>{% else %}<h3>—</h3>{% endif %}
+          <p>{{maxp.description if maxp and maxp.description else 'For heavier builds and frequent usage.'}}</p>
+          <div class="credits"><strong>7,500</strong><span>monthly credits</span></div>
+          <ul><li>Everything in Pro</li><li>Priority generations</li><li>Longer project context</li><li>Higher workspace limits</li></ul>
+          {% if maxp %}<a href="/billing/start/max" class="btn primary">Upgrade to Max →</a>{% else %}<span class="btn disabled">Map Stripe Max price</span>{% endif %}
+        </article>
+      </section>
+
+      <section class="topups">
+        <div class="section-title"><div><span class="eyebrow">ONE-TIME PURCHASES</span><h2>Credit top-ups</h2></div><p>These prices also come from your connected Stripe catalog.</p></div>
+        <div class="credit-grid">
+          {% for amount in [1000,2500,5000,10000] %}
+          {% set item=stripe_catalog.credits.get(amount) %}
+          <article>
+            <div class="credit-icon">✦</div>
+            <div><b>{{"{:,}".format(amount)}}</b><span>credits</span></div>
+            {% if item %}
+              <strong>${{'%.2f'|format(item.amount/100)}}</strong>
+              <a href="/billing/start/credits/{{amount}}">Buy →</a>
+            {% else %}
+              <strong>—</strong><em>Not mapped</em>
+            {% endif %}
+          </article>
+          {% endfor %}
+        </div>
+      </section>
     </section>
   </main>
 </div>
 <style>
-.vb-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.vb-card{border:1px solid #223149;background:#091321;border-radius:18px;padding:22px;color:#dce5f4;min-height:330px;display:flex;flex-direction:column}.vb-card.featured{border-color:#7358ff}.vb-card h3{font-size:34px;color:#fff;margin:24px 0 8px}.vb-card h3 small{font-size:13px;color:#7f8da4}.vb-card p{color:#8391a7}.vb-card ul{padding-left:18px;color:#c5cfdf;line-height:1.9}.pill{font-size:10px;color:#78e9c8;border:1px solid #285b50;border-radius:999px;padding:4px 7px}.btn{margin-top:auto;text-decoration:none;text-align:center;padding:12px;border-radius:11px;border:1px solid #2a3a52;color:#fff}.btn.primary{background:linear-gradient(135deg,#8257ff,#526cff);border:0}.btn.disabled{opacity:.5}.vb-credit{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.vb-credit article{border:1px solid #223149;background:#091321;border-radius:14px;padding:17px;display:grid;gap:5px;color:#fff}.vb-credit span{color:#7f90a8}.vb-credit strong{color:#b7a5ff}.vb-credit a{color:#fff;text-decoration:none;font-weight:800;margin-top:6px}@media(max-width:950px){.vb-grid{grid-template-columns:1fr}.vb-credit{grid-template-columns:1fr 1fr}}@media(max-width:600px){.vb-credit{grid-template-columns:1fr}}
+:root{--bg:#050a12;--panel:#091321;--border:#1d2c42;--text:#f5f7ff;--muted:#8292a9;--purple:#7d5cff;--blue:#5670ff;--green:#43d9aa}
+.bill-shell{min-height:100vh;background:var(--bg);color:var(--text)}
+.bill-main{margin-left:var(--sidebar-w,228px);min-height:100vh}
+.bill-top{height:76px;border-bottom:1px solid #172438;padding:0 30px;display:flex;justify-content:space-between;align-items:center}.eyebrow{font-size:10px;letter-spacing:.16em;font-weight:900;color:#927cff}.bill-top h1{margin:4px 0 0;font-size:25px}.top-actions{display:flex;gap:9px;align-items:center}.ghost{text-decoration:none;color:#b5c0d1;border:1px solid #27364d;background:#09121f;padding:9px 12px;border-radius:10px;font-size:12px;font-weight:800}.balance{border:1px solid #29384f;background:#091321;border-radius:11px;padding:9px 13px}.balance b{color:#aa9cff;font-size:11px;margin-right:9px}.balance span{color:#a7b3c6;font-size:12px}
+.wrap{padding:30px;max-width:1320px}.alert{padding:13px 15px;border:1px solid #2c3c55;background:#0b1625;border-radius:12px;margin-bottom:16px}.alert.error{border-color:#743a46;background:#281119;color:#ffa0af}
+.hero{display:grid;grid-template-columns:1fr auto;gap:28px;align-items:end;padding-bottom:26px}.kicker{font-size:10px;color:#927cff;letter-spacing:.16em;font-weight:900;display:flex;align-items:center;gap:8px}.kicker i{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 12px #43d9aa66}.hero h2{font-size:38px;letter-spacing:-.03em;margin:10px 0}.hero p{color:var(--muted);line-height:1.65;max-width:760px}.provider{display:grid;grid-template-columns:36px 1fr 9px;gap:11px;align-items:center;border:1px solid #27374f;background:#091321;padding:13px 15px;border-radius:15px}.stripe-icon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,#7753ff,#5b6eff);font-weight:900}.provider span,.provider b{display:block}.provider span{color:#75859c;font-size:10px}.provider b{font-size:11px;margin-top:2px}.provider>i{width:8px;height:8px;border-radius:50%;background:#ffbd5a}.provider>i.live{background:var(--green);box-shadow:0 0 10px #43d9aa66}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.plan{position:relative;border:1px solid var(--border);background:linear-gradient(180deg,#0a1422,#07101b);border-radius:18px;padding:23px;min-height:425px;display:flex;flex-direction:column}.plan.featured{border-color:#715aff;box-shadow:0 18px 45px #0006}.plan.current:after{content:"";position:absolute;inset:-1px;border:1px solid #43d9aa;border-radius:18px;pointer-events:none}.popular{position:absolute;right:18px;top:-10px;background:linear-gradient(135deg,#805cff,#5971ff);padding:6px 9px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.12em}.plan-head{display:flex;justify-content:space-between}.plan-head em{font-style:normal;font-size:9px;color:#7de9c8;border:1px solid #2a5a4f;background:#0c211d;padding:5px 7px;border-radius:999px}.plan h3{font-size:40px;margin:26px 0 7px}.plan h3 small{font-size:13px;color:#74849a}.plan>p{color:#7f8fa6;min-height:46px}.credits{display:flex;gap:7px;align-items:baseline;border-top:1px solid #15243a;border-bottom:1px solid #15243a;padding:15px 0;margin:17px 0}.credits strong{font-size:22px}.credits span{color:#75859c;font-size:11px}.plan ul{list-style:none;padding:0;display:grid;gap:11px;color:#c7d1e1}.plan li:before{content:"✓";color:#49dcaf;margin-right:9px}.btn{margin-top:auto;text-decoration:none;text-align:center;padding:13px;border-radius:11px;border:1px solid #2b3b53;color:#e8eef9;font-weight:900;font-size:13px}.btn.primary{border:0;background:linear-gradient(135deg,#8258ff,#536fff)}.btn.disabled{opacity:.45}.btn.muted{background:#0b1523}
+.topups{margin-top:34px;padding-top:28px;border-top:1px solid #17253a}.section-title{display:flex;justify-content:space-between;align-items:end;gap:20px}.section-title h2{font-size:26px;margin:5px 0}.section-title p{color:#7f8fa5}.credit-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}.credit-grid article{border:1px solid var(--border);background:#091321;border-radius:14px;padding:17px;display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center}.credit-icon{width:38px;height:38px;border-radius:10px;background:#151833;color:#a493ff;display:grid;place-items:center}.credit-grid b,.credit-grid span{display:block}.credit-grid b{font-size:18px}.credit-grid span{color:#718198;font-size:11px}.credit-grid strong{color:#b7a8ff}.credit-grid a,.credit-grid em{grid-column:2/4;color:#fff;text-decoration:none;font-weight:800;font-size:11px;font-style:normal}.credit-grid em{color:#65748b}
+@media(max-width:1050px){.plans{grid-template-columns:1fr}.credit-grid{grid-template-columns:1fr 1fr}.hero{grid-template-columns:1fr}}@media(max-width:700px){.bill-main{margin-left:0}.bill-top{height:auto;min-height:76px;padding:14px 16px}.top-actions{flex-wrap:wrap}.wrap{padding:20px 16px}.credit-grid{grid-template-columns:1fr}}
 </style>
 {% endblock %}
