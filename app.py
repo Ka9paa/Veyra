@@ -755,15 +755,15 @@ def pricing():return render_template('pricing.html')
 
 PUBLIC_PAGES={
  'faq':{
-   'eyebrow':'HELP CENTER','title':'Questions, answered.','intro':'Straight answers about Veyra, credits, building, exports, support, and account access.',
+   'eyebrow':'HELP CENTER','title':'Questions, answered.','intro':'Straight answers about Veyra beta, credits, building, exports, support, and account access.',
    'sections':[
       ('What is Veyra?','Veyra is an AI software-building workspace that turns prompts into working front-end projects and helps you refine, inspect, test, save, and export them.'),
-      ('Is Veyra publicly available?','Yes. Veyra is available for builders to create, refine, save, and export projects.'),
+      ('Is Veyra still in beta?','Yes. The public beta is where we are testing the product with real builders before the full Veyra 1.0 release.'),
       ('What are credits?','Credits represent usage inside Veyra. Builds, major edits, repair actions, and agent work may use credits depending on the plan.'),
       ('Can I export my project?','Yes. Studio can export the generated HTML, CSS, and JavaScript as a ZIP so you can keep or deploy your project elsewhere.'),
-      ('Does Deploy work yet?','Direct hosting integrations are currently limited. Veyra clearly labels unfinished deployment integrations instead of pretending a deployment happened.'),
+      ('Does Deploy work yet?','Direct hosting integrations are still beta. Veyra clearly labels unfinished deployment integrations instead of pretending a deployment happened.'),
       ('How do I get support?','Use the support bot in the bottom-right corner, visit the Support page, or contact the Veyra team if the bot cannot solve your issue.'),
-      ('Can I submit a vouch?','Signed-in users can submit a vouch. It remains private until a Veyra admin approves it.'),
+      ('Can I submit a vouch?','Signed-in beta users can submit a vouch. It remains private until a Veyra admin approves it.'),
       ('Can I cancel a paid plan?','When paid billing is enabled through Stripe, subscription management will be handled through the billing portal associated with the checkout account.')
    ]
  },
@@ -775,11 +775,11 @@ PUBLIC_PAGES={
       ('3. Refine with context','Ask for changes naturally. The current HTML, CSS, and JavaScript remain in project context so follow-up edits can build on the existing product.'),
       ('4. Inspect the result','Use Preview, Code, Structure, Data, responsive device modes, the Quality panel, and Auto QA.'),
       ('5. Save and export','Veyra can save projects to your account and export a project ZIP containing index.html, styles.css, and app.js.'),
-      ('6. Report issues','If something breaks, include the prompt, what you expected, what happened, and a screenshot when possible. The support bot can help collect this information.')
+      ('6. Report beta issues','If something breaks, include the prompt, what you expected, what happened, and a screenshot when possible. The support bot can help collect this information.')
    ]
  },
  'roadmap':{
-   'eyebrow':'ROADMAP','title':'Where Veyra is going.','intro':'The roadmap focuses on making the builder more reliable before adding unnecessary noise.',
+   'eyebrow':'ROADMAP','title':'Where Veyra is going.','intro':'The beta roadmap focuses on making the builder more reliable before adding unnecessary noise.',
    'sections':[
       ('Now — Builder reliability','Generation quality, preview stability, project persistence, QA, repair workflows, mobile polish, and better error states.'),
       ('Next — Real deployment connections','Hosting providers, environment configuration, deployment history, rollback, and custom domains.'),
@@ -789,7 +789,7 @@ PUBLIC_PAGES={
    ]
  },
  'changelog':{
-   'eyebrow':'CHANGELOG','title':'What changed in Veyra.','intro':'Major Veyra improvements without hiding the rough edges.',
+   'eyebrow':'CHANGELOG','title':'What changed in Veyra.','intro':'Major beta improvements without hiding the rough edges.',
    'sections':[
       ('V27 — Future Beta UI','New futuristic public UI, verified vouch archive, FAQ/docs/support/status/security pages, support bot, and Stripe-ready purchasing flow.'),
       ('V26 — UI Rebuild','Unified visual system across Studio, dashboard, public pages, navigation, cards, typography, and interaction states.'),
@@ -799,7 +799,7 @@ PUBLIC_PAGES={
    ]
  },
  'security':{
-   'eyebrow':'TRUST & SECURITY','title':'Built to earn trust.','intro':'Veyra keeps security claims specific instead of exaggerated.',
+   'eyebrow':'TRUST & SECURITY','title':'Built to earn trust.','intro':'Veyra is still in beta, so security claims stay specific instead of exaggerated.',
    'sections':[
       ('Authentication','Email/password accounts use hashed passwords. Google and Discord OAuth can be configured through environment variables.'),
       ('Sessions','Session cookies are HTTP-only and SameSite=Lax in the current Flask application.'),
@@ -809,7 +809,7 @@ PUBLIC_PAGES={
    ]
  },
  'status':{
-   'eyebrow':'SYSTEM STATUS','title':'Veyra status.','intro':'Current Veyra systems and what each one actually means.',
+   'eyebrow':'SYSTEM STATUS','title':'Veyra status.','intro':'Current beta systems and what each one actually means.',
    'sections':[
       ('Web application','Operational when this page is reachable.'),
       ('Veyra AI','Depends on the configured OpenAI API key and provider availability.'),
@@ -823,11 +823,11 @@ PUBLIC_PAGES={
    'sections':[
       ('The goal','Make it dramatically faster to move from a product idea to something real enough to test, show, and improve.'),
       ('The approach','Combine an AI builder with live preview, project memory, code access, responsive views, QA, repair, and export.'),
-      ('The beta','Real user feedback continues to shape Veyra and its upcoming releases.')
+      ('The beta','The current release is intentionally labeled beta. Real user feedback decides what becomes Veyra 1.0.')
    ]
  },
  'contact':{
-   'eyebrow':'CONTACT','title':'Talk to the Veyra team.','intro':'Use the support bot first for common issues. For account, partnership, or product feedback questions, use your community support channel.',
+   'eyebrow':'CONTACT','title':'Talk to the Veyra team.','intro':'Use the support bot first for common issues. For account, partnership, or beta feedback questions, use your community support channel.',
    'sections':[
       ('Product support','Open the support bot and describe what you were doing, what you expected, and what happened.'),
       ('Billing support','Include the email on the purchase and the plan name. Never send card numbers or sensitive payment credentials.'),
@@ -1307,7 +1307,7 @@ def support_api():
                 model=support_model,
                 instructions=(
                     'You are Veyra Support. Be concise, helpful, and honest. '
-                    'Veyra is publicly available. Never claim an unfinished feature works. '
+                    'Veyra is in public beta. Never claim an unfinished feature works. '
                     'For payment issues never ask for full card numbers. '
                     'Explain that paid checkout uses Stripe Payment Links when configured. '
                     'If the user reports a bug, ask for reproducible steps, expected behavior, '
@@ -2429,9 +2429,11 @@ def api_build():
 
     # Give Veyra enough time to generate a complete site while still keeping a
     # bounded upstream timeout. R11's 18-second cutoff was too short for real builds.
+    # Full site generations can legitimately take longer than a minute.
+    # Do not abort Veyra's own OpenAI request at the old 55-second mark.
     client=OpenAI(
         api_key=key,
-        timeout=55.0,
+        timeout=150.0,
         max_retries=0,
     )
     attempts=[]
@@ -2640,7 +2642,7 @@ def export_project():
         z.writestr('index.html',full_html)
         z.writestr('styles.css',css)
         z.writestr('app.js',js)
-        z.writestr('README.txt','Exported from Veyra — buildveyra.xyz')
+        z.writestr('README.txt','Exported from Veyra Beta — buildveyra.xyz')
     mem.seek(0)
     return send_file(
         mem,
