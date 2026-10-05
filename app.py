@@ -758,10 +758,10 @@ PUBLIC_PAGES={
    'eyebrow':'HELP CENTER','title':'Questions, answered.','intro':'Straight answers about Veyra, credits, building, exports, support, and account access.',
    'sections':[
       ('What is Veyra?','Veyra is an AI software-building workspace that turns prompts into working front-end projects and helps you refine, inspect, test, save, and export them.'),
-      ('Is Veyra publicly available?','Yes. Veyra is publicly available and continues to improve as new features, integrations, and reliability updates are released.'),
+      ('Is Veyra publicly available?','Yes. Veyra is available for builders to create, refine, save, and export projects.'),
       ('What are credits?','Credits represent usage inside Veyra. Builds, major edits, repair actions, and agent work may use credits depending on the plan.'),
       ('Can I export my project?','Yes. Studio can export the generated HTML, CSS, and JavaScript as a ZIP so you can keep or deploy your project elsewhere.'),
-      ('Does Deploy work yet?','Direct hosting integrations are still limited. Veyra clearly labels unfinished deployment integrations instead of pretending a deployment happened.'),
+      ('Does Deploy work yet?','Direct hosting integrations are currently limited. Veyra clearly labels unfinished deployment integrations instead of pretending a deployment happened.'),
       ('How do I get support?','Use the support bot in the bottom-right corner, visit the Support page, or contact the Veyra team if the bot cannot solve your issue.'),
       ('Can I submit a vouch?','Signed-in users can submit a vouch. It remains private until a Veyra admin approves it.'),
       ('Can I cancel a paid plan?','When paid billing is enabled through Stripe, subscription management will be handled through the billing portal associated with the checkout account.')
@@ -779,7 +779,7 @@ PUBLIC_PAGES={
    ]
  },
  'roadmap':{
-   'eyebrow':'ROADMAP','title':'Where Veyra is going.','intro':'The product roadmap focuses on making the builder more reliable before adding unnecessary noise.',
+   'eyebrow':'ROADMAP','title':'Where Veyra is going.','intro':'The roadmap focuses on making the builder more reliable before adding unnecessary noise.',
    'sections':[
       ('Now — Builder reliability','Generation quality, preview stability, project persistence, QA, repair workflows, mobile polish, and better error states.'),
       ('Next — Real deployment connections','Hosting providers, environment configuration, deployment history, rollback, and custom domains.'),
@@ -791,10 +791,10 @@ PUBLIC_PAGES={
  'changelog':{
    'eyebrow':'CHANGELOG','title':'What changed in Veyra.','intro':'Major Veyra improvements without hiding the rough edges.',
    'sections':[
-      ('V27 — Interface overhaul','New futuristic public UI, verified vouch archive, FAQ/docs/support/status/security pages, support bot, and Stripe-ready purchasing flow.'),
+      ('V27 — Future Beta UI','New futuristic public UI, verified vouch archive, FAQ/docs/support/status/security pages, support bot, and Stripe-ready purchasing flow.'),
       ('V26 — UI Rebuild','Unified visual system across Studio, dashboard, public pages, navigation, cards, typography, and interaction states.'),
       ('V25 — Preview Repair','Added preview loading skeletons, QA progress states, fixed NaN quality output, and improved failure messaging.'),
-      ('V24 — Product update','Added real project saving, ZIP export, honest beta messaging, and preview focus mode.'),
+      ('V24 — Beta Drop','Added real project saving, ZIP export, honest beta messaging, and preview focus mode.'),
       ('V23 — Launch Candidate','Added collapsible workspace panels and redesigned projects/pricing pages.')
    ]
  },
@@ -805,7 +805,7 @@ PUBLIC_PAGES={
       ('Sessions','Session cookies are HTTP-only and SameSite=Lax in the current Flask application.'),
       ('Preview isolation','Generated previews run inside a sandboxed iframe with script permission instead of executing directly inside the main Veyra UI.'),
       ('Secrets','API keys and OAuth secrets belong in environment variables and should never be hard-coded into the front-end.'),
-      ('Security reporting','If you discover a security issue, contact the Veyra team privately rather than posting exploit details publicly.')
+      ('Beta reporting','If you discover a security issue, contact the Veyra team privately rather than posting exploit details publicly.')
    ]
  },
  'status':{
@@ -813,9 +813,9 @@ PUBLIC_PAGES={
    'sections':[
       ('Web application','Operational when this page is reachable.'),
       ('Veyra AI','Depends on the configured OpenAI API key and provider availability.'),
-      ('Project storage','Application database storage for user and project records.'),
+      ('Project storage','Local SQLite storage in this beta build.'),
       ('OAuth','Google/Discord availability depends on your configured OAuth applications.'),
-      ('Direct deployment','Limited — use project export until deployment integrations are connected.')
+      ('Direct deployment','Limited beta — use project export until deployment integrations are connected.')
    ]
  },
  'about':{
@@ -823,7 +823,7 @@ PUBLIC_PAGES={
    'sections':[
       ('The goal','Make it dramatically faster to move from a product idea to something real enough to test, show, and improve.'),
       ('The approach','Combine an AI builder with live preview, project memory, code access, responsive views, QA, repair, and export.'),
-      ('The current release','The current release continues to evolve based on real user feedback and product reliability.')
+      ('The beta','Real user feedback continues to shape Veyra and its upcoming releases.')
    ]
  },
  'contact':{
@@ -859,9 +859,9 @@ PUBLIC_PAGES={
    ]
  },
  'privacy':{
-   'eyebrow':'LEGAL','title':'Privacy notice.','intro':'This starter text must be replaced with a complete attorney-reviewed privacy policy before a full production launch.',
+   'eyebrow':'LEGAL','title':'Privacy — Beta notice.','intro':'This starter text must be replaced with a complete attorney-reviewed privacy policy before a full production launch.',
    'sections':[
-      ('Account information','The current release stores account identifiers such as name, email, provider, credits, and project records in its application database.'),
+      ('Account information','The beta stores account identifiers such as name, email, provider, credits, and project records in its application database.'),
       ('Project content','Prompts and project files may be processed by configured AI services to provide generation and editing features.'),
       ('Authentication providers','Google and Discord OAuth may process information under their own privacy terms when those sign-in options are used.'),
       ('Payments','When Stripe payment links are enabled, payment information is handled by Stripe rather than being stored directly by this application.')
@@ -1278,7 +1278,7 @@ def buy_credits(amount):
 SUPPORT_FAQ=[
  ('credits',['credit','credits','balance'],'Credits represent Veyra usage. Your balance appears in the app. Pro includes 3,000 monthly credits and Max includes 7,500 monthly credits. Extra credit packs are available from the Pricing page.'),
  ('export',['export','download','zip'],'Open Studio and use Export to download the current generated project as a ZIP with HTML, CSS, and JavaScript.'),
- ('deploy',['deploy','deployment','hosting'],'Direct deployment integrations are still limited. Export your project ZIP for now instead of relying on a fake success state.'),
+ ('deploy',['deploy','deployment','hosting'],'Direct deployment integrations are still beta. Export your project ZIP for now instead of relying on a fake success state.'),
  ('login',['login','sign in','google','discord','oauth'],'You can sign in with email/password. Google and Discord require OAuth credentials to be configured by the Veyra administrator.'),
  ('billing',['pay','payment','billing','purchase','buy','card'],'Paid checkout is designed to use Stripe Payment Links. Choose Pro, Max, or an extra credit pack on Pricing; configured purchases open Stripe secure hosted checkout.'),
  ('bug',['bug','broken','error','not working'],'Tell me what page you were on, what you clicked, what you expected, what happened instead, and any error message you saw.'),
@@ -1307,7 +1307,7 @@ def support_api():
                 model=support_model,
                 instructions=(
                     'You are Veyra Support. Be concise, helpful, and honest. '
-                    'Never claim an unfinished feature works. '
+                    'Veyra is publicly available. Never claim an unfinished feature works. '
                     'For payment issues never ask for full card numbers. '
                     'Explain that paid checkout uses Stripe Payment Links when configured. '
                     'If the user reports a bug, ask for reproducible steps, expected behavior, '
