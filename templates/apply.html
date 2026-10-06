@@ -1,0 +1,122 @@
+{% extends 'app_base.html' %}
+{% block title %}Apply to Veyra{% endblock %}
+{% block top_title %}Join the Veyra Team{% endblock %}
+{% block content %}
+<div class="apply-wrap">
+  <section class="apply-hero">
+    <div>
+      <div class="eyebrow">CAREERS / COMMUNITY TEAM</div>
+      <h1>Help build what Veyra becomes next.</h1>
+      <p>We’re looking for people who care about software, design, community, media, support, and building a better experience around Veyra.</p>
+    </div>
+    <div class="apply-note">
+      <b>What happens after you apply?</b>
+      <span>Your application is reviewed privately by Veyra administrators. If we want to move forward, we’ll contact you using the account and Discord information you provide.</span>
+    </div>
+  </section>
+
+  {% if latest %}
+  <section class="status-card {{latest.status}}">
+    <div>
+      <small>LATEST APPLICATION</small>
+      <h3>{{latest.role}}</h3>
+      <p>Submitted {{latest.created_at}}</p>
+    </div>
+    <span>{{latest.status|upper}}</span>
+    {% if latest.review_note %}<p class="review-note">{{latest.review_note}}</p>{% endif %}
+  </section>
+  {% endif %}
+
+  {% if not latest or latest.status != 'pending' %}
+  <form method="post" class="apply-form">
+    <div class="form-section">
+      <div class="section-title">
+        <small>01</small>
+        <div><h2>Position</h2><p>Pick the area you think you’d be strongest in.</p></div>
+      </div>
+
+      <label>Position you’re applying for</label>
+      <select name="role" required>
+        <option value="">Choose a position</option>
+        {% for role in roles %}<option value="{{role}}">{{role}}</option>{% endfor %}
+      </select>
+
+      <div class="two-col">
+        <div>
+          <label>Discord username</label>
+          <input name="discord_username" placeholder="@yourname" value="{{user.name or ''}}">
+        </div>
+        <div>
+          <label>Portfolio / work link <span>optional</span></label>
+          <input name="portfolio_url" placeholder="https://...">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="section-title">
+        <small>02</small>
+        <div><h2>Tell us about you</h2><p>Short and real is better than trying to sound corporate.</p></div>
+      </div>
+
+      <label>What experience do you have?</label>
+      <textarea name="experience" required minlength="40" placeholder="Tell us what you’ve done before, what tools you use, communities you’ve worked with, projects you’ve made, etc."></textarea>
+
+      <label>Why do you want to join Veyra?</label>
+      <textarea name="why_veyra" required minlength="40" placeholder="Why Veyra specifically, and what do you think you could bring to the team?"></textarea>
+    </div>
+
+    <div class="form-section">
+      <div class="section-title">
+        <small>03</small>
+        <div><h2>Availability</h2><p>Give us a realistic idea of when you’re usually around.</p></div>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <label>General availability</label>
+          <input name="availability" required placeholder="Example: weekdays after 4 PM, weekends open">
+        </div>
+        <div>
+          <label>Timezone <span>optional</span></label>
+          <input name="timezone" placeholder="Example: CST / UTC-5">
+        </div>
+      </div>
+
+      <label>Anything else? <span>optional</span></label>
+      <textarea name="notes" class="short" placeholder="Anything else you want us to know."></textarea>
+    </div>
+
+    <div class="submit-row">
+      <div><b>Ready to submit?</b><span>Double-check your answers. Applications are reviewed privately.</span></div>
+      <button type="submit" class="btn primary">Submit application →</button>
+    </div>
+  </form>
+  {% else %}
+  <div class="pending-box">
+    <div class="pending-icon">✓</div>
+    <h2>Your application is under review.</h2>
+    <p>You don’t need to submit another one. You can check this page later for the current status.</p>
+    <a class="btn" href="{{url_for('dashboard')}}">Back to Dashboard</a>
+  </div>
+  {% endif %}
+</div>
+
+<style>
+.apply-wrap{max-width:1050px}
+.apply-hero{display:grid;grid-template-columns:1fr 330px;gap:20px;align-items:end;margin-bottom:18px}
+.apply-hero h1{font-size:38px;letter-spacing:-.03em;margin:8px 0}
+.apply-hero p{color:var(--muted);line-height:1.65;max-width:700px}
+.apply-note{border:1px solid var(--line);background:#0a1422;border-radius:15px;padding:17px}
+.apply-note b,.apply-note span{display:block}.apply-note span{color:var(--muted);font-size:12px;line-height:1.55;margin-top:6px}
+.status-card{border:1px solid var(--line);background:#0a1422;border-radius:15px;padding:17px 18px;margin-bottom:16px;display:grid;grid-template-columns:1fr auto;gap:8px}
+.status-card small{color:var(--muted);font-size:9px;letter-spacing:.12em}.status-card h3{margin:4px 0}.status-card>span{align-self:start;border:1px solid #6651b9;color:#b5a5ff;background:#171431;border-radius:999px;padding:5px 8px;font-size:9px;font-weight:900}
+.status-card.accepted>span{border-color:#285b4f;color:#7ce7c6;background:#0d211d}.status-card.denied>span{border-color:#733c47;color:#ff9cac;background:#291119}.review-note{grid-column:1/-1;color:var(--muted)}
+.apply-form{display:grid;gap:16px}.form-section{border:1px solid var(--line);background:#0a1321;border-radius:17px;padding:22px}.section-title{display:flex;gap:13px;align-items:flex-start;margin-bottom:20px}.section-title>small{color:#8f78ff;font-weight:900}.section-title h2{margin:0;font-size:20px}.section-title p{color:var(--muted);margin:4px 0 0}
+.apply-form label{display:block;font-size:12px;font-weight:800;margin:14px 0 7px}.apply-form label span{font-weight:500;color:var(--muted)}
+.apply-form input,.apply-form select,.apply-form textarea{width:100%;box-sizing:border-box;border:1px solid #2a3a52;background:#08111e;color:#eef3fc;border-radius:11px;padding:12px 13px;outline:none}.apply-form textarea{min-height:130px;resize:vertical}.apply-form textarea.short{min-height:90px}.apply-form input:focus,.apply-form select:focus,.apply-form textarea:focus{border-color:#7259ff;box-shadow:0 0 0 3px #7259ff18}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:13px}.submit-row{border:1px solid #342c65;background:linear-gradient(135deg,#0c1425,#11132c);border-radius:16px;padding:18px;display:flex;align-items:center;justify-content:space-between;gap:16px}.submit-row b,.submit-row span{display:block}.submit-row span{color:var(--muted);font-size:12px;margin-top:4px}.submit-row button{border:0;cursor:pointer}
+.pending-box{text-align:center;border:1px solid var(--line);background:#0a1321;border-radius:18px;padding:42px 24px}.pending-icon{width:52px;height:52px;border-radius:15px;background:#142a24;color:#62e2bc;display:grid;place-items:center;margin:0 auto 14px;font-size:24px}.pending-box p{color:var(--muted);max-width:560px;margin:8px auto 18px}
+@media(max-width:800px){.apply-hero,.two-col{grid-template-columns:1fr}.submit-row{align-items:flex-start;flex-direction:column}}
+</style>
+{% endblock %}

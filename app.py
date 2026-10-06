@@ -388,6 +388,25 @@ def init_db():
                 granted_by TEXT NOT NULL,
                 granted_at TEXT NOT NULL
             )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS staff_applications(
+                id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                role TEXT NOT NULL,
+                discord_username TEXT DEFAULT '',
+                portfolio_url TEXT DEFAULT '',
+                experience TEXT NOT NULL,
+                why_veyra TEXT NOT NULL,
+                availability TEXT NOT NULL,
+                timezone TEXT DEFAULT '',
+                notes TEXT DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                reviewed_by BIGINT,
+                reviewed_at TEXT,
+                review_note TEXT DEFAULT '',
+                created_at TEXT NOT NULL
+            )''')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_applications_status ON staff_applications(status,created_at)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_applications_user ON staff_applications(user_id,created_at)')
             c.execute('''CREATE TABLE IF NOT EXISTS project_members(
                 id BIGSERIAL PRIMARY KEY,
                 project_id BIGINT NOT NULL,
@@ -483,6 +502,25 @@ def init_db():
                 granted_by TEXT NOT NULL,
                 granted_at TEXT NOT NULL
             )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS staff_applications(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                role TEXT NOT NULL,
+                discord_username TEXT DEFAULT '',
+                portfolio_url TEXT DEFAULT '',
+                experience TEXT NOT NULL,
+                why_veyra TEXT NOT NULL,
+                availability TEXT NOT NULL,
+                timezone TEXT DEFAULT '',
+                notes TEXT DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                reviewed_by INTEGER,
+                reviewed_at TEXT,
+                review_note TEXT DEFAULT '',
+                created_at TEXT NOT NULL
+            )''')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_applications_status ON staff_applications(status,created_at)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_applications_user ON staff_applications(user_id,created_at)')
             c.execute('''CREATE TABLE IF NOT EXISTS project_members(id INTEGER PRIMARY KEY AUTOINCREMENT,project_id INTEGER NOT NULL,user_id INTEGER NOT NULL,role TEXT NOT NULL DEFAULT 'editor',added_by INTEGER NOT NULL,created_at TEXT NOT NULL,UNIQUE(project_id,user_id))''')
             c.execute('''CREATE TABLE IF NOT EXISTS agents(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'idle',created_at TEXT NOT NULL)''')
             c.execute('''CREATE TABLE IF NOT EXISTS project_databases(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER,name TEXT NOT NULL,provider TEXT NOT NULL DEFAULT 'Postgres',status TEXT NOT NULL DEFAULT 'connected',created_at TEXT NOT NULL)''')
@@ -1732,6 +1770,171 @@ def account_sync_status():
     })
 
 
+
+STAFF_APPLICATION_ROLES=[
+    'Support Staff',
+    'Community Moderator',
+    'Media Creator',
+    'VFX / Motion Designer',
+    'Developer',
+    'Partnerships / Outreach',
+]
+
+@app.route('/apply',methods=['GET','POST'])
+@login_required
+def apply_staff():
+    u=current_user()
+    with db() as c:
+        latest=c.execute(
+            'SELECT * FROM staff_applications WHERE user_id=? ORDER BY created_at DESC LIMIT 1',
+            (u['id'],)
+        ).fetchone()
+
+    if request.method=='POST':
+        role=(request.form.get('role') or '').strip()
+        discord_username=(request.form.get('discord_username') or '').strip()[:80]
+        portfolio_url=(request.form.get('portfolio_url') or '').strip()[:500]
+        experience=(request.form.get('experience') or '').strip()
+        why_veyra=(request.form.get('why_veyra') or '').strip()
+        availability=(request.form.get('availability') or '').strip()
+        timezone_name=(request.form.get('timezone') or '').strip()[:80]
+        notes=(request.form.get('notes') or '').strip()
+
+        if role not in STAFF_APPLICATION_ROLES:
+            flash('Please choose a valid position.','error')
+            return redirect(url_for('apply_staff'))
+
+        if latest and str(latest['status']).lower()=='pending':
+            flash('You already have a staff application under review.','error')
+            return redirect(url_for('apply_staff'))
+
+        if len(experience)<40:
+            flash('Please tell us a little more about your experience.','error')
+            return redirect(url_for('apply_staff'))
+
+        if len(why_veyra)<40:
+            flash('Please explain why you want to join the Veyra team.','error')
+            return redirect(url_for('apply_staff'))
+
+        if len(availability)<10:
+            flash('Please describe your general availability.','error')
+            return redirect(url_for('apply_staff'))
+
+        with db() as c:
+            c.execute(
+                '''INSERT INTO staff_applications(
+                    user_id,role,discord_username,portfolio_url,experience,why_veyra,
+                    availability,timezone,notes,status,created_at
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?)''',
+                (
+                    u['id'],role,discord_username,portfolio_url,experience[:3000],
+                    why_veyra[:3000],availability[:1000],timezone_name,notes[:2000],
+                    'pending',now()
+                )
+            )
+            c.commit()
+
+        flash('Application submitted. The Veyra team will review it from the Admin Center.','success')
+        return redirect(url_for('apply_staff'))
+
+    latest=dict(latest) if latest else None
+    return render_template(
+        'apply.html',
+        user=u,
+        roles=STAFF_APPLICATION_ROLES,
+        latest=latest,
+    )
+
+
+@app.route('/admin/applications')
+@login_required
+def admin_applications():
+    if not is_admin():
+        return ('Forbidden',403)
+
+    status=(request.args.get('status') or 'all').lower()
+    allowed={'all','pending','accepted','denied'}
+    if status not in allowed:
+        status='all'
+
+    with db() as c:
+        if status=='all':
+            rows=c.execute(
+                '''SELECT a.*,u.name,u.email,u.discord_id
+                   FROM staff_applications a
+                   JOIN users u ON u.id=a.user_id
+                   ORDER BY CASE a.status WHEN 'pending' THEN 0 ELSE 1 END, a.created_at DESC'''
+            ).fetchall()
+        else:
+            rows=c.execute(
+                '''SELECT a.*,u.name,u.email,u.discord_id
+                   FROM staff_applications a
+                   JOIN users u ON u.id=a.user_id
+                   WHERE a.status=?
+                   ORDER BY a.created_at DESC''',
+                (status,)
+            ).fetchall()
+
+        counts={}
+        for key in ('pending','accepted','denied'):
+            counts[key]=int(c.execute(
+                'SELECT COUNT(*) AS n FROM staff_applications WHERE status=?',
+                (key,)
+            ).fetchone()['n'] or 0)
+        counts['all']=sum(counts.values())
+
+    return render_template(
+        'admin_applications.html',
+        applications=[dict(r) for r in rows],
+        counts=counts,
+        current_status=status,
+    )
+
+
+@app.post('/admin/applications/<int:application_id>/<action>')
+@login_required
+def admin_review_application(application_id,action):
+    if not is_admin():
+        return ('Forbidden',403)
+
+    if action not in {'accept','deny','pending'}:
+        return ('Invalid action',400)
+
+    status={'accept':'accepted','deny':'denied','pending':'pending'}[action]
+    note=(request.form.get('review_note') or '').strip()[:1500]
+    admin=current_user()
+
+    with db() as c:
+        row=c.execute(
+            'SELECT * FROM staff_applications WHERE id=?',
+            (application_id,)
+        ).fetchone()
+        if not row:
+            return ('Application not found',404)
+
+        c.execute(
+            '''UPDATE staff_applications
+               SET status=?,reviewed_by=?,reviewed_at=?,review_note=?
+               WHERE id=?''',
+            (
+                status,
+                admin['id'] if status!='pending' else None,
+                now() if status!='pending' else None,
+                note if status!='pending' else '',
+                application_id
+            )
+        )
+        c.commit()
+
+    admin_audit(
+        'staff_application_'+status,
+        target_id=row['user_id'],
+        details={'application_id':application_id,'role':row['role'],'note':note}
+    )
+    flash(f'Application marked {status}.','success')
+    return redirect(url_for('admin_applications'))
+
+
 @app.route('/admin')
 @login_required
 def admin_dashboard():
@@ -1788,6 +1991,9 @@ def admin_dashboard():
         admin_count=c.execute(
             'SELECT COUNT(*) AS n FROM site_admins'
         ).fetchone()['n']
+        pending_applications=c.execute(
+            "SELECT COUNT(*) AS n FROM staff_applications WHERE status='pending'"
+        ).fetchone()['n']
         discord_linked=c.execute(
             "SELECT COUNT(*) AS n FROM users WHERE COALESCE(discord_id,'')<>'' OR lower(COALESCE(provider,''))='discord'"
         ).fetchone()['n']
@@ -1801,6 +2007,7 @@ def admin_dashboard():
         'total_credits':int(total_credits or 0),
         'total_logins':int(total_logins or 0),
         'admin_count':int(admin_count or 0),
+            'pending_applications':int(pending_applications or 0),
         'discord_linked':int(discord_linked or 0),
         'ai_status':'Ready' if os.getenv('OPENAI_API_KEY','').strip() else 'Local mode',
         'stripe_status':'Configured' if (
@@ -2429,11 +2636,9 @@ def api_build():
 
     # Give Veyra enough time to generate a complete site while still keeping a
     # bounded upstream timeout. R11's 18-second cutoff was too short for real builds.
-    # Full site generations can legitimately take longer than a minute.
-    # Do not abort Veyra's own OpenAI request at the old 55-second mark.
     client=OpenAI(
         api_key=key,
-        timeout=150.0,
+        timeout=55.0,
         max_retries=0,
     )
     attempts=[]

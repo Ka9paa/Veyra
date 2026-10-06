@@ -1,0 +1,76 @@
+{% extends 'app_base.html' %}
+{% block title %}Staff Applications — Veyra Admin{% endblock %}
+{% block top_title %}Staff Applications{% endblock %}
+{% block content %}
+<div class="admin-apps">
+  <div class="hero-row">
+    <div>
+      <div class="eyebrow">ADMIN / RECRUITING</div>
+      <h1 class="title">Staff applications</h1>
+      <p class="subtitle">Review real applications submitted through buildveyra.xyz/apply.</p>
+    </div>
+    <div class="hero-actions"><a class="btn" href="{{url_for('admin_dashboard')}}">← Admin Center</a></div>
+  </div>
+
+  <div class="app-stats">
+    {% for key,label in [('all','All'),('pending','Pending'),('accepted','Accepted'),('denied','Denied')] %}
+    <a class="{{'active' if current_status==key else ''}}" href="{{url_for('admin_applications',status=key)}}">
+      <span>{{label}}</span><b>{{counts[key]}}</b>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% if applications %}
+  <div class="application-list">
+    {% for a in applications %}
+    <article class="application-card">
+      <header>
+        <div>
+          <div class="role">{{a.role}}</div>
+          <h2>{{a.name or 'Veyra User'}}</h2>
+          <div class="identity">{{a.email}}{% if a.discord_username %} · {{a.discord_username}}{% endif %}</div>
+        </div>
+        <span class="status {{a.status}}">{{a.status|upper}}</span>
+      </header>
+
+      <div class="application-meta">
+        <div><small>SUBMITTED</small><b>{{a.created_at}}</b></div>
+        <div><small>AVAILABILITY</small><b>{{a.availability}}</b></div>
+        <div><small>TIMEZONE</small><b>{{a.timezone or 'Not provided'}}</b></div>
+        <div><small>PORTFOLIO</small>{% if a.portfolio_url %}<a target="_blank" rel="noopener" href="{{a.portfolio_url}}">Open link ↗</a>{% else %}<b>None</b>{% endif %}</div>
+      </div>
+
+      <div class="answers">
+        <section><small>EXPERIENCE</small><p>{{a.experience}}</p></section>
+        <section><small>WHY VEYRA</small><p>{{a.why_veyra}}</p></section>
+        {% if a.notes %}<section><small>OTHER NOTES</small><p>{{a.notes}}</p></section>{% endif %}
+      </div>
+
+      {% if a.review_note %}
+      <div class="reviewed-note"><b>Review note</b><span>{{a.review_note}}</span></div>
+      {% endif %}
+
+      <form class="review-form" method="post">
+        <input name="review_note" placeholder="Optional review note for your records">
+        <div>
+          <button formaction="{{url_for('admin_review_application',application_id=a.id,action='deny')}}" class="deny">Deny</button>
+          <button formaction="{{url_for('admin_review_application',application_id=a.id,action='pending')}}" class="neutral">Set pending</button>
+          <button formaction="{{url_for('admin_review_application',application_id=a.id,action='accept')}}" class="accept">Accept</button>
+        </div>
+      </form>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+    <div class="empty"><div class="empty-icon">⌁</div><h3>No applications here</h3><p>Applications will appear after users submit through /apply.</p></div>
+  {% endif %}
+</div>
+
+<style>
+.admin-apps{max-width:1180px}.app-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}.app-stats a{text-decoration:none;color:inherit;border:1px solid var(--line);background:#0a1321;border-radius:13px;padding:14px;display:flex;align-items:center;justify-content:space-between}.app-stats a.active{border-color:#715aff;background:#11132b}.app-stats span{color:var(--muted);font-size:11px}.app-stats b{font-size:19px}
+.application-list{display:grid;gap:14px}.application-card{border:1px solid var(--line);background:#0a1321;border-radius:17px;padding:20px}.application-card header{display:flex;justify-content:space-between;gap:16px}.role{color:#927cff;font-size:10px;font-weight:900;letter-spacing:.12em}.application-card h2{margin:5px 0;font-size:20px}.identity{color:var(--muted);font-size:11px}.status{align-self:start;border-radius:999px;padding:6px 8px;font-size:9px;font-weight:900;border:1px solid #5a4b9c;background:#171430;color:#b9a9ff}.status.accepted{border-color:#285b50;background:#0d211d;color:#79e8c5}.status.denied{border-color:#733b47;background:#291119;color:#ff9dad}
+.application-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0}.application-meta>div{border:1px solid #1e2d43;background:#08111e;border-radius:11px;padding:11px}.application-meta small{display:block;color:#6f8098;font-size:8px;letter-spacing:.11em}.application-meta b,.application-meta a{display:block;color:#eef3fb;font-size:11px;margin-top:5px;text-decoration:none}.answers{display:grid;gap:10px}.answers section{border-top:1px solid #17263b;padding-top:12px}.answers small{color:#7c8ca3;font-size:9px;letter-spacing:.11em}.answers p{color:#c6d0df;line-height:1.6;margin:6px 0;white-space:pre-wrap}.reviewed-note{margin-top:13px;border:1px solid #2b3850;background:#08111d;border-radius:11px;padding:11px}.reviewed-note b,.reviewed-note span{display:block}.reviewed-note span{color:var(--muted);font-size:11px;margin-top:4px}
+.review-form{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:14px}.review-form input{border:1px solid #2a3a52;background:#08111e;color:#eef3fb;border-radius:10px;padding:10px 11px}.review-form>div{display:flex;gap:7px}.review-form button{border:1px solid #314057;border-radius:10px;padding:10px 12px;background:#101a29;color:#fff;font-weight:800;cursor:pointer}.review-form button.accept{background:#133126;border-color:#2e755f;color:#8ef0d1}.review-form button.deny{background:#30131b;border-color:#77404b;color:#ff9fac}
+@media(max-width:900px){.application-meta{grid-template-columns:1fr 1fr}.app-stats{grid-template-columns:1fr 1fr}.review-form{grid-template-columns:1fr}.review-form>div{flex-wrap:wrap}}@media(max-width:600px){.application-meta{grid-template-columns:1fr}}
+</style>
+{% endblock %}
