@@ -1,5 +1,19 @@
 {% extends 'app_base.html' %}
-{% block title %}Staff Application — Veyra{% endblock %}
+{% block title %}Staff Application — Veyra
+<style>
+.sa-validation{border:1px solid #74404c;background:#28131b;color:#ffb1be;border-radius:13px;padding:14px 16px;margin-bottom:16px;display:grid;gap:4px}.sa-validation span{color:#e6b6bf}.word-meta{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:5px}.word-count{font-size:11px;color:#8a99ae}.word-count.good{color:#69e7c1}.word-count.bad{color:#ff9aac}.field-error{color:#ff93a6;font-size:11px;font-weight:700}.invalid-answer{border-color:#8a4050!important;box-shadow:0 0 0 3px #8a405018!important}
+</style>
+<script>
+(() => {
+ const form=document.getElementById('staffApplicationForm'); if(!form)return;
+ const wc=v=>{const m=String(v||'').trim().match(/\b[\w'-]+\b/g);return m?m.length:0};
+ const update=f=>{const min=Number(f.dataset.minWords||0),count=wc(f.value),meta=f.parentElement.querySelector('.word-count');if(meta){meta.textContent=`${count} / ${min} words`;meta.classList.toggle('good',count>=min);meta.classList.toggle('bad',count<min)}f.classList.toggle('invalid-answer',f.value.length>0&&count<min);return{min,count}};
+ form.querySelectorAll('[data-min-words]').forEach(f=>{update(f);f.addEventListener('input',()=>update(f))});
+ form.addEventListener('submit',e=>{let bad=null;form.querySelectorAll('[data-min-words]').forEach(f=>{const r=update(f);if(r.count<r.min&&!bad)bad=f});form.querySelectorAll('input[required],textarea[required]:not([data-min-words])').forEach(f=>{if(!f.value.trim()&&!bad)bad=f});if(bad){e.preventDefault();bad.focus();bad.scrollIntoView({behavior:'smooth',block:'center'})}});
+})();
+</script>
+
+{% endblock %}
 {% block top_title %}Staff Application{% endblock %}
 {% block content %}
 <div class="sa-head">
@@ -10,6 +24,10 @@
   </div>
   <a class="btn" href="/dashboard">← Dashboard</a>
 </div>
+
+{% if validation_errors %}
+<div class="sa-validation"><b>Your application was not submitted yet.</b><span>Fix the highlighted answers below. Everything you already typed has been kept.</span></div>
+{% endif %}
 
 {% if application %}
 <div class="sa-status {{application.status}}">
@@ -30,7 +48,7 @@
 {% endif %}
 
 {% if not application or application.status!='pending' %}
-<form method="post" class="sa-form">
+<form method="post" class="sa-form" id="staffApplicationForm" novalidate>
   <section class="card sa-section">
     <div class="section-num">01</div>
     <div class="section-copy">
@@ -39,31 +57,31 @@
       <p>Give us enough context to know who is applying.</p>
     </div>
     <div class="sa-grid">
-      <label><span>Discord username</span><input name="discord_name" placeholder="@username" value="{{user.name or ''}}"></label>
-      <label><span>Age</span><input name="age" placeholder="Your age"></label>
-      <label><span>Timezone</span><input name="timezone" placeholder="Example: CST / UTC-5"></label>
-      <label class="wide"><span>Availability *</span><textarea name="availability" required placeholder="When are you normally available to help Veyra members?"></textarea></label>
+      <label><span>Discord username</span><input name="discord_name" placeholder="@username" value="{{form_data.discord_name if form_data else (user.name or '')}}"></label>
+      <label><span>Age</span><input name="age" placeholder="Your age" value="{{form_data.age if form_data else ''}}" required>{% if validation_errors and validation_errors.age %}<small class="field-error">{{validation_errors.age}}</small>{% endif %}</label>
+      <label><span>Timezone</span><input name="timezone" placeholder="Example: CST / UTC-5" value="{{form_data.timezone if form_data else ''}}" required>{% if validation_errors and validation_errors.timezone %}<small class="field-error">{{validation_errors.timezone}}</small>{% endif %}</label>
+      <label class="wide"><span>Availability *</span><textarea name="availability" required data-min-words="5" placeholder="When are you normally available to help Veyra members?">{{form_data.availability if form_data else ''}}</textarea><div class="word-meta"><span class="word-count">0 / 5 words</span>{% if validation_errors and validation_errors.availability %}<small class="field-error">{{validation_errors.availability}}</small>{% endif %}</div></label>
     </div>
   </section>
 
   <section class="card sa-section">
     <div class="section-num">02</div>
     <div class="section-copy"><div class="eyebrow">EXPERIENCE</div><h2>Tell us what you bring.</h2><p>Prior staff experience is helpful, but good judgment matters more.</p></div>
-    <label><span>Tell us about yourself. *</span><textarea name="about" required placeholder="Who are you, what are you good at, and what should we know about you?"></textarea></label>
-    <label><span>What staff, support, moderation, development, or community experience do you have? *</span><textarea name="experience" required placeholder="Explain your experience and responsibilities."></textarea></label>
+    <label><span>Tell us about yourself. *</span><textarea name="about" required data-min-words="20" placeholder="Who are you, what are you good at, and what should we know about you?">{{form_data.about if form_data else ''}}</textarea><div class="word-meta"><span class="word-count">0 / 20 words</span>{% if validation_errors and validation_errors.about %}<small class="field-error">{{validation_errors.about}}</small>{% endif %}</div></label>
+    <label><span>What staff, support, moderation, development, or community experience do you have? *</span><textarea name="experience" required data-min-words="20" placeholder="Explain your experience and responsibilities.">{{form_data.experience if form_data else ''}}</textarea><div class="word-meta"><span class="word-count">0 / 20 words</span>{% if validation_errors and validation_errors.experience %}<small class="field-error">{{validation_errors.experience}}</small>{% endif %}</div></label>
   </section>
 
   <section class="card sa-section">
     <div class="section-num">03</div>
     <div class="section-copy"><div class="eyebrow">VEYRA</div><h2>Why Veyra?</h2><p>We want people who understand the product and actually care about the community.</p></div>
-    <label><span>Why do you want to join the Veyra staff team? *</span><textarea name="why_veyra" required placeholder="Why Veyra, and what would you want to contribute?"></textarea></label>
+    <label><span>Why do you want to join the Veyra staff team? *</span><textarea name="why_veyra" required data-min-words="20" placeholder="Why Veyra, and what would you want to contribute?">{{form_data.why_veyra if form_data else ''}}</textarea><div class="word-meta"><span class="word-count">0 / 20 words</span>{% if validation_errors and validation_errors.why_veyra %}<small class="field-error">{{validation_errors.why_veyra}}</small>{% endif %}</div></label>
   </section>
 
   <section class="card sa-section">
     <div class="section-num">04</div>
     <div class="section-copy"><div class="eyebrow">SUPPORT JUDGMENT</div><h2>How would you handle members?</h2><p>Professional support means staying calm, useful, and accurate even when somebody is frustrated.</p></div>
-    <label><span>A member is angry because Veyra failed a build and says they were charged credits unfairly. How would you handle it? *</span><textarea name="support_judgment" required placeholder="Walk us through what you would say and what you would check."></textarea></label>
-    <label><span>Anything else?</span><textarea name="extra" placeholder="Anything else you want the Veyra team to know?"></textarea></label>
+    <label><span>A member is angry because Veyra failed a build and says they were charged credits unfairly. How would you handle it? *</span><textarea name="support_judgment" required data-min-words="30" placeholder="Walk us through what you would say and what you would check.">{{form_data.support_judgment if form_data else ''}}</textarea><div class="word-meta"><span class="word-count">0 / 30 words</span>{% if validation_errors and validation_errors.support_judgment %}<small class="field-error">{{validation_errors.support_judgment}}</small>{% endif %}</div></label>
+    <label><span>Anything else?</span><textarea name="extra" placeholder="Anything else you want the Veyra team to know?">{{form_data.extra if form_data else ''}}</textarea></label>
   </section>
 
   <div class="sa-submit">

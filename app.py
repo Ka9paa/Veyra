@@ -2124,48 +2124,70 @@ def staff_apply():
             (u['id'],)
         ).fetchone()
 
+    form_data={
+        'discord_name':u.get('name') or '', 'age':'', 'timezone':'', 'availability':'',
+        'about':'', 'experience':'', 'why_veyra':'', 'support_judgment':'', 'extra':'',
+    }
+    validation_errors={}
+
     if request.method=='POST':
         if latest and str(latest['status']).lower()=='pending':
             flash('You already have a staff application under review.','error')
             return redirect(url_for('staff_apply'))
 
-        discord_name=(request.form.get('discord_name') or '').strip()[:100]
-        age=(request.form.get('age') or '').strip()[:20]
-        timezone=(request.form.get('timezone') or '').strip()[:80]
-        availability=(request.form.get('availability') or '').strip()[:300]
-        about=(request.form.get('about') or '').strip()
-        experience=(request.form.get('experience') or '').strip()
-        why_veyra=(request.form.get('why_veyra') or '').strip()
-        support_judgment=(request.form.get('support_judgment') or '').strip()
-        extra=(request.form.get('extra') or '').strip()
+        form_data={
+            'discord_name':(request.form.get('discord_name') or '').strip()[:100],
+            'age':(request.form.get('age') or '').strip()[:20],
+            'timezone':(request.form.get('timezone') or '').strip()[:80],
+            'availability':(request.form.get('availability') or '').strip()[:800],
+            'about':(request.form.get('about') or '').strip()[:2500],
+            'experience':(request.form.get('experience') or '').strip()[:2500],
+            'why_veyra':(request.form.get('why_veyra') or '').strip()[:2500],
+            'support_judgment':(request.form.get('support_judgment') or '').strip()[:2500],
+            'extra':(request.form.get('extra') or '').strip()[:2500],
+        }
 
-        required=[about,experience,why_veyra,support_judgment,availability]
-        if any(len(x)<20 for x in required):
-            flash('Please give a little more detail in every required answer before submitting.','error')
-            return redirect(url_for('staff_apply'))
+        def word_count(value):
+            return len(re.findall(r"\b[\w'-]+\b", value or ''))
 
-        with db() as c:
-            c.execute(
-                """INSERT INTO staff_applications(
+        requirements={
+            'availability':('Availability',5),
+            'about':('About you',20),
+            'experience':('Experience',20),
+            'why_veyra':('Why Veyra',20),
+            'support_judgment':('Support judgment',30),
+        }
+        for key,(label,minimum) in requirements.items():
+            count=word_count(form_data[key])
+            if count < minimum:
+                validation_errors[key]=f'{label} needs at least {minimum} words. You currently have {count}.'
+        if not form_data['age']: validation_errors['age']='Please enter your age.'
+        if not form_data['timezone']: validation_errors['timezone']='Please enter your timezone.'
+
+        if validation_errors:
+            return render_template('staff_apply.html',user=u,application=dict(latest) if latest else None,form_data=form_data,validation_errors=validation_errors),400
+
+        try:
+            with db() as c:
+                c.execute("""INSERT INTO staff_applications(
                     user_id,discord_name,age,timezone,availability,about,experience,
                     why_veyra,support_judgment,extra,status,created_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (
-                    u['id'],discord_name,age,timezone,availability,
-                    about[:2500],experience[:2500],why_veyra[:2500],
-                    support_judgment[:2500],extra[:2500],'pending',now()
-                )
-            )
-            c.commit()
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",(
+                    u['id'],form_data['discord_name'],form_data['age'],form_data['timezone'],
+                    form_data['availability'],form_data['about'],form_data['experience'],
+                    form_data['why_veyra'],form_data['support_judgment'],form_data['extra'],
+                    'pending',now()
+                ))
+                c.commit()
+        except Exception:
+            app.logger.exception('Staff application submission failed | user_id=%s',u.get('id'))
+            flash('Your application could not be submitted because of a server error. Your answers are still on this page — please try again.','error')
+            return render_template('staff_apply.html',user=u,application=dict(latest) if latest else None,form_data=form_data,validation_errors={}),500
 
         flash('Your staff application has been submitted. Veyra staff will review it soon.','success')
         return redirect(url_for('staff_apply'))
 
-    return render_template(
-        'staff_apply.html',
-        user=u,
-        application=dict(latest) if latest else None
-    )
+    return render_template('staff_apply.html',user=u,application=dict(latest) if latest else None,form_data=form_data,validation_errors=validation_errors)
 
 
 @app.route('/staff/review')
