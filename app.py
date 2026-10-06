@@ -388,25 +388,27 @@ def init_db():
                 granted_by TEXT NOT NULL,
                 granted_at TEXT NOT NULL
             )''')
-            c.execute('''CREATE TABLE IF NOT EXISTS staff_applications(
-                id BIGSERIAL PRIMARY KEY,
-                user_id BIGINT NOT NULL,
-                role TEXT NOT NULL,
-                discord_username TEXT DEFAULT '',
-                portfolio_url TEXT DEFAULT '',
-                experience TEXT NOT NULL,
-                why_veyra TEXT NOT NULL,
-                availability TEXT NOT NULL,
-                timezone TEXT DEFAULT '',
-                notes TEXT DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'pending',
-                reviewed_by BIGINT,
-                reviewed_at TEXT,
-                review_note TEXT DEFAULT '',
-                created_at TEXT NOT NULL
+            c.execute('''CREATE TABLE IF NOT EXISTS application_settings(
+                application_type TEXT PRIMARY KEY,
+                is_open INTEGER NOT NULL DEFAULT 1,
+                updated_by BIGINT,
+                updated_at TEXT NOT NULL
             )''')
-            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_applications_status ON staff_applications(status,created_at)')
-            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_applications_user ON staff_applications(user_id,created_at)')
+            c.execute('''CREATE TABLE IF NOT EXISTS business_applications(
+                id BIGSERIAL PRIMARY KEY,
+                application_type TEXT NOT NULL,
+                discord_user_id TEXT NOT NULL,
+                discord_username TEXT NOT NULL,
+                display_name TEXT DEFAULT '',
+                answers TEXT NOT NULL DEFAULT '{}',
+                status TEXT NOT NULL DEFAULT 'pending',
+                reviewer_user_id BIGINT,
+                reviewer_note TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                reviewed_at TEXT
+            )''')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_business_applications_status ON business_applications(status,created_at)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_business_applications_type ON business_applications(application_type,created_at)')
             c.execute('''CREATE TABLE IF NOT EXISTS project_members(
                 id BIGSERIAL PRIMARY KEY,
                 project_id BIGINT NOT NULL,
@@ -502,25 +504,27 @@ def init_db():
                 granted_by TEXT NOT NULL,
                 granted_at TEXT NOT NULL
             )''')
-            c.execute('''CREATE TABLE IF NOT EXISTS staff_applications(
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                role TEXT NOT NULL,
-                discord_username TEXT DEFAULT '',
-                portfolio_url TEXT DEFAULT '',
-                experience TEXT NOT NULL,
-                why_veyra TEXT NOT NULL,
-                availability TEXT NOT NULL,
-                timezone TEXT DEFAULT '',
-                notes TEXT DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'pending',
-                reviewed_by INTEGER,
-                reviewed_at TEXT,
-                review_note TEXT DEFAULT '',
-                created_at TEXT NOT NULL
+            c.execute('''CREATE TABLE IF NOT EXISTS application_settings(
+                application_type TEXT PRIMARY KEY,
+                is_open INTEGER NOT NULL DEFAULT 1,
+                updated_by INTEGER,
+                updated_at TEXT NOT NULL
             )''')
-            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_applications_status ON staff_applications(status,created_at)')
-            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_applications_user ON staff_applications(user_id,created_at)')
+            c.execute('''CREATE TABLE IF NOT EXISTS business_applications(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                application_type TEXT NOT NULL,
+                discord_user_id TEXT NOT NULL,
+                discord_username TEXT NOT NULL,
+                display_name TEXT DEFAULT '',
+                answers TEXT NOT NULL DEFAULT '{}',
+                status TEXT NOT NULL DEFAULT 'pending',
+                reviewer_user_id INTEGER,
+                reviewer_note TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                reviewed_at TEXT
+            )''')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_business_applications_status ON business_applications(status,created_at)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_business_applications_type ON business_applications(application_type,created_at)')
             c.execute('''CREATE TABLE IF NOT EXISTS project_members(id INTEGER PRIMARY KEY AUTOINCREMENT,project_id INTEGER NOT NULL,user_id INTEGER NOT NULL,role TEXT NOT NULL DEFAULT 'editor',added_by INTEGER NOT NULL,created_at TEXT NOT NULL,UNIQUE(project_id,user_id))''')
             c.execute('''CREATE TABLE IF NOT EXISTS agents(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'idle',created_at TEXT NOT NULL)''')
             c.execute('''CREATE TABLE IF NOT EXISTS project_databases(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER,name TEXT NOT NULL,provider TEXT NOT NULL DEFAULT 'Postgres',status TEXT NOT NULL DEFAULT 'connected',created_at TEXT NOT NULL)''')
@@ -933,6 +937,166 @@ def submit_vouch():
         c.execute('INSERT INTO vouches(user_id,name,role,rating,message,project_name,status,created_at) VALUES(?,?,?,?,?,?,?,?)',(u['id'],u.get('name') or 'Veyra User',role,rating,message[:1000],project,'pending',now()))
         c.commit()
     return jsonify({'ok':True,'message':'Your vouch was submitted for review.'})
+
+
+APPLICATION_TYPES={
+    'staff':{'label':'Staff Applications','short':'Staff','description':'Community support, moderation, customer assistance, and platform operations.','color':'#7c5cff'},
+    'media':{'label':'Media & VFX Applications','short':'Media / VFX','description':'Paid editors, motion designers, VFX artists, 3D artists, and content creators.','color':'#5f83ff'},
+    'business':{'label':'Business Inquiries','short':'Business','description':'Professional sales, vendor, service, licensing, and custom-work requests.','color':'#39d8ac'},
+    'partnership':{'label':'Partnership Inquiries','short':'Partnerships','description':'Creator, server, brand, community, and strategic partnership proposals.','color':'#c17cff'},
+}
+
+def ensure_application_defaults():
+    with db() as c:
+        for key in APPLICATION_TYPES:
+            c.execute(
+                "INSERT INTO application_settings(application_type,is_open,updated_by,updated_at) VALUES(?,?,NULL,?) ON CONFLICT(application_type) DO NOTHING",
+                (key,1,now())
+            )
+        c.commit()
+
+def get_application_settings():
+    ensure_application_defaults()
+    with db() as c:
+        rows=c.execute("SELECT application_type,is_open,updated_by,updated_at FROM application_settings").fetchall()
+    values={str(r['application_type']):bool(r['is_open']) for r in rows}
+    return {key:values.get(key,True) for key in APPLICATION_TYPES}
+
+def application_bot_authorized():
+    expected=(os.getenv('APPLICATION_BOT_SECRET') or '').strip()
+    supplied=(request.headers.get('Authorization') or '').strip()
+    return bool(expected) and hmac.compare_digest(supplied,'Bearer '+expected)
+
+@app.route('/admin/applications')
+@login_required
+def admin_applications():
+    if not is_admin():
+        return ('Forbidden',403)
+    ensure_application_defaults()
+    status=(request.args.get('status') or 'all').strip().lower()
+    app_type=(request.args.get('type') or 'all').strip().lower()
+    if status not in {'all','pending','accepted','denied'}:
+        status='all'
+    if app_type!='all' and app_type not in APPLICATION_TYPES:
+        app_type='all'
+
+    where=[]
+    args=[]
+    if status!='all':
+        where.append('status=?'); args.append(status)
+    if app_type!='all':
+        where.append('application_type=?'); args.append(app_type)
+
+    sql='SELECT * FROM business_applications'
+    if where:
+        sql+=' WHERE '+' AND '.join(where)
+    sql+=' ORDER BY created_at DESC LIMIT 250'
+
+    with db() as c:
+        rows=[dict(r) for r in c.execute(sql,tuple(args)).fetchall()]
+        stat_rows=c.execute("SELECT status,COUNT(*) AS n FROM business_applications GROUP BY status").fetchall()
+        type_rows=c.execute("SELECT application_type,COUNT(*) AS n FROM business_applications GROUP BY application_type").fetchall()
+
+    counts={'pending':0,'accepted':0,'denied':0}
+    for r in stat_rows:
+        counts[str(r['status'])]=int(r['n'] or 0)
+    settings_map=get_application_settings()
+    type_counts={str(r['application_type']):int(r['n'] or 0) for r in type_rows}
+
+    for row in rows:
+        try:
+            row['answers_data']=json.loads(row.get('answers') or '{}')
+        except Exception:
+            row['answers_data']={}
+        row['type_info']=APPLICATION_TYPES.get(row.get('application_type'),{
+            'label':'Application','short':'Application','description':'','color':'#7c5cff'
+        })
+
+    return render_template(
+        'admin_applications.html',
+        user=current_user(),
+        applications=rows,
+        settings=settings_map,
+        application_types=APPLICATION_TYPES,
+        counts=counts,
+        type_counts=type_counts,
+        selected_status=status,
+        selected_type=app_type,
+    )
+
+@app.post('/admin/applications/settings/<application_type>')
+@login_required
+def admin_application_setting(application_type):
+    if not is_admin():
+        return ('Forbidden',403)
+    if application_type not in APPLICATION_TYPES:
+        return ('Unknown application type',404)
+    value=1 if (request.form.get('is_open') or '').lower() in {'1','true','on','open'} else 0
+    actor=current_user()
+    with db() as c:
+        c.execute(
+            "INSERT INTO application_settings(application_type,is_open,updated_by,updated_at) VALUES(?,?,?,?) ON CONFLICT(application_type) DO UPDATE SET is_open=excluded.is_open,updated_by=excluded.updated_by,updated_at=excluded.updated_at",
+            (application_type,value,actor['id'],now())
+        )
+        c.commit()
+    admin_audit('application_setting',actor['id'],{'application_type':application_type,'is_open':bool(value)})
+    flash(f"{APPLICATION_TYPES[application_type]['short']} applications are now {'open' if value else 'closed'}.",'success')
+    return redirect(url_for('admin_applications'))
+
+@app.post('/admin/applications/<int:application_id>/<action>')
+@login_required
+def admin_application_review(application_id,action):
+    if not is_admin():
+        return ('Forbidden',403)
+    if action not in {'accept','deny','pending'}:
+        return ('Invalid action',400)
+    status={'accept':'accepted','deny':'denied','pending':'pending'}[action]
+    note=(request.form.get('reviewer_note') or '').strip()[:1200]
+    actor=current_user()
+    with db() as c:
+        existing=c.execute("SELECT id,status,application_type,discord_user_id FROM business_applications WHERE id=?",(application_id,)).fetchone()
+        if not existing:
+            return ('Application not found',404)
+        c.execute(
+            "UPDATE business_applications SET status=?,reviewer_user_id=?,reviewer_note=?,reviewed_at=? WHERE id=?",
+            (status,actor['id'],note,now() if status!='pending' else None,application_id)
+        )
+        c.commit()
+    admin_audit('review_application',application_id,{'before':existing['status'],'after':status,'type':existing['application_type']})
+    flash(f"Application #{application_id} marked {status}.",'success')
+    return redirect(request.referrer or url_for('admin_applications'))
+
+@app.get('/api/internal/application-settings')
+def internal_application_settings():
+    if not application_bot_authorized():
+        return jsonify({'ok':False,'error':'Unauthorized'}),401
+    return jsonify({'ok':True,'settings':get_application_settings()})
+
+@app.post('/api/internal/application-submit')
+def internal_application_submit():
+    if not application_bot_authorized():
+        return jsonify({'ok':False,'error':'Unauthorized'}),401
+    payload=request.get_json(silent=True) or {}
+    app_type=(payload.get('application_type') or '').strip().lower()
+    if app_type not in APPLICATION_TYPES:
+        return jsonify({'ok':False,'error':'Invalid application type'}),400
+    if not get_application_settings().get(app_type,True):
+        return jsonify({'ok':False,'error':'Applications are currently closed for this category.'}),409
+
+    discord_user_id=str(payload.get('discord_user_id') or '').strip()
+    discord_username=str(payload.get('discord_username') or '').strip()[:160]
+    display_name=str(payload.get('display_name') or '').strip()[:160]
+    answers=payload.get('answers') or {}
+    if not discord_user_id or not discord_username or not isinstance(answers,dict):
+        return jsonify({'ok':False,'error':'Missing application information'}),400
+
+    with db() as c:
+        row=c.execute(
+            "INSERT INTO business_applications(application_type,discord_user_id,discord_username,display_name,answers,status,created_at) VALUES(?,?,?,?,?,'pending',?) RETURNING id",
+            (app_type,discord_user_id,discord_username,display_name,json.dumps(answers,separators=(',',':')),now())
+        ).fetchone()
+        c.commit()
+    return jsonify({'ok':True,'application_id':int(row['id'])})
 
 @app.route('/admin/vouches')
 @login_required
@@ -1770,171 +1934,6 @@ def account_sync_status():
     })
 
 
-
-STAFF_APPLICATION_ROLES=[
-    'Support Staff',
-    'Community Moderator',
-    'Media Creator',
-    'VFX / Motion Designer',
-    'Developer',
-    'Partnerships / Outreach',
-]
-
-@app.route('/apply',methods=['GET','POST'])
-@login_required
-def apply_staff():
-    u=current_user()
-    with db() as c:
-        latest=c.execute(
-            'SELECT * FROM staff_applications WHERE user_id=? ORDER BY created_at DESC LIMIT 1',
-            (u['id'],)
-        ).fetchone()
-
-    if request.method=='POST':
-        role=(request.form.get('role') or '').strip()
-        discord_username=(request.form.get('discord_username') or '').strip()[:80]
-        portfolio_url=(request.form.get('portfolio_url') or '').strip()[:500]
-        experience=(request.form.get('experience') or '').strip()
-        why_veyra=(request.form.get('why_veyra') or '').strip()
-        availability=(request.form.get('availability') or '').strip()
-        timezone_name=(request.form.get('timezone') or '').strip()[:80]
-        notes=(request.form.get('notes') or '').strip()
-
-        if role not in STAFF_APPLICATION_ROLES:
-            flash('Please choose a valid position.','error')
-            return redirect(url_for('apply_staff'))
-
-        if latest and str(latest['status']).lower()=='pending':
-            flash('You already have a staff application under review.','error')
-            return redirect(url_for('apply_staff'))
-
-        if len(experience)<40:
-            flash('Please tell us a little more about your experience.','error')
-            return redirect(url_for('apply_staff'))
-
-        if len(why_veyra)<40:
-            flash('Please explain why you want to join the Veyra team.','error')
-            return redirect(url_for('apply_staff'))
-
-        if len(availability)<10:
-            flash('Please describe your general availability.','error')
-            return redirect(url_for('apply_staff'))
-
-        with db() as c:
-            c.execute(
-                '''INSERT INTO staff_applications(
-                    user_id,role,discord_username,portfolio_url,experience,why_veyra,
-                    availability,timezone,notes,status,created_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?)''',
-                (
-                    u['id'],role,discord_username,portfolio_url,experience[:3000],
-                    why_veyra[:3000],availability[:1000],timezone_name,notes[:2000],
-                    'pending',now()
-                )
-            )
-            c.commit()
-
-        flash('Application submitted. The Veyra team will review it from the Admin Center.','success')
-        return redirect(url_for('apply_staff'))
-
-    latest=dict(latest) if latest else None
-    return render_template(
-        'apply.html',
-        user=u,
-        roles=STAFF_APPLICATION_ROLES,
-        latest=latest,
-    )
-
-
-@app.route('/admin/applications')
-@login_required
-def admin_applications():
-    if not is_admin():
-        return ('Forbidden',403)
-
-    status=(request.args.get('status') or 'all').lower()
-    allowed={'all','pending','accepted','denied'}
-    if status not in allowed:
-        status='all'
-
-    with db() as c:
-        if status=='all':
-            rows=c.execute(
-                '''SELECT a.*,u.name,u.email,u.discord_id
-                   FROM staff_applications a
-                   JOIN users u ON u.id=a.user_id
-                   ORDER BY CASE a.status WHEN 'pending' THEN 0 ELSE 1 END, a.created_at DESC'''
-            ).fetchall()
-        else:
-            rows=c.execute(
-                '''SELECT a.*,u.name,u.email,u.discord_id
-                   FROM staff_applications a
-                   JOIN users u ON u.id=a.user_id
-                   WHERE a.status=?
-                   ORDER BY a.created_at DESC''',
-                (status,)
-            ).fetchall()
-
-        counts={}
-        for key in ('pending','accepted','denied'):
-            counts[key]=int(c.execute(
-                'SELECT COUNT(*) AS n FROM staff_applications WHERE status=?',
-                (key,)
-            ).fetchone()['n'] or 0)
-        counts['all']=sum(counts.values())
-
-    return render_template(
-        'admin_applications.html',
-        applications=[dict(r) for r in rows],
-        counts=counts,
-        current_status=status,
-    )
-
-
-@app.post('/admin/applications/<int:application_id>/<action>')
-@login_required
-def admin_review_application(application_id,action):
-    if not is_admin():
-        return ('Forbidden',403)
-
-    if action not in {'accept','deny','pending'}:
-        return ('Invalid action',400)
-
-    status={'accept':'accepted','deny':'denied','pending':'pending'}[action]
-    note=(request.form.get('review_note') or '').strip()[:1500]
-    admin=current_user()
-
-    with db() as c:
-        row=c.execute(
-            'SELECT * FROM staff_applications WHERE id=?',
-            (application_id,)
-        ).fetchone()
-        if not row:
-            return ('Application not found',404)
-
-        c.execute(
-            '''UPDATE staff_applications
-               SET status=?,reviewed_by=?,reviewed_at=?,review_note=?
-               WHERE id=?''',
-            (
-                status,
-                admin['id'] if status!='pending' else None,
-                now() if status!='pending' else None,
-                note if status!='pending' else '',
-                application_id
-            )
-        )
-        c.commit()
-
-    admin_audit(
-        'staff_application_'+status,
-        target_id=row['user_id'],
-        details={'application_id':application_id,'role':row['role'],'note':note}
-    )
-    flash(f'Application marked {status}.','success')
-    return redirect(url_for('admin_applications'))
-
-
 @app.route('/admin')
 @login_required
 def admin_dashboard():
@@ -1991,9 +1990,6 @@ def admin_dashboard():
         admin_count=c.execute(
             'SELECT COUNT(*) AS n FROM site_admins'
         ).fetchone()['n']
-        pending_applications=c.execute(
-            "SELECT COUNT(*) AS n FROM staff_applications WHERE status='pending'"
-        ).fetchone()['n']
         discord_linked=c.execute(
             "SELECT COUNT(*) AS n FROM users WHERE COALESCE(discord_id,'')<>'' OR lower(COALESCE(provider,''))='discord'"
         ).fetchone()['n']
@@ -2007,7 +2003,6 @@ def admin_dashboard():
         'total_credits':int(total_credits or 0),
         'total_logins':int(total_logins or 0),
         'admin_count':int(admin_count or 0),
-            'pending_applications':int(pending_applications or 0),
         'discord_linked':int(discord_linked or 0),
         'ai_status':'Ready' if os.getenv('OPENAI_API_KEY','').strip() else 'Local mode',
         'stripe_status':'Configured' if (
