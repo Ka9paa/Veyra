@@ -1,5 +1,81 @@
 {% extends 'app_base.html' %}
-{% block title %}Staff Application — Veyra{% endblock %}
+{% block title %}Staff Application — Veyra
+<style>
+.field-label{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.word-count{flex:0 0 auto;font-size:11px!important;font-weight:900!important;border:1px solid #653744;border-radius:999px;padding:4px 9px;line-height:1.2;color:#ff8fa2!important;background:#24121a;transition:.15s ease}
+.word-count.good{border-color:#25634f;color:#68e6bd!important;background:#0d241d}
+.word-count.bad{border-color:#653744;color:#ff8fa2!important;background:#24121a}
+.word-count.optional{border-color:#34445b;color:#8495ad!important;background:#0b1421}
+.word-error{font-size:11px;font-weight:800;color:#ff8298;margin-top:-1px}
+.word-field textarea.word-invalid{border-color:#784050!important;box-shadow:0 0 0 3px #ff5c7a12!important}
+.word-field textarea.word-valid{border-color:#28705a!important;box-shadow:0 0 0 3px #45dda812!important}
+</style>
+
+<script>
+(() => {
+  const form = document.querySelector('.sa-form');
+  if (!form) return;
+
+  const countWords = (value) => {
+    const trimmed = (value || '').trim();
+    return trimmed ? trimmed.split(/\s+/).filter(Boolean).length : 0;
+  };
+
+  const update = (textarea) => {
+    const name = textarea.name;
+    const counter = form.querySelector(`[data-counter-for="${CSS.escape(name)}"]`);
+    if (!counter) return true;
+
+    const words = countWords(textarea.value);
+    const min = Number(textarea.dataset.minWords || 0);
+
+    if (min > 0) {
+      const valid = words >= min;
+      counter.textContent = `${words} / ${min} words`;
+      counter.classList.toggle('good', valid);
+      counter.classList.toggle('bad', !valid);
+      textarea.classList.toggle('word-valid', valid);
+      textarea.classList.toggle('word-invalid', !valid);
+
+      // A server-side error from the previous submission must disappear as soon
+      // as this field becomes valid, so stale "1/5" messages cannot remain.
+      const serverError = form.querySelector(`[data-server-error-for="${CSS.escape(name)}"]`);
+      if (serverError) {
+        serverError.style.display = valid ? 'none' : '';
+        if (!valid) serverError.textContent = `Write at least ${min} words for this answer (${words}/${min} words).`;
+      }
+      return valid;
+    }
+
+    counter.textContent = `${words} word${words === 1 ? '' : 's'} • optional`;
+    return true;
+  };
+
+  const requiredTextareas = [...form.querySelectorAll('textarea[data-min-words]')];
+  const allTextareas = [...form.querySelectorAll('textarea')];
+
+  allTextareas.forEach((textarea) => {
+    update(textarea);
+    textarea.addEventListener('input', () => update(textarea));
+    textarea.addEventListener('blur', () => update(textarea));
+  });
+
+  form.addEventListener('submit', (event) => {
+    let firstInvalid = null;
+    requiredTextareas.forEach((textarea) => {
+      if (!update(textarea) && !firstInvalid) firstInvalid = textarea;
+    });
+
+    if (firstInvalid) {
+      event.preventDefault();
+      firstInvalid.focus();
+      firstInvalid.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+  });
+})();
+</script>
+
+{% endblock %}
 {% block top_title %}Staff Application{% endblock %}
 {% block content %}
 <div class="sa-head">
@@ -25,14 +101,12 @@
   {% elif application.status=='denied' %}
     <p>Your previous application was not accepted. You may submit a new application below.</p>
   {% endif %}
-  {% if application.reviewer_note %}
-    <div class="review-note"><b>Staff note</b><span>{{application.reviewer_note}}</span></div>
-  {% endif %}
+  {% if application.reviewer_note %}<div class="review-note"><b>Staff note</b><span>{{application.reviewer_note}}</span></div>{% endif %}
 </div>
 {% endif %}
 
 {% if not application or application.status!='pending' %}
-<form method="post" class="sa-form" id="staff-application-form" novalidate>
+<form method="post" class="sa-form">
   <section class="card sa-section">
     <div class="section-num">01</div>
     <div class="section-copy">
@@ -40,241 +114,42 @@
       <h2>Basic information</h2>
       <p>Give us enough context to know who is applying.</p>
     </div>
-
     <div class="sa-grid">
-      <label class="{{'field-error' if validation_errors.get('discord_name') else ''}}">
-        <span>Discord username *</span>
-        <input name="discord_name" required placeholder="@username" value="{{form_data.get('discord_name','')}}">
-        {% if validation_errors.get('discord_name') %}<small class="input-error">{{validation_errors.discord_name}}</small>{% endif %}
-      </label>
-
-      <label class="{{'field-error' if validation_errors.get('age') else ''}}">
-        <span>Age *</span>
-        <input name="age" required placeholder="Your age" value="{{form_data.get('age','')}}">
-        {% if validation_errors.get('age') %}<small class="input-error">{{validation_errors.age}}</small>{% endif %}
-      </label>
-
-      <label class="{{'field-error' if validation_errors.get('timezone') else ''}}">
-        <span>Timezone *</span>
-        <input name="timezone" required placeholder="Example: CST / UTC-5" value="{{form_data.get('timezone','')}}">
-        {% if validation_errors.get('timezone') %}<small class="input-error">{{validation_errors.timezone}}</small>{% endif %}
-      </label>
-
-      <label class="wide counted-field {{'field-error' if validation_errors.get('availability') else ''}}">
-        <div class="field-title">
-          <span>Availability *</span>
-          <span class="word-counter" data-counter-for="availability"></span>
-        </div>
-        <textarea name="availability" required data-min-words="{{min_words.availability}}" placeholder="When are you normally available to help Veyra members?">{{form_data.get('availability','')}}</textarea>
-        {% if validation_errors.get('availability') %}<small class="input-error">{{validation_errors.availability}}</small>{% endif %}
-      </label>
+      <label><span>Discord username</span><input name="discord_name" placeholder="@username" value="{{ form_data.get('discord_name', user.name or '') if form_data else (user.name or '') }}"></label>
+      <label><span>Age</span><input name="age" placeholder="Your age" value="{{ form_data.get('age','') if form_data else '' }}"></label>
+      <label><span>Timezone</span><input name="timezone" placeholder="Example: CST / UTC-5" value="{{ form_data.get('timezone','') if form_data else '' }}"></label>
+      <div class="wide"><label class="word-field"><div class="field-label"><span>Availability *</span><span class="word-count bad" data-counter-for="availability">0 / 5 words</span></div><textarea name="availability" required data-min-words="5" placeholder="When are you normally available to help Veyra members?">{{ form_data.get('availability','') if form_data else '' }}</textarea>{% if field_errors and field_errors.get('availability') %}<div class="word-error server-error" data-server-error-for="availability">{{field_errors.get('availability')}}</div>{% endif %}</label></div>
     </div>
   </section>
 
   <section class="card sa-section">
     <div class="section-num">02</div>
-    <div class="section-copy">
-      <div class="eyebrow">EXPERIENCE</div>
-      <h2>Tell us what you bring.</h2>
-      <p>Prior staff experience is helpful, but good judgment matters more.</p>
-    </div>
-
-    <label class="counted-field {{'field-error' if validation_errors.get('about') else ''}}">
-      <div class="field-title">
-        <span>Tell us about yourself. *</span>
-        <span class="word-counter" data-counter-for="about"></span>
-      </div>
-      <textarea name="about" required data-min-words="{{min_words.about}}" placeholder="Who are you, what are you good at, and what should we know about you?">{{form_data.get('about','')}}</textarea>
-      {% if validation_errors.get('about') %}<small class="input-error">{{validation_errors.about}}</small>{% endif %}
-    </label>
-
-    <label class="counted-field {{'field-error' if validation_errors.get('experience') else ''}}">
-      <div class="field-title">
-        <span>What staff, support, moderation, development, or community experience do you have? *</span>
-        <span class="word-counter" data-counter-for="experience"></span>
-      </div>
-      <textarea name="experience" required data-min-words="{{min_words.experience}}" placeholder="Explain your experience and responsibilities.">{{form_data.get('experience','')}}</textarea>
-      {% if validation_errors.get('experience') %}<small class="input-error">{{validation_errors.experience}}</small>{% endif %}
-    </label>
+    <div class="section-copy"><div class="eyebrow">EXPERIENCE</div><h2>Tell us what you bring.</h2><p>Prior staff experience is helpful, but good judgment matters more.</p></div>
+<label class="word-field"><div class="field-label"><span>Tell us about yourself. *</span><span class="word-count bad" data-counter-for="about">0 / 5 words</span></div><textarea name="about" required data-min-words="5" placeholder="Who are you, what are you good at, and what should we know about you?">{{ form_data.get('about','') if form_data else '' }}</textarea>{% if field_errors and field_errors.get('about') %}<div class="word-error server-error" data-server-error-for="about">{{field_errors.get('about')}}</div>{% endif %}</label>
+<label class="word-field"><div class="field-label"><span>What staff, support, moderation, development, or community experience do you have? *</span><span class="word-count bad" data-counter-for="experience">0 / 5 words</span></div><textarea name="experience" required data-min-words="5" placeholder="Explain your experience and responsibilities.">{{ form_data.get('experience','') if form_data else '' }}</textarea>{% if field_errors and field_errors.get('experience') %}<div class="word-error server-error" data-server-error-for="experience">{{field_errors.get('experience')}}</div>{% endif %}</label>
   </section>
 
   <section class="card sa-section">
     <div class="section-num">03</div>
-    <div class="section-copy">
-      <div class="eyebrow">VEYRA</div>
-      <h2>Why Veyra?</h2>
-      <p>We want people who understand the product and actually care about the community.</p>
-    </div>
-
-    <label class="counted-field {{'field-error' if validation_errors.get('why_veyra') else ''}}">
-      <div class="field-title">
-        <span>Why do you want to join the Veyra staff team? *</span>
-        <span class="word-counter" data-counter-for="why_veyra"></span>
-      </div>
-      <textarea name="why_veyra" required data-min-words="{{min_words.why_veyra}}" placeholder="Why Veyra, and what would you want to contribute?">{{form_data.get('why_veyra','')}}</textarea>
-      {% if validation_errors.get('why_veyra') %}<small class="input-error">{{validation_errors.why_veyra}}</small>{% endif %}
-    </label>
+    <div class="section-copy"><div class="eyebrow">VEYRA</div><h2>Why Veyra?</h2><p>We want people who understand the product and actually care about the community.</p></div>
+<label class="word-field"><div class="field-label"><span>Why do you want to join the Veyra staff team? *</span><span class="word-count bad" data-counter-for="why_veyra">0 / 5 words</span></div><textarea name="why_veyra" required data-min-words="5" placeholder="Why Veyra, and what would you want to contribute?">{{ form_data.get('why_veyra','') if form_data else '' }}</textarea>{% if field_errors and field_errors.get('why_veyra') %}<div class="word-error server-error" data-server-error-for="why_veyra">{{field_errors.get('why_veyra')}}</div>{% endif %}</label>
   </section>
 
   <section class="card sa-section">
     <div class="section-num">04</div>
-    <div class="section-copy">
-      <div class="eyebrow">SUPPORT JUDGMENT</div>
-      <h2>How would you handle members?</h2>
-      <p>Professional support means staying calm, useful, and accurate even when somebody is frustrated.</p>
-    </div>
-
-    <label class="counted-field {{'field-error' if validation_errors.get('support_judgment') else ''}}">
-      <div class="field-title">
-        <span>A member is angry because Veyra failed a build and says they were charged credits unfairly. How would you handle it? *</span>
-        <span class="word-counter" data-counter-for="support_judgment"></span>
-      </div>
-      <textarea name="support_judgment" required data-min-words="{{min_words.support_judgment}}" placeholder="Walk us through what you would say and what you would check.">{{form_data.get('support_judgment','')}}</textarea>
-      {% if validation_errors.get('support_judgment') %}<small class="input-error">{{validation_errors.support_judgment}}</small>{% endif %}
-    </label>
-
-    <label class="counted-field optional-field">
-      <div class="field-title">
-        <span>Anything else?</span>
-        <span class="word-counter optional" data-counter-for="extra"></span>
-      </div>
-      <textarea name="extra" data-min-words="0" data-optional="true" placeholder="Anything else you want the Veyra team to know?">{{form_data.get('extra','')}}</textarea>
-    </label>
+    <div class="section-copy"><div class="eyebrow">SUPPORT JUDGMENT</div><h2>How would you handle members?</h2><p>Professional support means staying calm, useful, and accurate even when somebody is frustrated.</p></div>
+<label class="word-field"><div class="field-label"><span>A member is angry because Veyra failed a build and says they were charged credits unfairly. How would you handle it? *</span><span class="word-count bad" data-counter-for="support_judgment">0 / 5 words</span></div><textarea name="support_judgment" required data-min-words="5" placeholder="Walk us through what you would say and what you would check.">{{ form_data.get('support_judgment','') if form_data else '' }}</textarea>{% if field_errors and field_errors.get('support_judgment') %}<div class="word-error server-error" data-server-error-for="support_judgment">{{field_errors.get('support_judgment')}}</div>{% endif %}</label>
+<label class="word-field"><div class="field-label"><span>Anything else?</span><span class="word-count optional" data-counter-for="extra">0 words • optional</span></div><textarea name="extra" data-optional="true" placeholder="Anything else you want the Veyra team to know?">{{ form_data.get('extra','') if form_data else '' }}</textarea>{% if field_errors and field_errors.get('extra') %}<div class="word-error server-error" data-server-error-for="extra">{{field_errors.get('extra')}}</div>{% endif %}</label>
   </section>
 
   <div class="sa-submit">
-    <div>
-      <b id="submit-title">Ready to submit?</b>
-      <span id="submit-help">Complete every required answer and meet the word requirements.</span>
-    </div>
-    <button class="btn primary" id="staff-submit" type="submit">Submit application →</button>
+    <div><b>Ready to submit?</b><span>Your answers will be visible only to authorized Veyra reviewers.</span></div>
+    <button class="btn primary" type="submit">Submit application →</button>
   </div>
 </form>
 {% endif %}
 
 <style>
-.sa-head{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:18px}
-.sa-status{border:1px solid var(--line);background:#0b1422;border-radius:15px;padding:17px;margin-bottom:16px}
-.sa-status>div:first-child{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-.sa-status small{color:var(--muted);letter-spacing:.12em}
-.sa-status strong{color:#a997ff}
-.sa-status span{color:var(--muted)}
-.sa-status.pending{border-color:#5f4bc1}
-.sa-status.accepted{border-color:#276451}
-.sa-status.accepted strong{color:#70ebc7}
-.sa-status.denied{border-color:#743c49}
-.sa-status.denied strong{color:#ff92a5}
-.sa-status p{color:#a7b4c8}
-.review-note{margin-top:10px;padding:11px;border-radius:10px;background:#07101d;display:grid!important;gap:4px!important}
-.review-note b{color:#fff}
-.sa-form{display:grid;gap:14px}
-.sa-section{position:relative;padding:22px}
-.section-num{position:absolute;right:20px;top:18px;color:#332c65;font-size:38px;font-weight:900}
-.section-copy{margin-bottom:18px}
-.section-copy h2{margin:5px 0}
-.section-copy p{color:var(--muted);margin:0}
-.sa-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.sa-grid .wide{grid-column:1/-1}
-.sa-form label{display:grid;gap:7px;margin-top:12px}
-.sa-form label>span,.field-title>span:first-child{font-size:12px;font-weight:800;color:#cdd6e5}
-.sa-form input,.sa-form textarea{width:100%;box-sizing:border-box;background:#07111e;border:1px solid #283950;border-radius:11px;color:#edf3ff;padding:12px 13px;outline:none;transition:border-color .16s,box-shadow .16s}
-.sa-form textarea{min-height:120px;resize:vertical}
-.sa-form input:focus,.sa-form textarea:focus{border-color:#735cff;box-shadow:0 0 0 3px #735cff18}
-.field-title{display:flex;justify-content:space-between;align-items:center;gap:12px}
-.word-counter{font-size:11px!important;font-weight:900!important;color:#ff748a!important;background:#2a111a;border:1px solid #713442;border-radius:999px;padding:4px 8px;white-space:nowrap;transition:.15s}
-.word-counter.met{color:#71e9c5!important;background:#0c211c;border-color:#286051}
-.word-counter.optional{color:#91a0b7!important;background:#0c1624;border-color:#283950}
-.counted-field.valid textarea{border-color:#286051}
-.counted-field.invalid textarea{border-color:#713442}
-.field-error input,.field-error textarea{border-color:#713442}
-.input-error{color:#ff8ea1;font-size:11px;font-weight:700}
-.sa-submit{display:flex;justify-content:space-between;align-items:center;gap:18px;border:1px solid #2d335a;background:#0c1424;border-radius:15px;padding:18px}
-.sa-submit b,.sa-submit span{display:block}
-.sa-submit span{color:var(--muted);margin-top:4px}
-.sa-submit.ready{border-color:#286051;background:#0c1c1a}
-.sa-submit.ready #submit-title{color:#77e8c7}
-.sa-submit .btn[disabled]{opacity:.48;cursor:not-allowed;filter:saturate(.5)}
-@media(max-width:700px){.sa-head,.sa-submit{align-items:flex-start;flex-direction:column}.sa-grid{grid-template-columns:1fr}.sa-grid .wide{grid-column:auto}.field-title{align-items:flex-start;flex-direction:column;gap:6px}}
+.sa-head{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:18px}.sa-status{border:1px solid var(--line);background:#0b1422;border-radius:15px;padding:17px;margin-bottom:16px}.sa-status>div:first-child{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.sa-status small{color:var(--muted);letter-spacing:.12em}.sa-status strong{color:#a997ff}.sa-status span{color:var(--muted)}.sa-status.pending{border-color:#5f4bc1}.sa-status.accepted{border-color:#276451}.sa-status.accepted strong{color:#70ebc7}.sa-status.denied{border-color:#743c49}.sa-status.denied strong{color:#ff92a5}.sa-status p{color:#a7b4c8}.review-note{margin-top:10px;padding:11px;border-radius:10px;background:#07101d;display:grid!important;gap:4px!important}.review-note b{color:#fff}.sa-form{display:grid;gap:14px}.sa-section{position:relative;padding:22px}.section-num{position:absolute;right:20px;top:18px;color:#332c65;font-size:38px;font-weight:900}.section-copy{margin-bottom:18px}.section-copy h2{margin:5px 0}.section-copy p{color:var(--muted);margin:0}.sa-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.sa-grid .wide{grid-column:1/-1}.sa-form label{display:grid;gap:7px;margin-top:12px}.sa-form label>span{font-size:12px;font-weight:800;color:#cdd6e5}.sa-form input,.sa-form textarea{width:100%;box-sizing:border-box;background:#07111e;border:1px solid #283950;border-radius:11px;color:#edf3ff;padding:12px 13px;outline:none}.sa-form textarea{min-height:120px;resize:vertical}.sa-form input:focus,.sa-form textarea:focus{border-color:#735cff;box-shadow:0 0 0 3px #735cff18}.sa-submit{display:flex;justify-content:space-between;align-items:center;gap:18px;border:1px solid #2d335a;background:#0c1424;border-radius:15px;padding:18px}.sa-submit b,.sa-submit span{display:block}.sa-submit span{color:var(--muted);margin-top:4px}@media(max-width:700px){.sa-head,.sa-submit{align-items:flex-start;flex-direction:column}.sa-grid{grid-template-columns:1fr}.sa-grid .wide{grid-column:auto}}
 </style>
-
-<script>
-(function(){
-  const form=document.getElementById('staff-application-form');
-  if(!form) return;
-
-  const submit=document.getElementById('staff-submit');
-  const submitWrap=document.querySelector('.sa-submit');
-  const submitTitle=document.getElementById('submit-title');
-  const submitHelp=document.getElementById('submit-help');
-
-  function words(value){
-    const clean=(value||'').trim();
-    return clean ? clean.split(/\s+/).filter(Boolean).length : 0;
-  }
-
-  function updateField(area){
-    const name=area.name;
-    const min=parseInt(area.dataset.minWords||'0',10);
-    const optional=area.dataset.optional==='true';
-    const count=words(area.value);
-    const counter=form.querySelector('[data-counter-for="'+name+'"]');
-    const label=area.closest('.counted-field');
-
-    if(counter){
-      if(optional){
-        counter.textContent=count+' word'+(count===1?'':'s')+' · optional';
-        counter.classList.remove('met');
-      }else{
-        counter.textContent=count+' / '+min+' words';
-        counter.classList.toggle('met',count>=min);
-      }
-    }
-
-    if(label && !optional){
-      label.classList.toggle('valid',count>=min);
-      label.classList.toggle('invalid',count<min);
-    }
-    return optional || count>=min;
-  }
-
-  function updateForm(){
-    let valid=true;
-
-    form.querySelectorAll('textarea[data-min-words]').forEach(area=>{
-      if(!updateField(area)) valid=false;
-    });
-
-    form.querySelectorAll('input[required]').forEach(input=>{
-      if(!input.value.trim()) valid=false;
-    });
-
-    submit.disabled=!valid;
-    submitWrap.classList.toggle('ready',valid);
-    submitTitle.textContent=valid?'Application ready':'Finish your application';
-    submitHelp.textContent=valid
-      ? 'Everything meets the requirements. You can submit now.'
-      : 'Required answers turn green when you meet their word requirement.';
-  }
-
-  form.querySelectorAll('textarea[data-min-words]').forEach(area=>{
-    area.addEventListener('input',updateForm);
-    area.addEventListener('change',updateForm);
-    area.addEventListener('keyup',updateForm);
-  });
-  form.querySelectorAll('input[required]').forEach(input=>{
-    input.addEventListener('input',updateForm);
-  });
-
-  form.addEventListener('submit',function(event){
-    updateForm();
-    if(submit.disabled){
-      event.preventDefault();
-      const firstInvalid=form.querySelector('.counted-field.invalid textarea, input[required]:invalid');
-      if(firstInvalid) firstInvalid.focus();
-    }
-  });
-
-  updateForm();
-})();
-</script>
 {% endblock %}

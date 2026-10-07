@@ -2115,16 +2115,9 @@ def dashboard():
 
 
 def _staff_word_count(value):
-    return len([part for part in re.split(r'\\s+', (value or '').strip()) if part])
-
-
-STAFF_APPLICATION_MIN_WORDS={
-    'availability':5,
-    'about':15,
-    'experience':15,
-    'why_veyra':15,
-    'support_judgment':20,
-}
+    # Keep server validation identical to the browser counter:
+    # any run of non-whitespace characters counts as one word.
+    return len(re.findall(r'\\S+', (value or '').strip()))
 
 
 @app.route('/staff/apply', methods=['GET','POST'])
@@ -2137,99 +2130,74 @@ def staff_apply():
             (u['id'],)
         ).fetchone()
 
-    form_data={
-        'discord_name':u.get('name') or '',
-        'age':'',
-        'timezone':'',
-        'availability':'',
-        'about':'',
-        'experience':'',
-        'why_veyra':'',
-        'support_judgment':'',
-        'extra':'',
-    }
-    validation_errors={}
+    form_data={}
+    field_errors={}
 
     if request.method=='POST':
         if latest and str(latest['status']).lower()=='pending':
             flash('You already have a staff application under review.','error')
             return redirect(url_for('staff_apply'))
 
+        discord_name=(request.form.get('discord_name') or '').strip()[:100]
+        age=(request.form.get('age') or '').strip()[:20]
+        timezone=(request.form.get('timezone') or '').strip()[:80]
+        availability=(request.form.get('availability') or '').strip()[:300]
+        about=(request.form.get('about') or '').strip()
+        experience=(request.form.get('experience') or '').strip()
+        why_veyra=(request.form.get('why_veyra') or '').strip()
+        support_judgment=(request.form.get('support_judgment') or '').strip()
+        extra=(request.form.get('extra') or '').strip()
+
         form_data={
-            'discord_name':(request.form.get('discord_name') or '').strip()[:100],
-            'age':(request.form.get('age') or '').strip()[:20],
-            'timezone':(request.form.get('timezone') or '').strip()[:80],
-            'availability':(request.form.get('availability') or '').strip()[:1200],
-            'about':(request.form.get('about') or '').strip()[:2500],
-            'experience':(request.form.get('experience') or '').strip()[:2500],
-            'why_veyra':(request.form.get('why_veyra') or '').strip()[:2500],
-            'support_judgment':(request.form.get('support_judgment') or '').strip()[:2500],
-            'extra':(request.form.get('extra') or '').strip()[:2500],
+            'discord_name':discord_name,
+            'age':age,
+            'timezone':timezone,
+            'availability':availability,
+            'about':about,
+            'experience':experience,
+            'why_veyra':why_veyra,
+            'support_judgment':support_judgment,
+            'extra':extra,
         }
 
-        # Basic required identity fields.
-        if not form_data['discord_name']:
-            validation_errors['discord_name']='Enter your Discord username.'
-        if not form_data['age']:
-            validation_errors['age']='Enter your age.'
-        if not form_data['timezone']:
-            validation_errors['timezone']='Enter your timezone.'
+        required_fields={
+            'availability':availability,
+            'about':about,
+            'experience':experience,
+            'why_veyra':why_veyra,
+            'support_judgment':support_judgment,
+        }
 
-        # Word-based validation matches exactly what the applicant sees live.
-        for field,min_words in STAFF_APPLICATION_MIN_WORDS.items():
-            count=_staff_word_count(form_data[field])
-            if count < min_words:
-                validation_errors[field]=(
-                    f'Write at least {min_words} words for this answer '
-                    f'({count}/{min_words} words).'
-                )
+        for field,value in required_fields.items():
+            words=_staff_word_count(value)
+            if words < 5:
+                field_errors[field]=f'Write at least 5 words for this answer ({words}/5 words).'
 
-        if validation_errors:
-            flash(
-                'Your application is not ready yet. Finish the answers highlighted in red, then submit again.',
-                'error'
-            )
+        if field_errors:
+            flash('Please complete every required answer with at least 5 words.','error')
             return render_template(
                 'staff_apply.html',
                 user=u,
                 application=dict(latest) if latest else None,
                 form_data=form_data,
-                validation_errors=validation_errors,
-                min_words=STAFF_APPLICATION_MIN_WORDS,
+                field_errors=field_errors,
             ),400
 
-        try:
-            with db() as c:
-                c.execute(
-                    """INSERT INTO staff_applications(
-                        user_id,discord_name,age,timezone,availability,about,experience,
-                        why_veyra,support_judgment,extra,status,created_at
-                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (
-                        u['id'],form_data['discord_name'],form_data['age'],form_data['timezone'],
-                        form_data['availability'],form_data['about'],form_data['experience'],
-                        form_data['why_veyra'],form_data['support_judgment'],form_data['extra'],
-                        'pending',now()
-                    )
+        with db() as c:
+            c.execute(
+                """INSERT INTO staff_applications(
+                    user_id,discord_name,age,timezone,availability,about,experience,
+                    why_veyra,support_judgment,extra,status,created_at
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    u['id'],discord_name,age,timezone,availability,
+                    about[:2500],experience[:2500],why_veyra[:2500],
+                    support_judgment[:2500],extra[:2500],'pending',now()
                 )
-                c.commit()
-        except Exception:
-            app.logger.exception('Staff application submission failed | user_id=%s',u.get('id'))
-            flash(
-                'We could not submit your application because of a server error. '
-                'Your answers are still here — please try again.',
-                'error'
             )
-            return render_template(
-                'staff_apply.html',
-                user=u,
-                application=dict(latest) if latest else None,
-                form_data=form_data,
-                validation_errors={},
-                min_words=STAFF_APPLICATION_MIN_WORDS,
-            ),500
+            c.commit()
 
-        flash('Your staff application was submitted successfully. Veyra staff will review it soon.','success')
+        flash('Your staff application has been submitted. Veyra staff will review it soon.','success')
         return redirect(url_for('staff_apply'))
 
     return render_template(
@@ -2237,8 +2205,7 @@ def staff_apply():
         user=u,
         application=dict(latest) if latest else None,
         form_data=form_data,
-        validation_errors=validation_errors,
-        min_words=STAFF_APPLICATION_MIN_WORDS,
+        field_errors=field_errors,
     )
 
 
