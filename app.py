@@ -474,23 +474,20 @@ def init_db():
                 created_at TEXT NOT NULL,
                 reviewed_at TEXT
             )""")
-            for staff_col,staff_type,staff_default in [
-                ('discord_name','TEXT',"''"),
-                ('age','TEXT',"''"),
-                ('timezone','TEXT',"''"),
-                ('availability','TEXT',"''"),
-                ('about','TEXT',"''"),
-                ('experience','TEXT',"''"),
-                ('why_veyra','TEXT',"''"),
-                ('support_judgment','TEXT',"''"),
-                ('extra','TEXT',"''"),
-                ('status','TEXT',"'pending'"),
-                ('reviewer_id','BIGINT','NULL'),
-                ('reviewer_note','TEXT',"''"),
-                ('created_at','TEXT',"''"),
-                ('reviewed_at','TEXT','NULL'),
-            ]:
-                c.execute(f'ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS {staff_col} {staff_type} DEFAULT {staff_default}')
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS discord_name TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS age TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS availability TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS about TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS experience TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS why_veyra TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS support_judgment TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS extra TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending'")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS reviewer_id BIGINT")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS reviewer_note TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS created_at TEXT")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS reviewed_at TEXT")
             c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_user ON staff_applications(user_id)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_status ON staff_applications(status)')
         else:
@@ -558,24 +555,25 @@ def init_db():
                 reviewed_at TEXT
             )""")
             staff_cols={r['name'] for r in c.execute('PRAGMA table_info(staff_applications)').fetchall()}
-            for staff_col,staff_sql in [
-                ('discord_name',"TEXT DEFAULT ''"),
-                ('age',"TEXT DEFAULT ''"),
-                ('timezone',"TEXT DEFAULT ''"),
-                ('availability',"TEXT DEFAULT ''"),
-                ('about',"TEXT DEFAULT ''"),
-                ('experience',"TEXT DEFAULT ''"),
-                ('why_veyra',"TEXT DEFAULT ''"),
-                ('support_judgment',"TEXT DEFAULT ''"),
-                ('extra',"TEXT DEFAULT ''"),
-                ('status',"TEXT DEFAULT 'pending'"),
-                ('reviewer_id','INTEGER'),
-                ('reviewer_note',"TEXT DEFAULT ''"),
-                ('created_at',"TEXT DEFAULT ''"),
-                ('reviewed_at','TEXT'),
-            ]:
-                if staff_col not in staff_cols:
-                    c.execute(f'ALTER TABLE staff_applications ADD COLUMN {staff_col} {staff_sql}')
+            staff_additions={
+                'discord_name':"TEXT DEFAULT ''",
+                'age':"TEXT DEFAULT ''",
+                'timezone':"TEXT DEFAULT ''",
+                'availability':"TEXT DEFAULT ''",
+                'about':"TEXT DEFAULT ''",
+                'experience':"TEXT DEFAULT ''",
+                'why_veyra':"TEXT DEFAULT ''",
+                'support_judgment':"TEXT DEFAULT ''",
+                'extra':"TEXT DEFAULT ''",
+                'status':"TEXT NOT NULL DEFAULT 'pending'",
+                'reviewer_id':"INTEGER",
+                'reviewer_note':"TEXT DEFAULT ''",
+                'created_at':"TEXT",
+                'reviewed_at':"TEXT",
+            }
+            for col,definition in staff_additions.items():
+                if col not in staff_cols:
+                    c.execute(f'ALTER TABLE staff_applications ADD COLUMN {col} {definition}')
             c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_user ON staff_applications(user_id)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_status ON staff_applications(status)')
             c.execute('''CREATE TABLE IF NOT EXISTS login_events(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,provider TEXT NOT NULL,email TEXT,account_name TEXT,discord_id TEXT,created_at TEXT NOT NULL,delivered INTEGER NOT NULL DEFAULT 0)''')
@@ -2155,51 +2153,26 @@ def dashboard():
 def staff_apply():
     u=current_user()
 
+    def word_count(value):
+        return len(re.findall(r"\b[\w'-]+\b", (value or '').strip()))
+
     with db() as c:
         latest=c.execute(
             'SELECT * FROM staff_applications WHERE user_id=? ORDER BY id DESC LIMIT 1',
             (u['id'],)
         ).fetchone()
 
-    form_data={
-        'discord_name':u.get('name') or '',
-        'age':'',
-        'timezone':'',
-        'availability':'',
-        'about':'',
-        'experience':'',
-        'why_veyra':'',
-        'support_judgment':'',
-        'extra':'',
-    }
-
-    word_requirements={
-        'availability':8,
-        'about':25,
-        'experience':20,
-        'why_veyra':20,
-        'support_judgment':35,
-    }
-
-    def word_count(value):
-        return len([w for w in re.split(r'\s+', (value or '').strip()) if w])
-
+    form_values={}
     if request.method=='POST':
         if latest and str(latest['status']).lower()=='pending':
             flash('You already have a staff application under review.','error')
-            return render_template(
-                'staff_apply.html',
-                user=u,
-                application=dict(latest),
-                form_data=form_data,
-                word_requirements=word_requirements
-            )
+            return redirect(url_for('staff_apply'))
 
-        form_data={
+        form_values={
             'discord_name':(request.form.get('discord_name') or '').strip()[:100],
             'age':(request.form.get('age') or '').strip()[:20],
             'timezone':(request.form.get('timezone') or '').strip()[:80],
-            'availability':(request.form.get('availability') or '').strip()[:2500],
+            'availability':(request.form.get('availability') or '').strip()[:1000],
             'about':(request.form.get('about') or '').strip()[:2500],
             'experience':(request.form.get('experience') or '').strip()[:2500],
             'why_veyra':(request.form.get('why_veyra') or '').strip()[:2500],
@@ -2207,27 +2180,28 @@ def staff_apply():
             'extra':(request.form.get('extra') or '').strip()[:2500],
         }
 
-        pretty_names={
+        required_fields={
             'availability':'Availability',
-            'about':'About you',
+            'about':'Tell us about yourself',
             'experience':'Experience',
             'why_veyra':'Why Veyra',
             'support_judgment':'Support judgment',
         }
-        errors=[]
-        for field,minimum in word_requirements.items():
-            count=word_count(form_data[field])
-            if count < minimum:
-                errors.append(f'{pretty_names[field]} needs at least {minimum} words ({count}/{minimum}).')
-
-        if errors:
-            flash(' '.join(errors),'error')
+        too_short=[
+            label for field,label in required_fields.items()
+            if word_count(form_values.get(field)) < 5
+        ]
+        if too_short:
+            flash(
+                'Each required written answer needs at least 5 words. Please finish: '
+                + ', '.join(too_short) + '.',
+                'error'
+            )
             return render_template(
                 'staff_apply.html',
                 user=u,
                 application=dict(latest) if latest else None,
-                form_data=form_data,
-                word_requirements=word_requirements
+                form_values=form_values
             ),400
 
         try:
@@ -2238,23 +2212,19 @@ def staff_apply():
                         why_veyra,support_judgment,extra,status,created_at
                     ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
-                        u['id'],
-                        form_data['discord_name'],
-                        form_data['age'],
-                        form_data['timezone'],
-                        form_data['availability'],
-                        form_data['about'],
-                        form_data['experience'],
-                        form_data['why_veyra'],
-                        form_data['support_judgment'],
-                        form_data['extra'],
-                        'pending',
-                        now()
+                        u['id'],form_values['discord_name'],form_values['age'],
+                        form_values['timezone'],form_values['availability'],
+                        form_values['about'],form_values['experience'],
+                        form_values['why_veyra'],form_values['support_judgment'],
+                        form_values['extra'],'pending',now()
                     )
                 )
                 c.commit()
-        except Exception:
-            app.logger.exception('Staff application submission failed | user_id=%s',u.get('id'))
+        except Exception as exc:
+            app.logger.exception(
+                'Staff application submit failed | user_id=%s | error=%s',
+                u.get('id'), type(exc).__name__
+            )
             flash(
                 'We could not submit your staff application because of a server error. '
                 'Your answers are still here — please try again.',
@@ -2264,8 +2234,7 @@ def staff_apply():
                 'staff_apply.html',
                 user=u,
                 application=dict(latest) if latest else None,
-                form_data=form_data,
-                word_requirements=word_requirements
+                form_values=form_values
             ),500
 
         flash('Your staff application has been submitted. Veyra staff will review it soon.','success')
@@ -2275,8 +2244,7 @@ def staff_apply():
         'staff_apply.html',
         user=u,
         application=dict(latest) if latest else None,
-        form_data=form_data,
-        word_requirements=word_requirements
+        form_values={}
     )
 
 

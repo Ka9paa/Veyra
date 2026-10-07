@@ -30,84 +30,113 @@
 {% endif %}
 
 {% if not application or application.status!='pending' %}
-<form method="post" class="sa-form" id="staffApplicationForm" novalidate>
+<form method="post" class="sa-form">
   <section class="card sa-section">
     <div class="section-num">01</div>
-    <div class="section-copy"><div class="eyebrow">ABOUT YOU</div><h2>Basic information</h2><p>Give us enough context to know who is applying.</p></div>
+    <div class="section-copy">
+      <div class="eyebrow">ABOUT YOU</div>
+      <h2>Basic information</h2>
+      <p>Give us enough context to know who is applying.</p>
+    </div>
     <div class="sa-grid">
-      <label><span>Discord username</span><input name="discord_name" placeholder="@username" value="{{form_data.discord_name if form_data else (user.name or '')}}"></label>
-      <label><span>Age</span><input name="age" placeholder="Your age" value="{{form_data.age if form_data else ''}}"></label>
-      <label><span>Timezone</span><input name="timezone" placeholder="Example: CST / UTC-5" value="{{form_data.timezone if form_data else ''}}"></label>
-      <label class="wide"><span>Availability *</span><textarea name="availability" required data-min-words="{{word_requirements.availability}}" placeholder="When are you normally available to help Veyra members?">{{form_data.availability if form_data else ''}}</textarea><div class="word-progress" data-for="availability"><b>0 / {{word_requirements.availability}} words</b><span>Minimum {{word_requirements.availability}} words</span></div></label>
+      <label><span>Discord username</span><input name="discord_name" placeholder="@username" value="{{user.name or ''}}"></label>
+      <label><span>Age</span><input name="age" placeholder="Your age" value="{{form_values.get('age', '')}}"></label>
+      <label><span>Timezone</span><input name="timezone" placeholder="Example: CST / UTC-5" value="{{form_values.get('timezone', '')}}"></label>
+      <label class="wide"><span>Availability *</span><textarea name="availability" required placeholder="When are you normally available to help Veyra members?">{{form_values.get('availability','')}}</textarea><div class="word-counter required" data-min-words="5" data-for="availability"><span class="wc-now">0</span> / 5 words</div></label>
     </div>
   </section>
 
   <section class="card sa-section">
     <div class="section-num">02</div>
     <div class="section-copy"><div class="eyebrow">EXPERIENCE</div><h2>Tell us what you bring.</h2><p>Prior staff experience is helpful, but good judgment matters more.</p></div>
-    <label><span>Tell us about yourself. *</span><textarea name="about" required data-min-words="{{word_requirements.about}}" placeholder="Who are you, what are you good at, and what should we know about you?">{{form_data.about if form_data else ''}}</textarea><div class="word-progress" data-for="about"><b>0 / {{word_requirements.about}} words</b><span>Minimum {{word_requirements.about}} words</span></div></label>
-    <label><span>What staff, support, moderation, development, or community experience do you have? *</span><textarea name="experience" required data-min-words="{{word_requirements.experience}}" placeholder="Explain your experience and responsibilities.">{{form_data.experience if form_data else ''}}</textarea><div class="word-progress" data-for="experience"><b>0 / {{word_requirements.experience}} words</b><span>Minimum {{word_requirements.experience}} words</span></div></label>
+    <label><span>Tell us about yourself. *</span><textarea name="about" required placeholder="Who are you, what are you good at, and what should we know about you?">{{form_values.get('about','')}}</textarea><div class="word-counter required" data-min-words="5" data-for="about"><span class="wc-now">0</span> / 5 words</div></label>
+    <label><span>What staff, support, moderation, development, or community experience do you have? *</span><textarea name="experience" required placeholder="Explain your experience and responsibilities.">{{form_values.get('experience','')}}</textarea><div class="word-counter required" data-min-words="5" data-for="experience"><span class="wc-now">0</span> / 5 words</div></label>
   </section>
 
   <section class="card sa-section">
     <div class="section-num">03</div>
     <div class="section-copy"><div class="eyebrow">VEYRA</div><h2>Why Veyra?</h2><p>We want people who understand the product and actually care about the community.</p></div>
-    <label><span>Why do you want to join the Veyra staff team? *</span><textarea name="why_veyra" required data-min-words="{{word_requirements.why_veyra}}" placeholder="Why Veyra, and what would you want to contribute?">{{form_data.why_veyra if form_data else ''}}</textarea><div class="word-progress" data-for="why_veyra"><b>0 / {{word_requirements.why_veyra}} words</b><span>Minimum {{word_requirements.why_veyra}} words</span></div></label>
+    <label><span>Why do you want to join the Veyra staff team? *</span><textarea name="why_veyra" required placeholder="Why Veyra, and what would you want to contribute?">{{form_values.get('why_veyra','')}}</textarea><div class="word-counter required" data-min-words="5" data-for="why_veyra"><span class="wc-now">0</span> / 5 words</div></label>
   </section>
 
   <section class="card sa-section">
     <div class="section-num">04</div>
     <div class="section-copy"><div class="eyebrow">SUPPORT JUDGMENT</div><h2>How would you handle members?</h2><p>Professional support means staying calm, useful, and accurate even when somebody is frustrated.</p></div>
-    <label><span>A member is angry because Veyra failed a build and says they were charged credits unfairly. How would you handle it? *</span><textarea name="support_judgment" required data-min-words="{{word_requirements.support_judgment}}" placeholder="Walk us through what you would say and what you would check.">{{form_data.support_judgment if form_data else ''}}</textarea><div class="word-progress" data-for="support_judgment"><b>0 / {{word_requirements.support_judgment}} words</b><span>Minimum {{word_requirements.support_judgment}} words</span></div></label>
-    <label><span>Anything else?</span><textarea name="extra" data-word-counter="optional" placeholder="Anything else you want the Veyra team to know?">{{form_data.extra if form_data else ''}}</textarea><div class="word-progress optional" data-for="extra"><b>0 words</b><span>Optional</span></div></label>
+    <label><span>A member is angry because Veyra failed a build and says they were charged credits unfairly. How would you handle it? *</span><textarea name="support_judgment" required placeholder="Walk us through what you would say and what you would check.">{{form_values.get('support_judgment','')}}</textarea><div class="word-counter required" data-min-words="5" data-for="support_judgment"><span class="wc-now">0</span> / 5 words</div></label>
+    <label><span>Anything else?</span><textarea name="extra" placeholder="Anything else you want the Veyra team to know?">{{form_values.get('extra','')}}</textarea><div class="word-counter" data-for="extra"><span class="wc-now">0</span> / words</div></label>
   </section>
 
   <div class="sa-submit">
-    <div><b>Ready to submit?</b><span>Your answers stay here if validation or the server fails. Each required answer has its own word minimum.</span></div>
-    <button class="btn primary" type="submit" id="staffSubmitBtn">Submit application →</button>
+    <div><b>Ready to submit?</b><span>Your answers will be visible only to authorized Veyra reviewers.</span></div>
+    <button class="btn primary" type="submit">Submit application →</button>
   </div>
 </form>
 {% endif %}
 
-<style>
-.sa-head{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:18px}.sa-status{border:1px solid var(--line);background:#0b1422;border-radius:15px;padding:17px;margin-bottom:16px}.sa-status>div:first-child{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.sa-status small{color:var(--muted);letter-spacing:.12em}.sa-status strong{color:#a997ff}.sa-status span{color:var(--muted)}.sa-status.pending{border-color:#5f4bc1}.sa-status.accepted{border-color:#276451}.sa-status.accepted strong{color:#70ebc7}.sa-status.denied{border-color:#743c49}.sa-status.denied strong{color:#ff92a5}.sa-status p{color:#a7b4c8}.review-note{margin-top:10px;padding:11px;border-radius:10px;background:#07101d;display:grid!important;gap:4px!important}.review-note b{color:#fff}.sa-form{display:grid;gap:14px}.sa-section{position:relative;padding:22px}.section-num{position:absolute;right:20px;top:18px;color:#332c65;font-size:38px;font-weight:900}.section-copy{margin-bottom:18px}.section-copy h2{margin:5px 0}.section-copy p{color:var(--muted);margin:0}.sa-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.sa-grid .wide{grid-column:1/-1}.sa-form label{display:grid;gap:7px;margin-top:12px}.sa-form label>span{font-size:12px;font-weight:800;color:#cdd6e5}.sa-form input,.sa-form textarea{width:100%;box-sizing:border-box;background:#07111e;border:1px solid #283950;border-radius:11px;color:#edf3ff;padding:12px 13px;outline:none;transition:.16s}.sa-form textarea{min-height:120px;resize:vertical}.sa-form input:focus,.sa-form textarea:focus{border-color:#735cff;box-shadow:0 0 0 3px #735cff18}.sa-form textarea.word-valid{border-color:#2f8f72;box-shadow:0 0 0 3px #36d9a713}.sa-form textarea.word-invalid:not(:focus){border-color:#66323d}.word-progress{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:#ff8297;padding:2px 2px 0}.word-progress b{font-weight:900}.word-progress span{color:#7f8fa7}.word-progress.met{color:#56e0b6}.word-progress.met span{color:#72bba7}.word-progress.optional{color:#9aa8bc}.sa-submit{display:flex;justify-content:space-between;align-items:center;gap:18px;border:1px solid #2d335a;background:#0c1424;border-radius:15px;padding:18px}.sa-submit b,.sa-submit span{display:block}.sa-submit span{color:var(--muted);margin-top:4px}.sa-submit button[disabled]{opacity:.55;cursor:not-allowed}@media(max-width:700px){.sa-head,.sa-submit{align-items:flex-start;flex-direction:column}.sa-grid{grid-template-columns:1fr}.sa-grid .wide{grid-column:auto}.word-progress{align-items:flex-start;flex-direction:column;gap:2px}}
-</style>
 
 <script>
 (() => {
-  const form=document.getElementById('staffApplicationForm');
-  if(!form) return;
-  const countWords=v=>{const s=(v||'').trim();return s?s.split(/\s+/).filter(Boolean).length:0;};
-  const refresh=field=>{
-    const counter=form.querySelector(`.word-progress[data-for="${field.name}"]`);
-    if(!counter) return true;
-    const count=countWords(field.value);
-    const min=Number(field.dataset.minWords||0);
-    const optional=field.dataset.wordCounter==='optional';
-    if(optional){
-      counter.querySelector('b').textContent=`${count} word${count===1?'':'s'}`;
-      return true;
-    }
-    counter.querySelector('b').textContent=`${count} / ${min} words`;
-    const met=count>=min;
-    counter.classList.toggle('met',met);
-    field.classList.toggle('word-valid',met);
-    field.classList.toggle('word-invalid',!met);
-    return met;
+  const countWords = (value) => {
+    const clean = (value || '').trim();
+    if (!clean) return 0;
+    const matches = clean.match(/\b[\w'-]+\b/g);
+    return matches ? matches.length : 0;
   };
-  const tracked=[...form.querySelectorAll('textarea[data-min-words],textarea[data-word-counter="optional"]')];
-  tracked.forEach(field=>{field.addEventListener('input',()=>refresh(field));refresh(field);});
-  form.addEventListener('submit',e=>{
-    const invalid=[...form.querySelectorAll('textarea[data-min-words]')].filter(field=>!refresh(field));
-    if(invalid.length){
-      e.preventDefault();
-      invalid[0].focus();
-      invalid[0].scrollIntoView({behavior:'smooth',block:'center'});
-      return;
+
+  const updateCounter = (field) => {
+    const counter = document.querySelector(`.word-counter[data-for="${field.name}"]`);
+    if (!counter) return true;
+
+    const words = countWords(field.value);
+    const now = counter.querySelector('.wc-now');
+    if (now) now.textContent = words;
+
+    const min = Number(counter.dataset.minWords || 0);
+    counter.classList.remove('valid','invalid');
+    field.classList.remove('word-valid','word-invalid');
+
+    if (min > 0) {
+      const good = words >= min;
+      counter.classList.add(good ? 'valid' : 'invalid');
+      field.classList.add(good ? 'word-valid' : 'word-invalid');
+      return good;
     }
-    const btn=document.getElementById('staffSubmitBtn');
-    if(btn){btn.disabled=true;btn.textContent='Submitting…';}
+    return true;
+  };
+
+  const fields = [...document.querySelectorAll('.sa-form textarea')];
+  fields.forEach(field => {
+    updateCounter(field);
+    field.addEventListener('input', () => updateCounter(field));
   });
+
+  const form = document.querySelector('.sa-form');
+  if (form) {
+    form.addEventListener('submit', (event) => {
+      const requiredFields = fields.filter(field => {
+        const counter = document.querySelector(`.word-counter[data-for="${field.name}"]`);
+        return counter && Number(counter.dataset.minWords || 0) > 0;
+      });
+
+      const invalid = requiredFields.filter(field => !updateCounter(field));
+      if (invalid.length) {
+        event.preventDefault();
+        invalid[0].focus();
+        invalid[0].scrollIntoView({behavior:'smooth', block:'center'});
+      }
+    });
+  }
 })();
 </script>
+
+<style>
+.sa-head{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:18px}.sa-status{border:1px solid var(--line);background:#0b1422;border-radius:15px;padding:17px;margin-bottom:16px}.sa-status>div:first-child{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.sa-status small{color:var(--muted);letter-spacing:.12em}.sa-status strong{color:#a997ff}.sa-status span{color:var(--muted)}.sa-status.pending{border-color:#5f4bc1}.sa-status.accepted{border-color:#276451}.sa-status.accepted strong{color:#70ebc7}.sa-status.denied{border-color:#743c49}.sa-status.denied strong{color:#ff92a5}.sa-status p{color:#a7b4c8}.review-note{margin-top:10px;padding:11px;border-radius:10px;background:#07101d;display:grid!important;gap:4px!important}.review-note b{color:#fff}.sa-form{display:grid;gap:14px}.sa-section{position:relative;padding:22px}.section-num{position:absolute;right:20px;top:18px;color:#332c65;font-size:38px;font-weight:900}.section-copy{margin-bottom:18px}.section-copy h2{margin:5px 0}.section-copy p{color:var(--muted);margin:0}.sa-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.sa-grid .wide{grid-column:1/-1}.sa-form label{display:grid;gap:7px;margin-top:12px}.sa-form label>span{font-size:12px;font-weight:800;color:#cdd6e5}.sa-form input,.sa-form textarea{width:100%;box-sizing:border-box;background:#07111e;border:1px solid #283950;border-radius:11px;color:#edf3ff;padding:12px 13px;outline:none}.sa-form textarea{min-height:120px;resize:vertical}.sa-form input:focus,.sa-form textarea:focus{border-color:#735cff;box-shadow:0 0 0 3px #735cff18}
+.word-counter{font-size:11px;font-weight:800;color:#7f8fa7;text-align:right;margin-top:-2px;transition:.18s}
+.word-counter.required.invalid{color:#ff7187}
+.word-counter.required.valid{color:#49ddb0}
+.sa-form textarea.word-invalid{border-color:#693242}
+.sa-form textarea.word-valid{border-color:#286353}
+.sa-form textarea.word-invalid:focus{border-color:#ff647d;box-shadow:0 0 0 3px #ff647d16}
+.sa-form textarea.word-valid:focus{border-color:#42d9aa;box-shadow:0 0 0 3px #42d9aa16}.sa-submit{display:flex;justify-content:space-between;align-items:center;gap:18px;border:1px solid #2d335a;background:#0c1424;border-radius:15px;padding:18px}.sa-submit b,.sa-submit span{display:block}.sa-submit span{color:var(--muted);margin-top:4px}@media(max-width:700px){.sa-head,.sa-submit{align-items:flex-start;flex-direction:column}.sa-grid{grid-template-columns:1fr}.sa-grid .wide{grid-column:auto}}
+</style>
 {% endblock %}
