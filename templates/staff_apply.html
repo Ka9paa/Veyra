@@ -1,15 +1,61 @@
 {% extends 'app_base.html' %}
 {% block title %}Staff Application — Veyra
-<style>
-.sa-validation{border:1px solid #74404c;background:#28131b;color:#ffb1be;border-radius:13px;padding:14px 16px;margin-bottom:16px;display:grid;gap:4px}.sa-validation span{color:#e6b6bf}.word-meta{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:5px}.word-count{font-size:11px;color:#8a99ae}.word-count.good{color:#69e7c1}.word-count.bad{color:#ff9aac}.field-error{color:#ff93a6;font-size:11px;font-weight:700}.invalid-answer{border-color:#8a4050!important;box-shadow:0 0 0 3px #8a405018!important}
-</style>
 <script>
 (() => {
- const form=document.getElementById('staffApplicationForm'); if(!form)return;
- const wc=v=>{const m=String(v||'').trim().match(/\b[\w'-]+\b/g);return m?m.length:0};
- const update=f=>{const min=Number(f.dataset.minWords||0),count=wc(f.value),meta=f.parentElement.querySelector('.word-count');if(meta){meta.textContent=`${count} / ${min} words`;meta.classList.toggle('good',count>=min);meta.classList.toggle('bad',count<min)}f.classList.toggle('invalid-answer',f.value.length>0&&count<min);return{min,count}};
- form.querySelectorAll('[data-min-words]').forEach(f=>{update(f);f.addEventListener('input',()=>update(f))});
- form.addEventListener('submit',e=>{let bad=null;form.querySelectorAll('[data-min-words]').forEach(f=>{const r=update(f);if(r.count<r.min&&!bad)bad=f});form.querySelectorAll('input[required],textarea[required]:not([data-min-words])').forEach(f=>{if(!f.value.trim()&&!bad)bad=f});if(bad){e.preventDefault();bad.focus();bad.scrollIntoView({behavior:'smooth',block:'center'})}});
+  const form = document.querySelector('.sa-form');
+  if (!form) return;
+
+  const countWords = (value) => {
+    const cleaned = (value || '').trim();
+    return cleaned ? cleaned.split(/\s+/).filter(Boolean).length : 0;
+  };
+
+  const updateCounter = (field) => {
+    const name = field.name;
+    const counter = form.querySelector(`.word-count[data-for="${name}"]`);
+    if (!counter) return true;
+
+    const words = countWords(field.value);
+    const min = Number(field.dataset.minWords || 0);
+
+    if (min > 0) {
+      const met = words >= min;
+      counter.textContent = `${words} / ${min} words`;
+      counter.classList.toggle('met', met);
+      field.classList.toggle('valid', met);
+      field.classList.toggle('invalid', !met);
+      return met;
+    }
+
+    counter.textContent = `${words} word${words === 1 ? '' : 's'} · optional`;
+    return true;
+  };
+
+  const requiredWordFields = [...form.querySelectorAll('textarea[data-min-words]')];
+  const allCountedFields = [...form.querySelectorAll('textarea[data-min-words], textarea[data-word-counter]')];
+  const submit = form.querySelector('button[type="submit"]');
+
+  const refresh = () => {
+    let valid = true;
+    for (const field of allCountedFields) {
+      const fieldValid = updateCounter(field);
+      if (field.dataset.minWords && !fieldValid) valid = false;
+    }
+    if (submit) submit.disabled = !valid;
+  };
+
+  allCountedFields.forEach(field => field.addEventListener('input', refresh));
+
+  form.addEventListener('submit', (event) => {
+    const bad = requiredWordFields.find(field => countWords(field.value) < Number(field.dataset.minWords || 5));
+    if (bad) {
+      event.preventDefault();
+      bad.focus();
+      refresh();
+    }
+  });
+
+  refresh();
 })();
 </script>
 
@@ -24,10 +70,6 @@
   </div>
   <a class="btn" href="/dashboard">← Dashboard</a>
 </div>
-
-{% if validation_errors %}
-<div class="sa-validation"><b>Your application was not submitted yet.</b><span>Fix the highlighted answers below. Everything you already typed has been kept.</span></div>
-{% endif %}
 
 {% if application %}
 <div class="sa-status {{application.status}}">
@@ -48,7 +90,7 @@
 {% endif %}
 
 {% if not application or application.status!='pending' %}
-<form method="post" class="sa-form" id="staffApplicationForm" novalidate>
+<form method="post" class="sa-form">
   <section class="card sa-section">
     <div class="section-num">01</div>
     <div class="section-copy">
@@ -57,31 +99,31 @@
       <p>Give us enough context to know who is applying.</p>
     </div>
     <div class="sa-grid">
-      <label><span>Discord username</span><input name="discord_name" placeholder="@username" value="{{form_data.discord_name if form_data else (user.name or '')}}"></label>
-      <label><span>Age</span><input name="age" placeholder="Your age" value="{{form_data.age if form_data else ''}}" required>{% if validation_errors and validation_errors.age %}<small class="field-error">{{validation_errors.age}}</small>{% endif %}</label>
-      <label><span>Timezone</span><input name="timezone" placeholder="Example: CST / UTC-5" value="{{form_data.timezone if form_data else ''}}" required>{% if validation_errors and validation_errors.timezone %}<small class="field-error">{{validation_errors.timezone}}</small>{% endif %}</label>
-      <label class="wide"><span>Availability *</span><textarea name="availability" required data-min-words="5" placeholder="When are you normally available to help Veyra members?">{{form_data.availability if form_data else ''}}</textarea><div class="word-meta"><span class="word-count">0 / 5 words</span>{% if validation_errors and validation_errors.availability %}<small class="field-error">{{validation_errors.availability}}</small>{% endif %}</div></label>
+      <label><span>Discord username</span><input name="discord_name" placeholder="@username" value="{{(draft.discord_name if draft is defined else user.name) or ''}}"></label>
+      <label><span>Age</span><input name="age" placeholder="Your age" value="{{draft.age if draft is defined else ''}}"></label>
+      <label><span>Timezone</span><input name="timezone" placeholder="Example: CST / UTC-5" value="{{draft.timezone if draft is defined else ''}}"></label>
+      <label class="wide"><span>Availability *</span><textarea name="availability" required data-min-words="5" placeholder="When are you normally available to help Veyra members?">{{draft.availability if draft is defined else ''}}</textarea><small class="word-count" data-for="availability">0 / 5 words</small></label>
     </div>
   </section>
 
   <section class="card sa-section">
     <div class="section-num">02</div>
     <div class="section-copy"><div class="eyebrow">EXPERIENCE</div><h2>Tell us what you bring.</h2><p>Prior staff experience is helpful, but good judgment matters more.</p></div>
-    <label><span>Tell us about yourself. *</span><textarea name="about" required data-min-words="20" placeholder="Who are you, what are you good at, and what should we know about you?">{{form_data.about if form_data else ''}}</textarea><div class="word-meta"><span class="word-count">0 / 20 words</span>{% if validation_errors and validation_errors.about %}<small class="field-error">{{validation_errors.about}}</small>{% endif %}</div></label>
-    <label><span>What staff, support, moderation, development, or community experience do you have? *</span><textarea name="experience" required data-min-words="20" placeholder="Explain your experience and responsibilities.">{{form_data.experience if form_data else ''}}</textarea><div class="word-meta"><span class="word-count">0 / 20 words</span>{% if validation_errors and validation_errors.experience %}<small class="field-error">{{validation_errors.experience}}</small>{% endif %}</div></label>
+    <label><span>Tell us about yourself. *</span><textarea name="about" required data-min-words="5" placeholder="Who are you, what are you good at, and what should we know about you?">{{draft.about if draft is defined else ''}}</textarea><small class="word-count" data-for="about">0 / 5 words</small></label>
+    <label><span>What staff, support, moderation, development, or community experience do you have? *</span><textarea name="experience" required data-min-words="5" placeholder="Explain your experience and responsibilities.">{{draft.experience if draft is defined else ''}}</textarea><small class="word-count" data-for="experience">0 / 5 words</small></label>
   </section>
 
   <section class="card sa-section">
     <div class="section-num">03</div>
     <div class="section-copy"><div class="eyebrow">VEYRA</div><h2>Why Veyra?</h2><p>We want people who understand the product and actually care about the community.</p></div>
-    <label><span>Why do you want to join the Veyra staff team? *</span><textarea name="why_veyra" required data-min-words="20" placeholder="Why Veyra, and what would you want to contribute?">{{form_data.why_veyra if form_data else ''}}</textarea><div class="word-meta"><span class="word-count">0 / 20 words</span>{% if validation_errors and validation_errors.why_veyra %}<small class="field-error">{{validation_errors.why_veyra}}</small>{% endif %}</div></label>
+    <label><span>Why do you want to join the Veyra staff team? *</span><textarea name="why_veyra" required data-min-words="5" placeholder="Why Veyra, and what would you want to contribute?">{{draft.why_veyra if draft is defined else ''}}</textarea><small class="word-count" data-for="why_veyra">0 / 5 words</small></label>
   </section>
 
   <section class="card sa-section">
     <div class="section-num">04</div>
     <div class="section-copy"><div class="eyebrow">SUPPORT JUDGMENT</div><h2>How would you handle members?</h2><p>Professional support means staying calm, useful, and accurate even when somebody is frustrated.</p></div>
-    <label><span>A member is angry because Veyra failed a build and says they were charged credits unfairly. How would you handle it? *</span><textarea name="support_judgment" required data-min-words="30" placeholder="Walk us through what you would say and what you would check.">{{form_data.support_judgment if form_data else ''}}</textarea><div class="word-meta"><span class="word-count">0 / 30 words</span>{% if validation_errors and validation_errors.support_judgment %}<small class="field-error">{{validation_errors.support_judgment}}</small>{% endif %}</div></label>
-    <label><span>Anything else?</span><textarea name="extra" placeholder="Anything else you want the Veyra team to know?">{{form_data.extra if form_data else ''}}</textarea></label>
+    <label><span>A member is angry because Veyra failed a build and says they were charged credits unfairly. How would you handle it? *</span><textarea name="support_judgment" required data-min-words="5" placeholder="Walk us through what you would say and what you would check.">{{draft.support_judgment if draft is defined else ''}}</textarea><small class="word-count" data-for="support_judgment">0 / 5 words</small></label>
+    <label><span>Anything else?</span><textarea name="extra" data-word-counter="optional" placeholder="Anything else you want the Veyra team to know?">{{draft.extra if draft is defined else ''}}</textarea><small class="word-count optional" data-for="extra">0 words · optional</small></label>
   </section>
 
   <div class="sa-submit">
@@ -93,5 +135,13 @@
 
 <style>
 .sa-head{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:18px}.sa-status{border:1px solid var(--line);background:#0b1422;border-radius:15px;padding:17px;margin-bottom:16px}.sa-status>div:first-child{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.sa-status small{color:var(--muted);letter-spacing:.12em}.sa-status strong{color:#a997ff}.sa-status span{color:var(--muted)}.sa-status.pending{border-color:#5f4bc1}.sa-status.accepted{border-color:#276451}.sa-status.accepted strong{color:#70ebc7}.sa-status.denied{border-color:#743c49}.sa-status.denied strong{color:#ff92a5}.sa-status p{color:#a7b4c8}.review-note{margin-top:10px;padding:11px;border-radius:10px;background:#07101d;display:grid!important;gap:4px!important}.review-note b{color:#fff}.sa-form{display:grid;gap:14px}.sa-section{position:relative;padding:22px}.section-num{position:absolute;right:20px;top:18px;color:#332c65;font-size:38px;font-weight:900}.section-copy{margin-bottom:18px}.section-copy h2{margin:5px 0}.section-copy p{color:var(--muted);margin:0}.sa-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.sa-grid .wide{grid-column:1/-1}.sa-form label{display:grid;gap:7px;margin-top:12px}.sa-form label>span{font-size:12px;font-weight:800;color:#cdd6e5}.sa-form input,.sa-form textarea{width:100%;box-sizing:border-box;background:#07111e;border:1px solid #283950;border-radius:11px;color:#edf3ff;padding:12px 13px;outline:none}.sa-form textarea{min-height:120px;resize:vertical}.sa-form input:focus,.sa-form textarea:focus{border-color:#735cff;box-shadow:0 0 0 3px #735cff18}.sa-submit{display:flex;justify-content:space-between;align-items:center;gap:18px;border:1px solid #2d335a;background:#0c1424;border-radius:15px;padding:18px}.sa-submit b,.sa-submit span{display:block}.sa-submit span{color:var(--muted);margin-top:4px}@media(max-width:700px){.sa-head,.sa-submit{align-items:flex-start;flex-direction:column}.sa-grid{grid-template-columns:1fr}.sa-grid .wide{grid-column:auto}}
+
+.word-count{display:block;margin-top:5px;font-size:11px;font-weight:800;color:#ff6f87;transition:.18s}
+.word-count.met{color:#51dfaF}
+.word-count.optional{color:#718198}
+.sa-form textarea.invalid{border-color:#8e3b4b!important;box-shadow:0 0 0 3px #8e3b4b18!important}
+.sa-form textarea.valid{border-color:#2f816b!important;box-shadow:0 0 0 3px #2f816b18!important}
+.sa-submit button:disabled{opacity:.48;cursor:not-allowed;filter:saturate(.45)}
+
 </style>
 {% endblock %}
