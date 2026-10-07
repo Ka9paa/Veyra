@@ -476,22 +476,6 @@ def init_db():
             )""")
             c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_user ON staff_applications(user_id)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_status ON staff_applications(status)')
-            # Migrate older staff application tables instead of assuming the newest
-            # CREATE TABLE definition was applied to an existing database.
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS discord_name TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS age TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS availability TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS about TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS experience TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS why_veyra TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS support_judgment TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS extra TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS reviewer_id BIGINT")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS reviewer_note TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS reviewed_at TEXT")
         else:
             c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 50,created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
             c.execute('''CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)''')
@@ -558,25 +542,6 @@ def init_db():
             )""")
             c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_user ON staff_applications(user_id)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_status ON staff_applications(status)')
-            staff_cols={r['name'] for r in c.execute('PRAGMA table_info(staff_applications)').fetchall()}
-            for col,ddl in [
-                ('discord_name',"TEXT DEFAULT ''"),
-                ('age',"TEXT DEFAULT ''"),
-                ('timezone',"TEXT DEFAULT ''"),
-                ('availability',"TEXT DEFAULT ''"),
-                ('about',"TEXT DEFAULT ''"),
-                ('experience',"TEXT DEFAULT ''"),
-                ('why_veyra',"TEXT DEFAULT ''"),
-                ('support_judgment',"TEXT DEFAULT ''"),
-                ('extra',"TEXT DEFAULT ''"),
-                ('status',"TEXT DEFAULT 'pending'"),
-                ('reviewer_id','INTEGER'),
-                ('reviewer_note',"TEXT DEFAULT ''"),
-                ('created_at',"TEXT DEFAULT ''"),
-                ('reviewed_at','TEXT'),
-            ]:
-                if col not in staff_cols:
-                    c.execute(f'ALTER TABLE staff_applications ADD COLUMN {col} {ddl}')
             c.execute('''CREATE TABLE IF NOT EXISTS login_events(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,provider TEXT NOT NULL,email TEXT,account_name TEXT,discord_id TEXT,created_at TEXT NOT NULL,delivered INTEGER NOT NULL DEFAULT 0)''')
         c.commit()
 
@@ -2149,6 +2114,19 @@ def dashboard():
 
 
 
+def _staff_word_count(value):
+    return len([part for part in re.split(r'\\s+', (value or '').strip()) if part])
+
+
+STAFF_APPLICATION_MIN_WORDS={
+    'availability':5,
+    'about':15,
+    'experience':15,
+    'why_veyra':15,
+    'support_judgment':20,
+}
+
+
 @app.route('/staff/apply', methods=['GET','POST'])
 @login_required
 def staff_apply():
@@ -2159,53 +2137,65 @@ def staff_apply():
             (u['id'],)
         ).fetchone()
 
+    form_data={
+        'discord_name':u.get('name') or '',
+        'age':'',
+        'timezone':'',
+        'availability':'',
+        'about':'',
+        'experience':'',
+        'why_veyra':'',
+        'support_judgment':'',
+        'extra':'',
+    }
+    validation_errors={}
+
     if request.method=='POST':
         if latest and str(latest['status']).lower()=='pending':
             flash('You already have a staff application under review.','error')
             return redirect(url_for('staff_apply'))
 
-        discord_name=(request.form.get('discord_name') or '').strip()[:100]
-        age=(request.form.get('age') or '').strip()[:20]
-        timezone=(request.form.get('timezone') or '').strip()[:80]
-        availability=(request.form.get('availability') or '').strip()[:300]
-        about=(request.form.get('about') or '').strip()
-        experience=(request.form.get('experience') or '').strip()
-        why_veyra=(request.form.get('why_veyra') or '').strip()
-        support_judgment=(request.form.get('support_judgment') or '').strip()
-        extra=(request.form.get('extra') or '').strip()
-
-        required_answers={
-            'Availability':availability,
-            'About you':about,
-            'Experience':experience,
-            'Why Veyra':why_veyra,
-            'Support judgment':support_judgment,
+        form_data={
+            'discord_name':(request.form.get('discord_name') or '').strip()[:100],
+            'age':(request.form.get('age') or '').strip()[:20],
+            'timezone':(request.form.get('timezone') or '').strip()[:80],
+            'availability':(request.form.get('availability') or '').strip()[:1200],
+            'about':(request.form.get('about') or '').strip()[:2500],
+            'experience':(request.form.get('experience') or '').strip()[:2500],
+            'why_veyra':(request.form.get('why_veyra') or '').strip()[:2500],
+            'support_judgment':(request.form.get('support_judgment') or '').strip()[:2500],
+            'extra':(request.form.get('extra') or '').strip()[:2500],
         }
 
-        def word_count(value):
-            return len([w for w in re.split(r'\s+', (value or '').strip()) if w])
+        # Basic required identity fields.
+        if not form_data['discord_name']:
+            validation_errors['discord_name']='Enter your Discord username.'
+        if not form_data['age']:
+            validation_errors['age']='Enter your age.'
+        if not form_data['timezone']:
+            validation_errors['timezone']='Enter your timezone.'
 
-        too_short=[name for name,value in required_answers.items() if word_count(value)<5]
-        if too_short:
+        # Word-based validation matches exactly what the applicant sees live.
+        for field,min_words in STAFF_APPLICATION_MIN_WORDS.items():
+            count=_staff_word_count(form_data[field])
+            if count < min_words:
+                validation_errors[field]=(
+                    f'Write at least {min_words} words for this answer '
+                    f'({count}/{min_words} words).'
+                )
+
+        if validation_errors:
             flash(
-                'Please write at least 5 words for: ' + ', '.join(too_short) + '.',
+                'Your application is not ready yet. Finish the answers highlighted in red, then submit again.',
                 'error'
             )
             return render_template(
                 'staff_apply.html',
                 user=u,
                 application=dict(latest) if latest else None,
-                draft={
-                    'discord_name':discord_name,
-                    'age':age,
-                    'timezone':timezone,
-                    'availability':availability,
-                    'about':about,
-                    'experience':experience,
-                    'why_veyra':why_veyra,
-                    'support_judgment':support_judgment,
-                    'extra':extra,
-                }
+                form_data=form_data,
+                validation_errors=validation_errors,
+                min_words=STAFF_APPLICATION_MIN_WORDS,
             ),400
 
         try:
@@ -2216,43 +2206,39 @@ def staff_apply():
                         why_veyra,support_judgment,extra,status,created_at
                     ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
-                        u['id'],discord_name,age,timezone,availability,
-                        about[:2500],experience[:2500],why_veyra[:2500],
-                        support_judgment[:2500],extra[:2500],'pending',now()
+                        u['id'],form_data['discord_name'],form_data['age'],form_data['timezone'],
+                        form_data['availability'],form_data['about'],form_data['experience'],
+                        form_data['why_veyra'],form_data['support_judgment'],form_data['extra'],
+                        'pending',now()
                     )
                 )
                 c.commit()
         except Exception:
-            app.logger.exception('Staff application submit failed | user_id=%s',u.get('id'))
+            app.logger.exception('Staff application submission failed | user_id=%s',u.get('id'))
             flash(
                 'We could not submit your application because of a server error. '
-                'Your answers are still on this page — please try again.',
+                'Your answers are still here — please try again.',
                 'error'
             )
             return render_template(
                 'staff_apply.html',
                 user=u,
                 application=dict(latest) if latest else None,
-                draft={
-                    'discord_name':discord_name,
-                    'age':age,
-                    'timezone':timezone,
-                    'availability':availability,
-                    'about':about,
-                    'experience':experience,
-                    'why_veyra':why_veyra,
-                    'support_judgment':support_judgment,
-                    'extra':extra,
-                }
+                form_data=form_data,
+                validation_errors={},
+                min_words=STAFF_APPLICATION_MIN_WORDS,
             ),500
 
-        flash('Your staff application has been submitted. Veyra staff will review it soon.','success')
+        flash('Your staff application was submitted successfully. Veyra staff will review it soon.','success')
         return redirect(url_for('staff_apply'))
 
     return render_template(
         'staff_apply.html',
         user=u,
-        application=dict(latest) if latest else None
+        application=dict(latest) if latest else None,
+        form_data=form_data,
+        validation_errors=validation_errors,
+        min_words=STAFF_APPLICATION_MIN_WORDS,
     )
 
 
