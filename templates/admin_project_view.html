@@ -1,0 +1,91 @@
+{% extends 'app_base.html' %}
+{% block title %}Project Inspector — Veyra Admin{% endblock %}
+{% block top_title %}Admin Project Inspector{% endblock %}
+{% block content %}
+<style>
+.ap-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:16px}.ap-head h1{margin:4px 0;font-size:30px}.ap-head p{color:var(--muted);margin:0}
+.ap-grid{display:grid;grid-template-columns:320px minmax(0,1fr);gap:14px}.ap-card{border:1px solid var(--line);border-radius:15px;background:#0a1422;overflow:hidden}.ap-card h3{font-size:12px;margin:0;padding:15px;border-bottom:1px solid var(--line)}
+.ap-meta{padding:14px;display:grid;gap:12px}.ap-meta div{display:grid;gap:3px}.ap-meta small{color:#65758e}.ap-meta b{font-size:12px;word-break:break-word}
+.ap-tabs{display:flex;gap:6px;padding:10px;border-bottom:1px solid var(--line)}.ap-tab{height:30px;padding:0 10px;border:1px solid #2b3c59;border-radius:8px;background:#0c1727;color:#9faec2;cursor:pointer}.ap-tab.active{background:#6f4ce3;color:#fff;border-color:#805def}
+.ap-pane{display:none}.ap-pane.active{display:block}.ap-pane pre{margin:0;padding:16px;min-height:520px;max-height:70vh;overflow:auto;background:#060d17;color:#cbd7e8;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word}
+.ap-preview iframe{width:100%;height:70vh;border:0;background:white}.ap-list{padding:10px 14px}.ap-list div{padding:10px 0;border-bottom:1px solid #15243a}.ap-list div:last-child{border-bottom:0}.ap-list small{display:block;color:#687a93;margin-top:3px}
+@media(max-width:900px){.ap-grid{grid-template-columns:1fr}}
+</style>
+
+<div class="ap-head">
+  <div>
+    <div class="eyebrow">ADMIN / PROJECTS</div>
+    <h1>{{project.name or 'Untitled Project'}}</h1>
+    <p>Read-only inspection of project #{{project.id}} owned by {{project.owner_name or project.owner_email or ('user #' ~ project.user_id)}}.</p>
+  </div>
+  <a class="btn" href="/admin">← Admin Center</a>
+</div>
+
+<div class="ap-grid">
+  <aside style="display:grid;gap:14px;align-content:start">
+    <section class="ap-card">
+      <h3>Project details</h3>
+      <div class="ap-meta">
+        <div><small>Owner</small><b>{{project.owner_name or 'Veyra user'}}</b><span>{{project.owner_email or 'No email'}}</span></div>
+        <div><small>Project ID</small><b>#{{project.id}}</b></div>
+        <div><small>Created</small><b>{{project.created_at}}</b></div>
+        <div><small>Updated</small><b>{{project.updated_at}}</b></div>
+        <div><small>Description</small><b>{{project.description or 'No description'}}</b></div>
+      </div>
+    </section>
+
+    <section class="ap-card">
+      <h3>Members</h3>
+      <div class="ap-list">
+        {% for m in members %}
+          <div><b>{{m.name or m.email or ('User #' ~ m.user_id)}}</b><small>{{m.email or ''}} · {{m.role|capitalize}}</small></div>
+        {% else %}<div><small>No additional project members.</small></div>{% endfor %}
+      </div>
+    </section>
+
+    <section class="ap-card">
+      <h3>Deployments</h3>
+      <div class="ap-list">
+        {% for d in deployments %}
+          <div><b>{{d.status|capitalize}}</b><small>{{d.created_at}}</small>{% if d.url %}<a href="{{d.url}}" target="_blank" rel="noopener">{{d.url}}</a>{% endif %}</div>
+        {% else %}<div><small>No deployments recorded.</small></div>{% endfor %}
+      </div>
+    </section>
+  </aside>
+
+  <section class="ap-card">
+    <div class="ap-tabs">
+      <button class="ap-tab active" data-tab="preview">Preview</button>
+      <button class="ap-tab" data-tab="html">HTML</button>
+      <button class="ap-tab" data-tab="css">CSS</button>
+      <button class="ap-tab" data-tab="js">JavaScript</button>
+    </div>
+    <div class="ap-pane ap-preview active" data-pane="preview">
+      <iframe id="adminProjectPreview" sandbox="allow-scripts"></iframe>
+    </div>
+    <div class="ap-pane" data-pane="html"><pre>{{project.html or ''}}</pre></div>
+    <div class="ap-pane" data-pane="css"><pre>{{project.css or ''}}</pre></div>
+    <div class="ap-pane" data-pane="js"><pre>{{project.js or ''}}</pre></div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const html = {{ (project.html or '')|tojson }};
+  const css = {{ (project.css or '')|tojson }};
+  const js = {{ (project.js or '')|tojson }};
+  const frame = document.getElementById('adminProjectPreview');
+
+  if (frame) {
+    frame.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body>${html}<script>${js.replace(/<\/script>/gi,'<\\/script>')}<\/script></body></html>`;
+  }
+
+  const tabs = [...document.querySelectorAll('[data-tab]')];
+  const panes = [...document.querySelectorAll('[data-pane]')];
+  tabs.forEach(tab => tab.addEventListener('click', () => {
+    tabs.forEach(x => x.classList.toggle('active', x === tab));
+    panes.forEach(p => p.classList.toggle('active', p.dataset.pane === tab.dataset.tab));
+  }));
+})();
+</script>
+{% endblock %}
