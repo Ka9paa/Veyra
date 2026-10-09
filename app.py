@@ -1873,6 +1873,12 @@ def admin_dashboard():
         discord_linked=c.execute(
             "SELECT COUNT(*) AS n FROM users WHERE COALESCE(discord_id,'')<>'' OR lower(COALESCE(provider,''))='discord'"
         ).fetchone()['n']
+        staff_pending=c.execute(
+            "SELECT COUNT(*) AS n FROM staff_applications WHERE lower(COALESCE(status,'pending'))='pending'"
+        ).fetchone()['n']
+        staff_total=c.execute(
+            "SELECT COUNT(*) AS n FROM staff_applications"
+        ).fetchone()['n']
 
     stats={
         'total_users':int(total_users or 0),
@@ -1884,10 +1890,13 @@ def admin_dashboard():
         'total_logins':int(total_logins or 0),
         'admin_count':int(admin_count or 0),
         'discord_linked':int(discord_linked or 0),
+        'staff_pending':int(staff_pending or 0),
+        'staff_total':int(staff_total or 0),
         'ai_status':'Ready' if os.getenv('OPENAI_API_KEY','').strip() else 'Local mode',
         'stripe_status':'Configured' if (
-            os.getenv('STRIPE_PRO_PAYMENT_LINK','').strip()
-            or os.getenv('STRIPE_MAX_PAYMENT_LINK','').strip()
+            os.getenv('STRIPE_SECRET_KEY','').strip()
+            or os.getenv('STRIPE_PRO_PRICE_ID','').strip()
+            or os.getenv('STRIPE_PRO_PAYMENT_LINK','').strip()
         ) else 'Not configured',
     }
 
