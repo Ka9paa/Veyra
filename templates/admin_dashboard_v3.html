@@ -16,13 +16,7 @@
 .adm-table-wrap{overflow:auto}.adm-table{width:100%;border-collapse:collapse;min-width:830px}
 .adm-table th{height:38px;text-align:left;padding:0 12px;color:#5f7089;font-size:9px;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--line)}
 .adm-table td{padding:11px 12px;border-bottom:1px solid #142137;font-size:11px}.adm-table tr:last-child td{border-bottom:0}.adm-table tr:hover td{background:#0d1828}
-.adm-user{display:flex;align-items:center;gap:11px;min-width:220px}
-.adm-avatar{width:42px;height:42px;flex:0 0 42px;border-radius:12px;background:linear-gradient(135deg,#172540,#20183e);display:grid;place-items:center;font-weight:900;color:#c2b0ff;overflow:hidden;border:1px solid #31435f;box-shadow:0 4px 16px rgba(0,0,0,.22)}
-.adm-avatar img{width:100%;height:100%;object-fit:cover;display:block}
-.adm-avatar.has-photo{background:#0d1726}
-.adm-user b{display:block;font-size:11px;color:#edf3ff}
-.adm-user small{display:block;color:#62738e;margin-top:3px}
-.adm-provider{display:inline-flex;margin-top:5px;padding:3px 6px;border-radius:999px;border:1px solid #293b58;background:#0d1727;color:#8294ae;font-size:8px;text-transform:uppercase;letter-spacing:.08em}
+.adm-user{display:flex;align-items:center;gap:9px}.adm-avatar{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#211943,#10203a);display:grid;place-items:center;font-weight:900;color:#c7b6ff;overflow:hidden;border:1px solid #334563;box-shadow:0 0 0 2px rgba(123,92,255,.08)}.adm-avatar img{width:100%;height:100%;object-fit:cover;display:block}.adm-user b{display:block;font-size:11px;color:#f5f7ff}.adm-user small{display:block;color:#62738e;margin-top:2px}.adm-user-meta{display:flex;gap:5px;margin-top:4px;flex-wrap:wrap}.adm-mini{font-size:8px;border:1px solid #2b3b58;border-radius:999px;padding:2px 5px;color:#8293ab;background:#0b1524}
 .adm-pill{display:inline-flex;align-items:center;height:23px;padding:0 7px;border:1px solid #2d3e5c;border-radius:999px;background:#101a2b;color:#9cacbf;font-size:9px}.adm-pill.pro{border-color:#54418e;color:#bba4ff}.adm-pill.max{border-color:#315a76;color:#76cfff}.adm-pill.bad{border-color:#71384b;color:#ff9fb0}
 .adm-actions{display:flex;gap:5px;flex-wrap:wrap}.adm-actions form{margin:0}.adm-btn{height:29px;padding:0 8px;border:1px solid #2b3b58;border-radius:8px;background:#0c1625;color:#a6b3c5;font-size:9px;cursor:pointer}.adm-btn:hover{color:#fff;border-color:#4b5f81}.adm-btn.primary{background:#6f4ce3;border-color:#7c58ee;color:#fff}
 .adm-side{display:grid;gap:13px;align-content:start}.adm-status-list{padding:10px 14px}.adm-status{min-height:45px;display:flex;align-items:center;border-bottom:1px solid #16243a;gap:8px}.adm-status:last-child{border:0}.adm-status i{width:7px;height:7px;border-radius:50%;background:#45dfae}.adm-status span{color:#7788a1}.adm-status b{margin-left:auto;font-size:10px}
@@ -33,7 +27,7 @@
 </style>
 
 <div class="adm-head">
-  <div><div class="eyebrow">CONTROL PLANE</div><h1>Veyra Admin Center</h1><p>Website accounts, plans, credits, restrictions, Discord linking, and real platform activity from the shared database.</p></div>
+  <div><div class="eyebrow">CONTROL PLANE</div><h1>Veyra Admin Center</h1><p>Manage real Veyra accounts, plans, credits, restrictions, linked Discord identities, projects, and platform activity from one control center.</p></div>
   <div class="adm-live"><i></i> Shared database connected</div>
 </div>
 
@@ -55,20 +49,8 @@
           {% set did = u.discord_id or (u.provider_user_id if u.provider=='discord' else '') %}
           <tr>
             <td><div class="adm-user">
-              <div class="adm-avatar {% if u.admin_avatar_url %}has-photo{% endif %}">
-                {% if u.admin_avatar_url %}
-                  <img src="{{u.admin_avatar_url}}" alt="{{u.name or 'Veyra user'}} profile picture" referrerpolicy="no-referrer" loading="eager" decoding="async"
-                       onerror="this.style.display='none';this.parentElement.querySelector('.adm-fallback').style.display='grid'">
-                  <span class="adm-fallback" style="display:none;width:100%;height:100%;place-items:center">{{(u.name or u.email or 'VE')[:2]|upper}}</span>
-                {% else %}
-                  <span class="adm-fallback" style="display:grid;width:100%;height:100%;place-items:center">{{(u.name or u.email or 'VE')[:2]|upper}}</span>
-                {% endif %}
-              </div>
-              <div>
-                <b>{{u.name or 'Veyra user'}}</b>
-                <small>{{u.email or 'No email'}} · #{{u.id}}</small>
-                <span class="adm-provider">{{u.provider or 'account'}}{% if did %} · Discord linked{% endif %}{% if u.avatar_needs_refresh %} · PFP refreshes next sign-in{% endif %}</span>
-              </div>
+              <div class="adm-avatar">{% if u.avatar_url %}<img src="{{u.avatar_url}}" alt="{{u.name or 'Veyra user'}} avatar" referrerpolicy="no-referrer">{% else %}{{(u.name or u.email or 'VE')[:2]|upper}}{% endif %}</div>
+              <div><b>{{u.name or 'Veyra user'}}</b><small>{{u.email or 'No email'}} · #{{u.id}}</small><div class="adm-user-meta"><span class="adm-mini">{{(u.provider or 'email')|upper}}</span>{% if did %}<span class="adm-mini">DISCORD LINKED</span>{% endif %}</div></div>
             </div></td>
             <td><span class="adm-pill {{(u.plan or 'free')|lower}}">{{(u.plan or 'free')|upper}}</span></td>
             <td><b>{{u.credits or 0}}</b></td>
