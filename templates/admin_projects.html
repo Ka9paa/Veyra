@@ -1,0 +1,73 @@
+{% extends 'app_base.html' %}
+{% block title %}All Projects — Veyra Admin{% endblock %}
+{% block top_title %}Admin · All Projects{% endblock %}
+{% block content %}
+<div class="hero-row">
+  <div>
+    <div class="eyebrow">ADMIN CENTER</div>
+    <h1 class="title">Everyone's projects</h1>
+    <p class="subtitle">View every project saved in Veyra, see who owns it, and launch a safe interactive preview for testing.</p>
+  </div>
+  <div class="hero-actions">
+    <a class="btn" href="{{url_for('admin_dashboard')}}">← Admin Center</a>
+    <a class="btn" href="{{url_for('staff_review')}}">Staff applications</a>
+  </div>
+</div>
+
+<form class="admin-project-filters" method="get">
+  <input class="input" name="q" value="{{search}}" placeholder="Search project, owner, or email">
+  <select class="select" name="owner">
+    <option value="">All owners</option>
+    {% for o in owners %}
+      <option value="{{o.id}}" {% if owner_filter|string == o.id|string %}selected{% endif %}>{{o.name or o.email}} · {{o.project_count}} project{{'' if o.project_count==1 else 's'}}</option>
+    {% endfor %}
+  </select>
+  <button class="btn primary" type="submit">Search</button>
+  {% if search or owner_filter %}<a class="btn" href="{{url_for('admin_projects')}}">Clear</a>{% endif %}
+</form>
+
+<div class="admin-project-summary">
+  <div class="card"><span>VISIBLE PROJECTS</span><strong>{{projects|length}}</strong></div>
+  <div class="card"><span>PROJECT OWNERS</span><strong>{{owners|length}}</strong></div>
+</div>
+
+<div class="admin-project-list">
+{% for p in projects %}
+  <article class="card project-row">
+    <div class="project-icon">V</div>
+    <div class="project-meta">
+      <div class="project-title-row">
+        <strong>{{p.name}}</strong>
+        <span class="tag">#{{p.id}}</span>
+      </div>
+      <p>{{p.description or 'No description provided.'}}</p>
+      <div class="owner-line">
+        <b>{{p.owner_name or 'Veyra User'}}</b>
+        <span>{{p.owner_email or 'No email'}}</span>
+        {% if p.owner_discord_id %}<span>Discord linked</span>{% endif %}
+      </div>
+      <small>Created {{p.created_at}} · Updated {{p.updated_at}}</small>
+    </div>
+    <div class="project-actions">
+      <a class="btn primary" href="{{url_for('admin_project_preview',project_id=p.id)}}">Test project →</a>
+    </div>
+  </article>
+{% else %}
+  <div class="empty">
+    <div class="empty-icon">⌕</div>
+    <h3>No projects found</h3>
+    <p>Try clearing the filters or searching another owner/project.</p>
+  </div>
+{% endfor %}
+</div>
+
+<style>
+.admin-project-filters{display:grid;grid-template-columns:minmax(260px,1fr) minmax(220px,320px) auto auto;gap:9px;margin-bottom:15px}
+.admin-project-summary{display:grid;grid-template-columns:repeat(2,minmax(0,220px));gap:10px;margin-bottom:15px}
+.admin-project-summary .card{padding:14px 16px}.admin-project-summary span{display:block;color:var(--muted);font-size:9px;letter-spacing:.13em;font-weight:850}.admin-project-summary strong{display:block;font-size:25px;margin-top:4px}
+.admin-project-list{display:grid;gap:10px}.project-row{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:14px;align-items:center}
+.project-icon{width:48px;height:48px;border-radius:13px;display:grid;place-items:center;background:linear-gradient(135deg,#3f247d,#7450ff);font-weight:900}
+.project-meta{min-width:0}.project-title-row{display:flex;gap:9px;align-items:center}.project-title-row strong{font-size:15px}.project-meta p{margin:5px 0 7px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.owner-line{display:flex;gap:9px;flex-wrap:wrap;font-size:11px}.owner-line span{color:#7f90a9}.project-meta small{display:block;color:#596b84;margin-top:6px}.project-actions{display:flex;gap:8px}
+@media(max-width:800px){.admin-project-filters{grid-template-columns:1fr}.project-row{grid-template-columns:42px 1fr}.project-actions{grid-column:1/-1}.admin-project-summary{grid-template-columns:1fr 1fr}}
+</style>
+{% endblock %}

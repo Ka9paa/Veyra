@@ -1825,22 +1825,6 @@ def admin_dashboard():
             ).fetchall()
         ]
 
-        all_projects=[
-            dict(r) for r in c.execute(
-                '''SELECT
-                       p.id,p.user_id,p.name,p.description,p.created_at,p.updated_at,
-                       LENGTH(COALESCE(p.html,'')) AS html_size,
-                       LENGTH(COALESCE(p.css,'')) AS css_size,
-                       LENGTH(COALESCE(p.js,'')) AS js_size,
-                       u.name AS owner_name,u.email AS owner_email,u.avatar_url AS owner_avatar,
-                       (SELECT COUNT(*) FROM project_members pm WHERE pm.project_id=p.id) AS member_count,
-                       (SELECT COUNT(*) FROM deployments d WHERE d.project_id=p.id) AS deployment_count
-                   FROM projects p
-                   LEFT JOIN users u ON u.id=p.user_id
-                   ORDER BY p.updated_at DESC'''
-            ).fetchall()
-        ]
-
     for u in users:
         uid=u['id']
         u['plan_action']=url_for('admin_set_plan',user_id=uid)
@@ -1873,12 +1857,6 @@ def admin_dashboard():
         discord_linked=c.execute(
             "SELECT COUNT(*) AS n FROM users WHERE COALESCE(discord_id,'')<>'' OR lower(COALESCE(provider,''))='discord'"
         ).fetchone()['n']
-        staff_pending=c.execute(
-            "SELECT COUNT(*) AS n FROM staff_applications WHERE lower(COALESCE(status,'pending'))='pending'"
-        ).fetchone()['n']
-        staff_total=c.execute(
-            "SELECT COUNT(*) AS n FROM staff_applications"
-        ).fetchone()['n']
 
     stats={
         'total_users':int(total_users or 0),
@@ -1890,13 +1868,10 @@ def admin_dashboard():
         'total_logins':int(total_logins or 0),
         'admin_count':int(admin_count or 0),
         'discord_linked':int(discord_linked or 0),
-        'staff_pending':int(staff_pending or 0),
-        'staff_total':int(staff_total or 0),
         'ai_status':'Ready' if os.getenv('OPENAI_API_KEY','').strip() else 'Local mode',
         'stripe_status':'Configured' if (
-            os.getenv('STRIPE_SECRET_KEY','').strip()
-            or os.getenv('STRIPE_PRO_PRICE_ID','').strip()
-            or os.getenv('STRIPE_PRO_PAYMENT_LINK','').strip()
+            os.getenv('STRIPE_PRO_PAYMENT_LINK','').strip()
+            or os.getenv('STRIPE_MAX_PAYMENT_LINK','').strip()
         ) else 'Not configured',
     }
 
@@ -1906,57 +1881,114 @@ def admin_dashboard():
         users=users,
         stats=stats,
         support_threads=support_threads,
-        audit_rows=audit_rows,
-        all_projects=all_projects
+        audit_rows=audit_rows
     )
 
 
-@app.route('/admin/projects/<int:project_id>')
+@app.route('/admin/projects')
 @login_required
-def admin_project_view(project_id):
+def admin_projects():
+    if not is_admin():
+        return ('Forbidden',403)
+
+    q=(request.args.get('q') or '').strip()
+    owner=(request.args.get('owner') or '').strip()
+
+    sql="""
+        SELECT
+            p.*,
+            u.name AS owner_name,
+            u.email AS owner_email,
+            u.discord_id AS owner_discord_id
+        FROM projects p
+        JOIN users u ON u.id=p.user_id
+    """
+    params=[]
+    where=[]
+
+    if q:
+        where.append("(LOWER(p.name) LIKE ? OR LOWER(COALESCE(p.description,'')) LIKE ? OR LOWER(COALESCE(u.name,'')) LIKE ? OR LOWER(COALESCE(u.email,'')) LIKE ?)")
+        needle='%'+q.lower()+'%'
+        params.extend([needle,needle,needle,needle])
+
+    if owner:
+        try:
+            where.append("p.user_id=?")
+            params.append(int(owner))
+        except Exception:
+            pass
+
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+
+    sql += " ORDER BY p.updated_at DESC, p.id DESC"
+
+    with db() as c:
+        rows=c.execute(sql,tuple(params)).fetchall()
+        owners=c.execute(
+            """SELECT u.id,u.name,u.email,COUNT(p.id) AS project_count
+               FROM users u
+               JOIN projects p ON p.user_id=u.id
+               GROUP BY u.id,u.name,u.email
+               ORDER BY project_count DESC,u.name ASC"""
+        ).fetchall()
+
+    return render_template(
+        'admin_projects.html',
+        user=current_user(),
+        projects=[dict(r) for r in rows],
+        owners=[dict(r) for r in owners],
+        search=q,
+        owner_filter=owner,
+    )
+
+
+@app.route('/admin/projects/<int:project_id>/preview')
+@login_required
+def admin_project_preview(project_id):
     if not is_admin():
         return ('Forbidden',403)
 
     with db() as c:
         row=c.execute(
-            '''SELECT p.*,u.name AS owner_name,u.email AS owner_email,u.avatar_url AS owner_avatar
+            """SELECT p.*,u.name AS owner_name,u.email AS owner_email
                FROM projects p
-               LEFT JOIN users u ON u.id=p.user_id
-               WHERE p.id=?''',
+               JOIN users u ON u.id=p.user_id
+               WHERE p.id=?""",
             (project_id,)
         ).fetchone()
 
-        if not row:
-            return ('Project not found',404)
+    if not row:
+        return ('Project not found',404)
 
-        members=[
-            dict(r) for r in c.execute(
-                '''SELECT pm.role,pm.created_at,u.id AS user_id,u.name,u.email,u.avatar_url
-                   FROM project_members pm
-                   JOIN users u ON u.id=pm.user_id
-                   WHERE pm.project_id=?
-                   ORDER BY pm.created_at ASC''',
-                (project_id,)
-            ).fetchall()
-        ]
+    project=dict(row)
+    html=(project.get('html') or '').strip()
+    css=project.get('css') or ''
+    js=project.get('js') or ''
 
-        deployments=[
-            dict(r) for r in c.execute(
-                '''SELECT id,url,status,created_at
-                   FROM deployments
-                   WHERE project_id=?
-                   ORDER BY created_at DESC
-                   LIMIT 20''',
-                (project_id,)
-            ).fetchall()
-        ]
+    if not html:
+        html='<!doctype html><html><head></head><body><main style="font-family:system-ui;padding:40px"><h1>No HTML saved</h1><p>This project does not currently contain saved HTML.</p></main></body></html>'
+
+    style_tag='<style>\\n'+css+'\\n</style>'
+    script_tag='<script>\\n'+js+'\\n<\\/script>'
+
+    if '</head>' in html.lower():
+        idx=html.lower().rfind('</head>')
+        html=html[:idx]+style_tag+html[idx:]
+    else:
+        html=style_tag+html
+
+    if '</body>' in html.lower():
+        idx=html.lower().rfind('</body>')
+        html=html[:idx]+script_tag+html[idx:]
+    else:
+        html=html+script_tag
 
     return render_template(
-        'admin_project_view.html',
+        'admin_project_preview.html',
         user=current_user(),
-        project=dict(row),
-        members=members,
-        deployments=deployments
+        project=project,
+        preview_html=html,
     )
 
 

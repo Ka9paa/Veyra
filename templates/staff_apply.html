@@ -2,6 +2,7 @@
 {% block title %}Staff Application — Veyra{% endblock %}
 {% block top_title %}Staff Application{% endblock %}
 {% block content %}
+
 <div class="sa-head">
   <div>
     <div class="eyebrow">JOIN THE TEAM</div>
@@ -75,59 +76,42 @@
 
 .word-field{position:relative}.word-count{justify-self:end;margin-top:-2px;font-size:11px;font-weight:800;color:#ff7288;transition:color .15s ease}.word-count.valid{color:#51e0b3}.word-count.invalid{color:#ff7288}.sa-form textarea.word-valid{border-color:#2f8f72;box-shadow:0 0 0 3px #45d9aa10}.sa-form textarea.word-invalid:not(:focus){border-color:#633443}.sa-submit button:disabled{opacity:.48;cursor:not-allowed;filter:saturate(.55)}
 </style>
-{% endblock %}
-
-
 <script>
-document.addEventListener('DOMContentLoaded', () => {
+(() => {
   const form = document.getElementById('staffApplicationForm');
   if (!form) return;
-
-  const fields = Array.from(form.querySelectorAll('textarea[data-min-words]'));
+  const fields = [...form.querySelectorAll('textarea[data-min-words]')];
   const submit = document.getElementById('staffSubmitButton');
+  const countWords = value => value.trim() ? value.trim().split(/\s+/).filter(Boolean).length : 0;
 
-  const countWords = (value) => {
-    const clean = (value || '').trim();
-    return clean ? clean.split(/\s+/).filter(Boolean).length : 0;
-  };
-
-  const updateField = (field) => {
-    const minimum = Number(field.dataset.minWords || 5);
+  function updateField(field) {
+    const min = Number(field.dataset.minWords || 5);
     const count = countWords(field.value);
-    const wrapper = field.closest('.word-field');
-    const counter = wrapper ? wrapper.querySelector('.word-count') : null;
-    const valid = count >= minimum;
-
+    const counter = field.closest('.word-field')?.querySelector('.word-count');
+    const valid = count >= min;
     if (counter) {
-      counter.innerHTML = `<b>${count}</b> / ${minimum} words`;
+      counter.innerHTML = `<b>${count}</b> / ${min} words`;
       counter.classList.toggle('valid', valid);
       counter.classList.toggle('invalid', !valid);
     }
-
     field.classList.toggle('word-valid', valid);
-    field.classList.toggle('word-invalid', !valid);
-    field.setCustomValidity(valid ? '' : `Minimum ${minimum} words required.`);
+    field.classList.toggle('word-invalid', !valid && count > 0);
+    field.setCustomValidity(valid ? '' : `Please write at least ${min} words.`);
     return valid;
-  };
+  }
 
-  const refresh = () => {
-    const ready = fields.every(updateField);
-    if (submit) {
-      submit.disabled = !ready;
-      submit.classList.toggle('ready', ready);
-    }
-    return ready;
-  };
+  function refresh() {
+    const valid = fields.every(updateField);
+    if (submit) submit.disabled = !valid;
+    return valid;
+  }
 
-  fields.forEach((field) => {
-    field.addEventListener('input', () => updateField(field));
-    field.addEventListener('blur', () => updateField(field));
-  });
+  fields.forEach(field => field.addEventListener('input', refresh));
 
-  form.addEventListener('submit', (event) => {
+  form.addEventListener('submit', event => {
     if (!refresh()) {
       event.preventDefault();
-      const firstInvalid = fields.find((field) => !field.checkValidity());
+      const firstInvalid = fields.find(f => !f.checkValidity());
       if (firstInvalid) {
         firstInvalid.focus();
         firstInvalid.reportValidity();
@@ -141,35 +125,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   refresh();
-});
+})();
 </script>
-
-<style>
-.word-count{
-  margin-top:7px;
-  font-size:12px;
-  font-weight:700;
-  color:#ff6f86;
-  transition:.18s ease;
-}
-.word-count.invalid{color:#ff6f86}
-.word-count.valid{color:#45e0ad}
-.word-count.valid b{color:#70f0c7}
-.word-count.invalid b{color:#ff91a2}
-textarea.word-invalid{
-  border-color:#7d3443!important;
-  box-shadow:0 0 0 3px rgba(255,90,116,.07)!important;
-}
-textarea.word-valid{
-  border-color:#2c8067!important;
-  box-shadow:0 0 0 3px rgba(69,224,173,.06)!important;
-}
-#staffSubmitButton:disabled{
-  opacity:.45;
-  cursor:not-allowed;
-  filter:saturate(.55);
-}
-#staffSubmitButton.ready{
-  box-shadow:0 8px 28px rgba(111,82,255,.22);
-}
-</style>
+{% endblock %}

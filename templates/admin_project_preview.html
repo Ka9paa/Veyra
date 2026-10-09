@@ -1,0 +1,43 @@
+{% extends 'app_base.html' %}
+{% block title %}Test {{project.name}} — Veyra Admin{% endblock %}
+{% block top_title %}Admin · Project Preview{% endblock %}
+{% block content %}
+<div class="preview-head">
+  <div>
+    <div class="eyebrow">ADMIN PROJECT TESTER</div>
+    <h1 class="title">{{project.name}}</h1>
+    <p class="subtitle">Owned by {{project.owner_name or project.owner_email}} · Project #{{project.id}} · Updated {{project.updated_at}}</p>
+  </div>
+  <div class="hero-actions">
+    <a class="btn" href="{{url_for('admin_projects')}}">← All projects</a>
+    <button class="btn" type="button" onclick="document.getElementById('adminPreview').contentWindow.location.reload()">Reload preview</button>
+  </div>
+</div>
+
+<div class="preview-toolbar card">
+  <div><span class="live-dot"></span><b>Interactive sandbox preview</b><small>Scripts can run inside the isolated preview, but the project cannot access Veyra's account session.</small></div>
+  <div class="preview-sizes">
+    <button type="button" onclick="setPreviewWidth('100%')">Desktop</button>
+    <button type="button" onclick="setPreviewWidth('768px')">Tablet</button>
+    <button type="button" onclick="setPreviewWidth('390px')">Mobile</button>
+  </div>
+</div>
+
+<div class="preview-stage">
+  <iframe id="adminPreview"
+          sandbox="allow-scripts allow-forms allow-modals"
+          referrerpolicy="no-referrer"
+          srcdoc="{{preview_html|e}}"></iframe>
+</div>
+
+<script>
+function setPreviewWidth(width){
+  const frame=document.getElementById('adminPreview');
+  frame.style.width=width;
+}
+</script>
+
+<style>
+.preview-head{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:15px}.preview-toolbar{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:12px}.preview-toolbar>div:first-child{display:grid;grid-template-columns:10px auto;column-gap:8px}.preview-toolbar small{grid-column:2;color:var(--muted);margin-top:2px}.live-dot{width:8px;height:8px;border-radius:50%;background:#45dfae;box-shadow:0 0 10px #45dfae66;margin-top:6px}.preview-sizes{display:flex;gap:7px}.preview-sizes button{border:1px solid #2a3b59;background:#0d1727;color:#b7c4d6;border-radius:9px;padding:8px 10px;cursor:pointer}.preview-stage{height:calc(100vh - 245px);min-height:560px;border:1px solid var(--line);border-radius:16px;background:#02050a;padding:12px;display:flex;justify-content:center;overflow:auto}.preview-stage iframe{width:100%;height:100%;min-height:530px;border:0;border-radius:10px;background:white;transition:width .2s ease}@media(max-width:760px){.preview-head,.preview-toolbar{align-items:flex-start;flex-direction:column}.preview-stage{height:680px}}
+</style>
+{% endblock %}
