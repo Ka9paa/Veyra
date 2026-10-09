@@ -1766,19 +1766,35 @@ def admin_dashboard():
         # - OAuth profile photo when Veyra already has one.
         # - Discord's default avatar when a Discord-linked account has no custom photo.
         # - Template falls back to initials for email/password accounts.
-        u['admin_avatar_url']=(u.get('avatar_url') or '').strip() or None
-        if not u['admin_avatar_url']:
-            discord_id=str(
-                u.get('discord_id')
-                or (u.get('provider_user_id') if (u.get('provider') or '').lower()=='discord' else '')
-                or ''
-            ).strip()
-            if discord_id.isdigit():
-                try:
-                    default_index=(int(discord_id) >> 22) % 6
-                    u['admin_avatar_url']=f'https://cdn.discordapp.com/embed/avatars/{default_index}.png'
-                except Exception:
-                    pass
+        # Admin Center profile picture. OAuth logins persist the provider's
+        # current picture into users.avatar_url. Existing accounts created before
+        # avatar capture was enabled will populate this automatically the next
+        # time that user signs in with Google/Discord.
+        raw_avatar=(u.get('avatar_url') or '').strip()
+        u['admin_avatar_url']=raw_avatar if raw_avatar.startswith(('https://','http://')) else None
+        u['avatar_needs_refresh']=False
+
+        provider=(u.get('provider') or '').strip().lower()
+        discord_id=str(
+            u.get('discord_id')
+            or (u.get('provider_user_id') if provider=='discord' else '')
+            or ''
+        ).strip()
+
+        # Discord default avatars are deterministic, so old Discord accounts can
+        # still get a real Discord avatar even when we do not have a custom hash.
+        if not u['admin_avatar_url'] and discord_id.isdigit():
+            try:
+                default_index=(int(discord_id) >> 22) % 6
+                u['admin_avatar_url']=f'https://cdn.discordapp.com/embed/avatars/{default_index}.png'
+            except Exception:
+                pass
+
+        # A Google custom profile image cannot be reconstructed from a Google user
+        # id alone; it must come from OAuth userinfo. Mark old rows so the UI can
+        # make that clear instead of pretending the initial is the real photo.
+        if not u['admin_avatar_url'] and provider in {'google','discord'}:
+            u['avatar_needs_refresh']=True
 
         u['plan_action']=url_for('admin_set_plan',user_id=uid)
         u['credit_action']=url_for('admin_set_credits',user_id=uid)
