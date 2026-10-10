@@ -1,3 +1,93 @@
-{% extends 'app_base.html' %}{% block title %}Agents — Veyra{% endblock %}{% block top_title %}Agents{% endblock %}{% block content %}
-<div class="hero-row"><div><div class="eyebrow">AUTOMATION</div><h2 class="title">Agents</h2><p class="subtitle">Create and manage your Veyra agents.</p></div></div>
-<div style="display:grid;grid-template-columns:360px 1fr;gap:14px;margin-top:18px"><form class="card" method="post" action="{{url_for('agents_create')}}"><h3>Create agent</h3><label>Name</label><input class="input" name="name" required><label style="display:block;margin-top:12px">Description</label><textarea class="textarea" name="description"></textarea><button class="btn primary" style="margin-top:12px" type="submit">Create agent</button></form><section class="card"><h3>Your agents</h3>{% if agents %}<div class="list">{% for a in agents %}<div class="row"><div><b>{{a.name}}</b><span>{{a.description or 'No description'}} · {{a.status}}</span></div><form method="post" action="{{url_for('agents_delete',agent_id=a.id)}}"><button class="btn danger">Delete</button></form></div>{% endfor %}</div>{% else %}<div class="empty"><b>No agents yet</b>Create one from the form.</div>{% endif %}</section></div>{% endblock %}
+{% extends 'app_base.html' %}
+{% block title %}Agents — Veyra{% endblock %}
+{% block top_title %}Agents{% endblock %}
+{% block content %}
+<div class="hero-row agents-hero">
+  <div>
+    <div class="eyebrow">Automation</div>
+    <h1 class="title">Your AI workforce.</h1>
+    <p class="subtitle">Create reusable Veyra agents for repeatable jobs, project workflows, QA, research, and development tasks.</p>
+  </div>
+  <a class="btn primary" href="#create-agent">＋ Create agent</a>
+</div>
+
+<div class="agent-stats">
+  <div class="metric-card"><div class="metric-label">TOTAL AGENTS</div><div class="metric-value">{{stats.total}}</div><div class="metric-note">Created in your workspace</div></div>
+  <div class="metric-card"><div class="metric-label">ACTIVE</div><div class="metric-value">{{stats.active}}</div><div class="metric-note">Currently marked active</div></div>
+  <div class="metric-card"><div class="metric-label">IDLE</div><div class="metric-value">{{stats.idle}}</div><div class="metric-note">Ready for configuration</div></div>
+</div>
+
+<div class="agents-layout">
+  <section class="card agent-library">
+    <div class="card-head">
+      <div><div class="eyebrow">WORKSPACE</div><h3>Your agents</h3></div>
+      <span class="tag">{{stats.total}} total</span>
+    </div>
+    {% if agents %}
+    <div class="agent-grid">
+      {% for a in agents %}
+      <article class="agent-card">
+        <div class="agent-card-top">
+          <div class="agent-orb">✦</div>
+          <span class="agent-status {{a.status|lower}}"><i></i>{{a.status|capitalize}}</span>
+        </div>
+        <h3>{{a.name}}</h3>
+        <p>{{a.description or 'No description yet.'}}</p>
+        <div class="agent-meta">
+          <span>Created</span><b>{{a.created_at}}</b>
+        </div>
+        <div class="agent-actions">
+          <button class="btn" type="button" disabled>Configure</button>
+          <button class="btn" type="button" disabled>Run</button>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty agent-empty">
+      <div class="empty-icon">✦</div>
+      <h3>No agents yet</h3>
+      <p>Create your first reusable worker. Your workspace stays empty until you actually create one — no fake agents.</p>
+      <a class="btn primary" href="#create-agent">Create your first agent</a>
+    </div>
+    {% endif %}
+  </section>
+
+  <aside class="card create-agent-card" id="create-agent">
+    <div class="eyebrow">NEW AGENT</div>
+    <h2>Create an agent</h2>
+    <p>Give it one clear responsibility. You can expand its workflow later.</p>
+    <form class="form" method="post" action="{{url_for('agents_create')}}">
+      <label>
+        <span>Agent name</span>
+        <input class="input" name="name" maxlength="80" placeholder="e.g. QA Reviewer" required>
+      </label>
+      <label>
+        <span>What should it handle?</span>
+        <textarea class="agent-textarea" name="description" maxlength="500" placeholder="Review every generated project for broken interactions, responsive issues, and accessibility problems." required></textarea>
+        <small id="agentWords">0 words · minimum 3</small>
+      </label>
+      <button class="btn primary create-agent-btn" type="submit">Create agent →</button>
+    </form>
+    <div class="agent-tip">
+      <b>Good agent setup</b>
+      <span>One job, clear outcome, repeatable instructions.</span>
+    </div>
+  </aside>
+</div>
+
+<style>
+.agent-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
+.agents-layout{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(320px,.65fr);gap:14px;align-items:start}
+.agent-library{min-height:420px}.agent-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.agent-card{border:1px solid var(--line);border-radius:15px;background:linear-gradient(180deg,#0b1626,#08111e);padding:17px;min-height:215px;display:flex;flex-direction:column}
+.agent-card-top{display:flex;align-items:center;justify-content:space-between}.agent-orb{width:42px;height:42px;border-radius:13px;background:radial-gradient(circle at 35% 25%,#a66dff,#5d55e8 55%,#151a32);display:grid;place-items:center;box-shadow:0 0 22px #795cff22}
+.agent-status{font-size:10px;border:1px solid #293a57;border-radius:999px;padding:5px 8px;color:#96a6bd}.agent-status i{display:inline-block;width:6px;height:6px;border-radius:50%;background:#75869e;margin-right:6px}.agent-status.active i,.agent-status.running i{background:#45dfae;box-shadow:0 0 8px #45dfae88}
+.agent-card h3{font-size:17px;margin:15px 0 5px}.agent-card p{color:var(--muted);margin:0;line-height:1.5;min-height:45px}.agent-meta{margin-top:15px;padding-top:12px;border-top:1px solid var(--line);display:flex;justify-content:space-between;color:#63748e;font-size:10px}.agent-meta b{color:#8394ab;font-weight:600}.agent-actions{display:flex;gap:7px;margin-top:13px}.agent-actions .btn{flex:1;opacity:.55}
+.create-agent-card{position:sticky;top:86px}.create-agent-card h2{font-size:23px;margin:6px 0}.create-agent-card>p{margin:0 0 18px}.form label>span{display:block;color:#bac5d5;font-size:12px;font-weight:750;margin-bottom:7px}.agent-textarea{width:100%;min-height:132px;resize:vertical;border:1px solid #283957;border-radius:11px;background:#08111e;color:#fff;padding:12px;outline:none;font:inherit}.agent-textarea:focus{border-color:#704eed;box-shadow:0 0 0 3px rgba(112,78,237,.08)}#agentWords{color:#718198}.create-agent-btn{width:100%;margin-top:2px}.agent-tip{margin-top:14px;padding:13px;border:1px solid #243650;background:#091422;border-radius:12px}.agent-tip b,.agent-tip span{display:block}.agent-tip span{color:var(--muted);font-size:11px;margin-top:3px}
+@media(max-width:1000px){.agents-layout{grid-template-columns:1fr}.create-agent-card{position:static}.agent-grid{grid-template-columns:1fr}.agent-stats{grid-template-columns:1fr 1fr 1fr}}@media(max-width:650px){.agent-stats{grid-template-columns:1fr}}
+</style>
+<script>
+(()=>{const t=document.querySelector('textarea[name="description"]'),o=document.getElementById('agentWords');if(!t||!o)return;const u=()=>{const n=t.value.trim()?t.value.trim().split(/\s+/).length:0;o.textContent=`${n} word${n===1?'':'s'} · minimum 3`;o.style.color=n>=3?'#45dfae':'#ff7f93'};t.addEventListener('input',u);u()})()
+</script>
+{% endblock %}

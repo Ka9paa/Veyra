@@ -2,230 +2,51 @@
 {% block title %}Admin Center — Veyra{% endblock %}
 {% block top_title %}Admin Center{% endblock %}
 {% block content %}
-<div class="ac-shell">
-  <section class="ac-hero">
-    <div>
-      <div class="eyebrow">VEYRA CONTROL PLANE</div>
-      <h1>Run Veyra from one place.</h1>
-      <p>Users, plans, credits, staff applications, support, infrastructure, and administrative activity — using live workspace data.</p>
-    </div>
-    <div class="ac-actions">
-      <a class="btn" href="/staff/review">Staff applications{% if stats.staff_pending %}<span class="ac-count">{{stats.staff_pending}}</span>{% endif %}</a>
-      <a class="btn" href="/dashboard">Open workspace</a>
-      <a class="btn primary" href="/">View site ↗</a>
-    </div>
-  </section>
-
-  <section class="ac-metrics">
-    <article><span>USERS</span><strong>{{stats.total_users}}</strong><small>{{stats.paid_users}} paid accounts</small></article>
-    <article><span>PROJECTS</span><strong>{{stats.projects}}</strong><small>Across all workspaces</small></article>
-    <article><span>CREDITS</span><strong>{{"{:,}".format(stats.total_credits or 0)}}</strong><small>Current user balances</small></article>
-    <article><span>STAFF APPS</span><strong>{{stats.staff_pending or 0}}</strong><small>{{stats.staff_total or 0}} total submitted</small></article>
-    <article><span>LOGINS</span><strong>{{stats.total_logins or 0}}</strong><small>{{stats.discord_linked or 0}} Discord linked</small></article>
-    <article><span>RESTRICTED</span><strong>{{stats.restricted}}</strong><small>Accounts currently limited</small></article>
-  </section>
-
-  <section class="ac-statusbar">
-    <div><i class="ok"></i><span>AI</span><b>{{stats.ai_status}}</b></div>
-    <div><i class="{{'ok' if stats.stripe_status=='Configured' else 'warn'}}"></i><span>Stripe</span><b>{{stats.stripe_status}}</b></div>
-    <div><i class="ok"></i><span>Database</span><b>Connected</b></div>
-    <div><i class="ok"></i><span>Admin access</span><b>{{stats.admin_count or 0}} admins</b></div>
-  </section>
-
-  <div class="ac-grid">
-    <section class="ac-panel users-panel">
-      <header>
-        <div><span class="eyebrow">ACCOUNT OPERATIONS</span><h2>Users</h2></div>
-        <div class="ac-search"><input id="adminUserSearch" type="search" placeholder="Search name, email, Discord, ID…"></div>
-      </header>
-      <div class="ac-user-table">
-        <div class="ac-table-head"><span>User</span><span>Plan</span><span>Credits</span><span>Discord</span><span>Status</span><span>Actions</span></div>
-        <div id="adminUserRows">
-        {% for u in users %}
-          <article class="ac-user-row" data-search="{{(u.name or '')|lower}} {{(u.email or '')|lower}} {{(u.discord_id or '')|lower}} {{u.id}}">
-            <div class="ac-user">
-              <div class="avatar">{% if u.avatar_url %}<img src="{{u.avatar_url}}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><span class="avatar-fallback" style="display:none">{{(u.name or u.email or 'V')[0]|upper}}</span>{% else %}<span class="avatar-fallback">{{(u.name or u.email or 'V')[0]|upper}}</span>{% endif %}</div>
-              <div><b>{{u.name or 'Unnamed user'}}</b><small>{{u.email or 'No email'}} · #{{u.id}}</small></div>
-            </div>
-            <div><span class="plan-pill {{(u.plan or 'free')|lower}}">{{(u.plan or 'free')|upper}}</span></div>
-            <div><b class="credit-num">{{"{:,}".format(u.credits or 0)}}</b></div>
-            <div><span class="{{'good' if u.discord_id else 'muted'}}">{{'Linked' if u.discord_id else '—'}}</span></div>
-            <div>{% if u.is_blacklisted %}<span class="danger-pill">Restricted</span>{% else %}<span class="good-pill">Active</span>{% endif %}</div>
-            <div class="row-actions">
-              <button type="button" class="mini" onclick="toggleAdminMenu('menu-{{u.id}}')">Manage</button>
-              <div class="admin-menu" id="menu-{{u.id}}">
-                <form action="{{u.plan_action}}" method="post"><select name="plan"><option value="free" {% if (u.plan or 'free')=='free' %}selected{% endif %}>Free</option><option value="pro" {% if u.plan=='pro' %}selected{% endif %}>Pro</option><option value="max" {% if u.plan=='max' %}selected{% endif %}>Max</option></select><button>Set plan</button></form>
-                <form action="{{u.credit_action}}" method="post"><input type="number" name="credits" min="0" value="{{u.credits or 0}}"><button>Set credits</button></form>
-                <div class="quick-row"><form action="{{u.add100_action}}" method="post"><button>+100</button></form><form action="{{u.add1000_action}}" method="post"><button>+1,000</button></form></div>
-                {% if u.is_blacklisted %}
-                  <form action="{{u.unrestrict_action}}" method="post"><button class="success">Restore account</button></form>
-                {% else %}
-                  <form action="{{u.restrict_action}}" method="post"><input name="reason" placeholder="Restriction reason"><button class="danger">Restrict account</button></form>
-                {% endif %}
-              </div>
-            </div>
-          </article>
-        {% else %}
-          <div class="ac-empty">No users found.</div>
-        {% endfor %}
-        </div>
-      </div>
-    </section>
-
-    <aside class="ac-side">
-      <section class="ac-panel">
-        <header><div><span class="eyebrow">REVIEW QUEUE</span><h2>Staff & support</h2></div></header>
-        <div class="queue-card">
-          <div><span>Pending staff applications</span><strong>{{stats.staff_pending or 0}}</strong></div>
-          <a href="/staff/review">Review applications →</a>
-        </div>
-        <div class="queue-card">
-          <div><span>Support threads</span><strong>{{stats.open_support or 0}}</strong></div>
-          <a href="#support">View recent support ↓</a>
-        </div>
-      </section>
-
-      <section class="ac-panel">
-        <header><div><span class="eyebrow">SYSTEMS</span><h2>Service health</h2></div></header>
-        <div class="health-list">
-          <div><i class="ok"></i><span>Website</span><b>Operational</b></div>
-          <div><i class="ok"></i><span>AI engine</span><b>{{stats.ai_status}}</b></div>
-          <div><i class="ok"></i><span>Database</span><b>Operational</b></div>
-          <div><i class="{{'ok' if stats.stripe_status=='Configured' else 'warn'}}"></i><span>Stripe</span><b>{{stats.stripe_status}}</b></div>
-        </div>
-      </section>
-    </aside>
-  </div>
-
-  <div class="ac-bottom-grid">
-    <section class="ac-panel" id="support">
-      <header><div><span class="eyebrow">CUSTOMER SUPPORT</span><h2>Recent support threads</h2></div></header>
-      <div class="thread-list">
-        {% for t in support_threads %}
-        <article><div><b>Thread #{{t.id}}</b><small>User #{{t.user_id or '—'}} · {{t.created_at}}</small></div><p>{{t.question}}</p></article>
-        {% else %}<div class="ac-empty">No recent support threads.</div>{% endfor %}
-      </div>
-    </section>
-
-    <section class="ac-panel">
-      <header><div><span class="eyebrow">SECURITY / AUDIT</span><h2>Admin activity</h2></div></header>
-      <div class="audit-list">
-        {% for r in audit_rows %}
-        <article><i></i><div><b>{{r.action.replace('_',' ')|title}}</b><small>{{r.actor_name}} → {{r.target_name}} · {{r.created_at}}</small>{% if r.summary %}<p>{{r.summary}}</p>{% endif %}</div></article>
-        {% else %}<div class="ac-empty">No administrative activity yet.</div>{% endfor %}
-      </div>
-    </section>
-  </div>
+<div class="hero-row">
+  <div><div class="eyebrow">VEYRA OPERATIONS</div><h1 class="title">Admin Center</h1><p class="subtitle">Users, support, AI conversations, staff applications, billing status, and account actions in one place.</p></div>
+</div>
+<div class="admin-nav">
+  <a class="admin-nav-card" href="{{url_for('admin_support')}}"><span>◎</span><div><b>Support</b><small>{{stats.open_support}} recent conversations</small></div><em>→</em></a>
+  <a class="admin-nav-card" href="{{url_for('admin_ai_conversations')}}"><span>✦</span><div><b>AI Conversations</b><small>{{stats.ai_conversations}} logged interactions</small></div><em>→</em></a>
+  <a class="admin-nav-card" href="{{url_for('admin_staff_applications')}}"><span>▤</span><div><b>Staff Applications</b><small>{{stats.staff_pending}} pending review</small></div><em>→</em></a>
+  <a class="admin-nav-card" href="{{url_for('staff_apply')}}"><span>↗</span><div><b>Public Application</b><small>Open the applicant-facing page</small></div><em>→</em></a>
+</div>
+<div class="grid admin-stats">
+  {% for label,value,note in [
+    ('Users',stats.total_users,'All accounts'),
+    ('Paid users',stats.paid_users,'Pro + Max'),
+    ('Projects',stats.projects,'Saved projects'),
+    ('Credits',stats.total_credits,'Across accounts'),
+    ('Discord linked',stats.discord_linked,'Linked accounts'),
+    ('Admins',stats.admin_count,'Admin access')
+  ] %}
+  <div class="metric-card"><div class="metric-label">{{label|upper}}</div><div class="metric-value">{{value}}</div><div class="metric-note">{{note}}</div></div>
+  {% endfor %}
 </div>
 
+<div class="section card">
+  <div class="card-head"><h3>User management</h3><span class="tag">{{users|length}} users</span></div>
+  <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>User</th><th>Plan</th><th>Credits</th><th>Discord</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+  {% for u in users %}
+  <tr>
+    <td><b>{{u.name or 'Unnamed'}}</b><small>{{u.email or 'No email'}} · #{{u.id}}</small></td>
+    <td><form method="post" action="{{u.plan_action}}"><select name="plan" onchange="this.form.submit()"><option value="free" {{'selected' if (u.plan or 'free')=='free'}}>Free</option><option value="pro" {{'selected' if u.plan=='pro'}}>Pro</option><option value="max" {{'selected' if u.plan=='max'}}>Max</option></select></form></td>
+    <td><form method="post" action="{{u.credit_action}}" class="credit-form"><input name="credits" value="{{u.credits or 0}}" type="number" min="0"><button>Set</button></form></td>
+    <td>{{'Linked' if u.discord_id or u.provider=='discord' else '—'}}</td>
+    <td>{% if u.is_blacklisted %}<span class="bad">Restricted</span>{% else %}<span class="good">Active</span>{% endif %}</td>
+    <td>{% if u.is_blacklisted %}<form method="post" action="{{u.unrestrict_action}}"><button class="mini">Unrestrict</button></form>{% else %}<form method="post" action="{{u.restrict_action}}"><input type="hidden" name="reason" value="Restricted from Admin Center"><button class="mini danger">Restrict</button></form>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody></table></div>
+</div>
+
+<div class="admin-two">
+  <div class="card"><div class="card-head"><h3>Recent AI conversations</h3><a class="btn" href="{{url_for('admin_ai_conversations')}}">View all</a></div>
+  {% for a in recent_ai %}<div class="admin-preview"><b>{{a.user_name or a.user_email or ('User #' ~ a.user_id)}}</b><p>{{a.prompt}}</p><small>{{a.engine}} · {{a.created_at}}</small></div>{% else %}<div class="empty compact">No AI conversations yet.</div>{% endfor %}</div>
+  <div class="card"><div class="card-head"><h3>Recent staff applications</h3><a class="btn" href="{{url_for('admin_staff_applications')}}">Review</a></div>
+  {% for s in recent_staff %}<div class="admin-preview"><b>{{s.user_name or s.user_email}}</b><p>{{s.motivation}}</p><small>{{s.status|capitalize}} · {{s.created_at}}</small></div>{% else %}<div class="empty compact">No staff applications yet.</div>{% endfor %}</div>
+</div>
 <style>
-.ac-shell{display:grid;gap:16px}.ac-hero{position:relative;overflow:hidden;border:1px solid #263650;border-radius:20px;background:radial-gradient(circle at 8% 0%,rgba(119,87,255,.2),transparent 35%),linear-gradient(145deg,#0d1728,#08111e);padding:28px;display:flex;justify-content:space-between;gap:24px;align-items:end}.ac-hero:after{content:"";position:absolute;width:320px;height:320px;border-radius:50%;right:-130px;top:-180px;background:#7358ff13;filter:blur(2px)}.ac-hero h1{font-size:36px;letter-spacing:-.04em;margin:8px 0 8px}.ac-hero p{max-width:760px;color:var(--muted);line-height:1.6}.ac-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;position:relative;z-index:2}.ac-count{margin-left:7px;background:#7358ff;color:#fff;border-radius:999px;padding:2px 6px;font-size:10px}.ac-metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}.ac-metrics article{border:1px solid var(--line);background:#0a1321;border-radius:15px;padding:16px}.ac-metrics span{display:block;color:#71839c;font-size:9px;letter-spacing:.13em;font-weight:900}.ac-metrics strong{display:block;font-size:26px;margin:5px 0;color:#fff}.ac-metrics small{color:#64758e}.ac-statusbar{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);background:#08111e;border-radius:14px;overflow:hidden}.ac-statusbar>div{display:grid;grid-template-columns:10px 1fr auto;gap:9px;align-items:center;padding:12px 14px;border-right:1px solid var(--line)}.ac-statusbar>div:last-child{border-right:0}.ac-statusbar span{color:#7d8da5;font-size:11px}.ac-statusbar b{font-size:11px}.ac-statusbar i,.health-list i{width:8px;height:8px;border-radius:50%;background:#66768d}.ac-statusbar i.ok,.health-list i.ok{background:#45dfae;box-shadow:0 0 10px #45dfae55}.ac-statusbar i.warn,.health-list i.warn{background:#ffba56}.ac-grid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:16px}.ac-side{display:grid;gap:16px;align-content:start}.ac-panel{border:1px solid var(--line);background:#091321;border-radius:17px;overflow:visible}.ac-panel>header{padding:17px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:14px;align-items:end}.ac-panel h2{font-size:17px;margin:4px 0 0}.ac-search input{width:250px}.ac-user-table{overflow:visible}.ac-table-head,.ac-user-row{display:grid;grid-template-columns:2fr .6fr .7fr .65fr .75fr .7fr;gap:10px;align-items:center}.ac-table-head{padding:10px 14px;color:#64758e;font-size:9px;letter-spacing:.12em;font-weight:900}.ac-user-row{position:relative;padding:12px 14px;border-top:1px solid #152338}.ac-user-row:hover{background:#0b1626}.ac-user{display:flex;align-items:center;gap:10px;min-width:0}.avatar{overflow:hidden;position:relative;width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#271c57,#7452ff);display:grid;place-items:center;font-weight:900;flex:0 0 auto}.ac-user b,.ac-user small{display:block}.ac-user small{color:#687b94;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px;margin-top:2px}.plan-pill,.good-pill,.danger-pill{display:inline-flex;border-radius:999px;padding:5px 7px;font-size:9px;font-weight:900}.plan-pill.free{background:#141c29;color:#9babc1}.plan-pill.pro{background:#1c1837;color:#ab9cff}.plan-pill.max{background:#222044;color:#d3c7ff}.good-pill{background:#10251f;color:#71e6c3}.danger-pill{background:#2d141b;color:#ff91a3}.good{color:#62dfbb}.muted{color:#65768e}.credit-num{font-size:12px}.row-actions{position:relative}.mini{border:1px solid #2b3c55;background:#0d1828;color:#c8d3e3;border-radius:9px;padding:7px 9px;cursor:pointer}.admin-menu{display:none;position:absolute;right:0;top:36px;z-index:50;width:260px;border:1px solid #30435f;border-radius:13px;background:#08111e;padding:10px;box-shadow:0 20px 45px #000a}.admin-menu.open{display:grid;gap:8px}.admin-menu form{display:grid;grid-template-columns:1fr auto;gap:6px}.admin-menu input,.admin-menu select{min-width:0;padding:8px;border:1px solid #263750;border-radius:8px;background:#0c1726;color:#fff}.admin-menu button{border:1px solid #34465f;background:#101b2c;color:#e2e9f5;border-radius:8px;padding:8px;cursor:pointer}.admin-menu button.danger{color:#ff9bac;border-color:#6c3541}.admin-menu button.success{color:#73e4c2;border-color:#285b4d}.quick-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}.quick-row form{display:block}.quick-row button{width:100%}.queue-card{padding:15px 17px;border-bottom:1px solid var(--line)}.queue-card:last-child{border-bottom:0}.queue-card>div{display:flex;justify-content:space-between}.queue-card span{color:#8090a7}.queue-card strong{font-size:21px}.queue-card a{display:inline-block;margin-top:8px;color:#aa9cff;text-decoration:none;font-weight:800;font-size:11px}.health-list{padding:7px 14px}.health-list>div{display:grid;grid-template-columns:9px 1fr auto;gap:9px;align-items:center;padding:11px 3px;border-bottom:1px solid #152338}.health-list>div:last-child{border-bottom:0}.health-list span{color:#7b8ba2}.health-list b{font-size:11px}.ac-bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.thread-list,.audit-list{padding:8px 14px}.thread-list article{padding:12px 4px;border-bottom:1px solid #152338}.thread-list article:last-child{border-bottom:0}.thread-list b,.thread-list small{display:block}.thread-list small{color:#65768e;margin-top:2px}.thread-list p{color:#a9b4c5;margin:8px 0 0;line-height:1.45}.audit-list article{display:grid;grid-template-columns:8px 1fr;gap:10px;padding:12px 4px;border-bottom:1px solid #152338}.audit-list article>i{width:7px;height:7px;border-radius:50%;background:#8066ff;margin-top:5px}.audit-list b,.audit-list small{display:block}.audit-list small{color:#65768e;margin-top:2px}.audit-list p{color:#8c9bb0;margin:5px 0 0}.ac-empty{padding:30px;text-align:center;color:#6e7f97}@media(max-width:1250px){.ac-metrics{grid-template-columns:repeat(3,1fr)}.ac-grid{grid-template-columns:1fr}.ac-side{grid-template-columns:1fr 1fr}.ac-table-head{display:none}.ac-user-row{grid-template-columns:1fr 100px 100px 85px 90px 80px}}@media(max-width:850px){.ac-hero{align-items:flex-start;flex-direction:column}.ac-actions{justify-content:flex-start}.ac-statusbar{grid-template-columns:1fr 1fr}.ac-metrics{grid-template-columns:1fr 1fr}.ac-bottom-grid,.ac-side{grid-template-columns:1fr}.ac-user-row{grid-template-columns:1fr 1fr}.ac-user-row>div:nth-child(4),.ac-user-row>div:nth-child(5){display:none}.ac-search input{width:100%}}@media(max-width:560px){.ac-metrics{grid-template-columns:1fr}.ac-statusbar{grid-template-columns:1fr}.ac-user-row{grid-template-columns:1fr}.ac-user-row>div:not(:first-child):not(:last-child){display:none}}
-.avatar img{width:100%;height:100%;object-fit:cover}.avatar-fallback{width:100%;height:100%;place-items:center}
-.ac-projects{margin-top:16px}.ac-project-search{width:min(340px,100%);height:34px;border:1px solid #2b3b58;border-radius:9px;background:#091422;color:#dce6f5;padding:0 10px;outline:none}.ac-project-search:focus{border-color:#6f54e8;box-shadow:0 0 0 3px rgba(111,84,232,.12)}
-.ac-project-table{overflow:auto}.ac-project-table table{width:100%;border-collapse:collapse;min-width:920px}.ac-project-table th{padding:10px 12px;text-align:left;color:#63748e;font-size:9px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--line)}.ac-project-table td{padding:12px;border-bottom:1px solid #142137;font-size:11px}.ac-project-table tr:hover td{background:#0d1828}
-.project-name b,.project-name small,.project-owner b,.project-owner small{display:block}.project-name small,.project-owner small{color:#687a94;margin-top:3px}.project-owner{display:flex;align-items:center;gap:9px}.project-owner .avatar{width:32px;height:32px;border-radius:9px;background:#15233a;display:grid;place-items:center;color:#bca7ff;font-weight:850}.project-actions{display:flex;gap:6px}.project-actions a{text-decoration:none}.project-pill{display:inline-flex;align-items:center;height:24px;padding:0 7px;border:1px solid #2d3e5c;border-radius:999px;background:#101a2b;color:#9cacbf;font-size:9px}
+.admin-nav{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:14px}.admin-nav-card{min-height:76px;border:1px solid var(--line);border-radius:14px;background:#0a1422;padding:14px;display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;text-decoration:none}.admin-nav-card>span{width:38px;height:38px;border-radius:10px;background:#15182f;color:#9c82ff;display:grid;place-items:center}.admin-nav-card b,.admin-nav-card small{display:block}.admin-nav-card small{color:var(--muted);font-size:10px;margin-top:2px}.admin-nav-card em{font-style:normal;color:#6d7e97}.admin-stats{grid-template-columns:repeat(6,1fr)}.admin-table-wrap{overflow:auto}.admin-table{width:100%;border-collapse:collapse;min-width:850px}.admin-table th,.admin-table td{padding:11px;border-bottom:1px solid var(--line);text-align:left}.admin-table th{color:#697a93;font-size:10px;letter-spacing:.1em}.admin-table td small{display:block;color:var(--muted)}.admin-table select,.admin-table input{background:#08111e;border:1px solid #293a56;color:#fff;border-radius:8px;padding:7px}.credit-form{display:flex;gap:5px}.credit-form input{width:85px}.credit-form button,.mini{border:1px solid #31425e;background:#101a2a;color:#dce5f4;border-radius:8px;padding:7px 9px}.danger{border-color:#673744;color:#ff9aab}.good{color:#57deb2}.bad{color:#ff8598}.admin-two{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:13px}.admin-preview{padding:11px 0;border-bottom:1px solid var(--line)}.admin-preview:last-child{border:0}.admin-preview p{margin:4px 0;color:#b5c1d3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.admin-preview small{color:#66778f}@media(max-width:1100px){.admin-nav{grid-template-columns:1fr 1fr}.admin-stats{grid-template-columns:repeat(3,1fr)}.admin-two{grid-template-columns:1fr}}@media(max-width:650px){.admin-nav,.admin-stats{grid-template-columns:1fr}}
 </style>
-
-<script>
-function toggleAdminMenu(id){
-  document.querySelectorAll('.admin-menu.open').forEach(el=>{ if(el.id!==id) el.classList.remove('open'); });
-  const target=document.getElementById(id);
-  if(target) target.classList.toggle('open');
-}
-document.addEventListener('click',e=>{
-  if(!e.target.closest('.row-actions')) document.querySelectorAll('.admin-menu.open').forEach(el=>el.classList.remove('open'));
-});
-const adminSearch=document.getElementById('adminUserSearch');
-if(adminSearch){
-  adminSearch.addEventListener('input',()=>{
-    const q=adminSearch.value.trim().toLowerCase();
-    document.querySelectorAll('.ac-user-row').forEach(row=>{
-      row.style.display=(!q || row.dataset.search.includes(q))?'grid':'none';
-    });
-  });
-}
-</script>
-
-<section class="ac-panel ac-projects">
-  <header>
-    <div>
-      <span class="eyebrow">PROJECT OPERATIONS</span>
-      <h2>All Veyra projects</h2>
-      <p class="muted">{{all_projects|length}} saved projects across every account.</p>
-    </div>
-    <div class="ac-search">
-      <input id="adminProjectSearch" class="ac-project-search" type="search" placeholder="Search project, owner, email, ID…">
-    </div>
-  </header>
-
-  <div class="ac-project-table">
-    <table id="adminProjectsTable">
-      <thead>
-        <tr>
-          <th>Project</th>
-          <th>Owner</th>
-          <th>Members</th>
-          <th>Deployments</th>
-          <th>Code size</th>
-          <th>Updated</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-      {% for p in all_projects %}
-        <tr data-project-row data-search="{{(p.name or '')|lower}} {{(p.description or '')|lower}} {{(p.owner_name or '')|lower}} {{(p.owner_email or '')|lower}} {{p.id}} {{p.user_id}}">
-          <td>
-            <div class="project-name">
-              <b>{{p.name or 'Untitled Project'}}</b>
-              <small>#{{p.id}} · {{p.description or 'No description'}}</small>
-            </div>
-          </td>
-          <td>
-            <div class="project-owner">
-              <div class="avatar">
-                {% if p.owner_avatar %}<img src="{{p.owner_avatar}}" alt="">{% else %}<span class="avatar-fallback">{{(p.owner_name or p.owner_email or 'V')[0]|upper}}</span>{% endif %}
-              </div>
-              <div><b>{{p.owner_name or 'Veyra user'}}</b><small>{{p.owner_email or 'No email'}} · user #{{p.user_id}}</small></div>
-            </div>
-          </td>
-          <td><span class="project-pill">{{p.member_count or 0}}</span></td>
-          <td><span class="project-pill">{{p.deployment_count or 0}}</span></td>
-          <td><span class="project-pill">{{(p.html_size or 0) + (p.css_size or 0) + (p.js_size or 0)}} chars</span></td>
-          <td><small>{{p.updated_at}}</small></td>
-          <td>
-            <div class="project-actions">
-              <a class="mini primary" href="{{url_for('admin_project_view',project_id=p.id)}}">Inspect</a>
-              <a class="mini" href="/p/{{p.id}}" target="_blank" rel="noopener">Public ↗</a>
-            </div>
-          </td>
-        </tr>
-      {% else %}
-        <tr><td colspan="7"><div class="ac-empty">No projects exist yet.</div></td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    <div id="adminProjectEmpty" class="ac-empty" style="display:none">No projects match your search.</div>
-  </div>
-</section>
-
-<script>
-(() => {
-  const input = document.getElementById('adminProjectSearch');
-  const rows = [...document.querySelectorAll('[data-project-row]')];
-  const empty = document.getElementById('adminProjectEmpty');
-  if (!input) return;
-  const filter = () => {
-    const q = input.value.trim().toLowerCase();
-    let shown = 0;
-    rows.forEach(row => {
-      const match = !q || (row.dataset.search || '').includes(q);
-      row.style.display = match ? '' : 'none';
-      if (match) shown++;
-    });
-    if (empty) empty.style.display = shown ? 'none' : 'block';
-  };
-  input.addEventListener('input', filter);
-})();
-</script>
-
 {% endblock %}
