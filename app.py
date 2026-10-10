@@ -62,6 +62,10 @@ def veyra_fallback_model():
     return (os.getenv('VEYRA_FALLBACK_MODEL') or 'gpt-6-sol').strip() or 'gpt-6-sol'
 
 
+class VeyraRequestRestricted(Exception):
+    pass
+
+
 def classify_ai_error(exc):
     """Return a safe diagnostic code without leaking keys, request bodies, or secrets."""
     name=type(exc).__name__.lower()
@@ -79,6 +83,15 @@ def classify_ai_error(exc):
         return 'OPENAI_CONNECTION'
     if 'model' in message and ('not found' in message or 'does not exist' in message or 'access' in message):
         return 'OPENAI_MODEL'
+    if (
+        isinstance(exc, VeyraRequestRestricted)
+        or 'refusal' in name
+        or 'refusal' in message
+        or 'safety' in message
+        or 'content policy' in message
+        or 'policy violation' in message
+    ):
+        return 'REQUEST_RESTRICTED'
     if 'json' in name or 'json' in message or 'incomplete veyra project payload' in message:
         return 'OPENAI_RESPONSE'
     if 'badrequest' in name or 'bad request' in message or '400' in message:
@@ -160,9 +173,25 @@ def run_veyra_response(client, *, model, instructions, input_text, max_output_to
 
     response=client.responses.create(**kwargs)
 
+    # The Responses API can return a refusal item instead of normal text.
+    # Treat that as a clean restricted-request state, not as OPENAI_UNKNOWN.
+    refusal_messages=[]
+    for item in (getattr(response,'output',None) or []):
+        for content in (getattr(item,'content',None) or []):
+            content_type=str(getattr(content,'type','') or '').lower()
+            refusal_text=str(getattr(content,'refusal','') or '').strip()
+            if content_type=='refusal' or refusal_text:
+                refusal_messages.append(refusal_text or 'The request was restricted.')
+
+    if refusal_messages:
+        raise VeyraRequestRestricted(' '.join(refusal_messages)[:800])
+
     status=str(getattr(response,'status','') or '')
     if status and status != 'completed':
         details=getattr(response,'incomplete_details',None)
+        details_text=str(details or '').lower()
+        if 'safety' in details_text or 'content' in details_text:
+            raise VeyraRequestRestricted('The request was restricted by the generation safety system.')
         raise ValueError(f'Incomplete Veyra response: status={status}; details={details}')
 
     output=(getattr(response,'output_text',None) or '').strip()
@@ -2406,7 +2435,7 @@ def api_build():
         "The object must contain: assistant_message,title,html,css,js,files,changed_files,next_steps,quality. "
         "html must be body markup only. css must be complete CSS. js must be browser-safe vanilla JavaScript. "
         "Keep editing the supplied current project instead of restarting unless the user explicitly requests a rebuild. "
-        "Build polished, responsive, usable products rather than generic placeholder layouts. ""Keep generated HTML/CSS/JS concise and production-minded; do not repeat code or add explanatory prose inside code fields. ""Reuse CSS classes and variables, avoid duplicate selectors, and keep JavaScript focused only on interactions the request needs. "
+        "Build polished, responsive, usable products rather than generic placeholder layouts. ""Keep generated HTML/CSS/JS concise and production-minded; do not repeat code or add explanatory prose inside code fields. "
         "Preserve existing functionality unless the user asks to change it. "
         "The assistant_message should briefly explain what changed and why. "
         "files must contain the real project files you changed or maintained. "
@@ -2427,12 +2456,11 @@ def api_build():
         },
     }
 
-    # Full site generation can legitimately take longer than a minute.
-    # Vercel Fluid Compute currently allows 300s by default, so keep Veyra's
-    # upstream deadline comfortably below that instead of aborting at 55s.
+    # Give Veyra enough time to generate a complete site while still keeping a
+    # bounded upstream timeout. R11's 18-second cutoff was too short for real builds.
     client=OpenAI(
         api_key=key,
-        timeout=170.0,
+        timeout=55.0,
         max_retries=0,
     )
     attempts=[]
@@ -2452,7 +2480,7 @@ def api_build():
                 model=model,
                 instructions=system,
                 input_text=json.dumps(payload,separators=(',',':')),
-                max_output_tokens=5200,
+                max_output_tokens=7000,
                 reasoning=None,
             )
 
@@ -2506,21 +2534,39 @@ def api_build():
             )
 
             # Retrying a second model cannot fix authentication, billing, or connectivity.
-            if code in {'OPENAI_AUTH','OPENAI_ACCESS','OPENAI_RATE_LIMIT','OPENAI_TIMEOUT','OPENAI_CONNECTION'}:
+            if code in {'OPENAI_AUTH','OPENAI_ACCESS','OPENAI_RATE_LIMIT','OPENAI_TIMEOUT','OPENAI_CONNECTION','REQUEST_RESTRICTED'}:
                 break
 
     if data is None:
         code=classify_ai_error(last_exc) if last_exc else 'OPENAI_UNKNOWN'
+
+        if code=='REQUEST_RESTRICTED':
+            return jsonify({
+                'ok':False,
+                'error':(
+                    'Veyra cannot generate that specific request. No credits were used. '
+                    'You can still ask Veyra to build a compliant age-gated creator, media, '
+                    'subscription, or community platform without explicit sexual content.'
+                ),
+                'assistant_message':(
+                    'I can’t build that specific request, but I can help turn it into a '
+                    'compliant age-gated creator or media platform instead. No credits were used.'
+                ),
+                'code':'REQUEST_RESTRICTED',
+                'diagnostic_code':'REQUEST_RESTRICTED',
+                'credits_used':0,
+                'credits_remaining':credits_before,
+                'credit_cost':credit_cost,
+                'is_followup':is_followup,
+                'ai_attempts':attempts,
+            }),400
+
         d=local_preview(prompt)
-        friendly_failure=(
-            'The live Veyra build took longer than expected, so I kept your project safe and used the local preview. '
-            'No credits were used. Please run the request again.'
-            if code=='OPENAI_TIMEOUT'
-            else 'The live Veyra AI request could not complete, so I showed a local preview instead. '
-                 f'No credits were used. Diagnostic: {code}.'
-        )
         d.update({
-            'assistant_message':friendly_failure,
+            'assistant_message':(
+                'The live Veyra AI request could not complete, so I showed a local preview instead. '
+                f'No credits were used. Diagnostic: {code}.'
+            ),
             'engine':'Veyra Local Engine',
             'diagnostic_code':code,
             'credits_used':0,
