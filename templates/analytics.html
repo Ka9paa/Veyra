@@ -1,6 +1,2 @@
-{% extends 'app_base.html' %}{% block title %}Analytics — Veyra{% endblock %}{% block top_title %}Analytics{% endblock %}
-{% block content %}
-<div class="hero-row"><div><div class="eyebrow">Measure</div><h1 class="title">Analytics</h1><p class="subtitle">Real recorded project events only. No decorative fake graphs.</p></div></div>
-{% if events %}<div class="card"><div class="card-head"><h3>Recent events</h3><span class="tag">{{events|length}} loaded</span></div><div class="list">{% for e in events %}<div class="list-row"><div class="row-main"><div class="emblem">↗</div><div class="row-copy"><strong>{{e.event_type}}</strong><span class="muted">{{e.project_name}} · {{e.created_at}}</span></div></div></div>{% endfor %}</div></div>
-{% else %}<div class="empty"><div class="empty-icon">⌁</div><h3>No analytics yet</h3><p>Once a published project records real activity, it will appear here.</p></div>{% endif %}
-{% endblock %}
+{% extends 'app_base.html' %}{% block title %}Analytics — Veyra{% endblock %}{% block top_title %}Analytics{% endblock %}{% block content %}
+<div><div class="eyebrow">ACTIVITY</div><h2 class="title">Analytics</h2><p class="subtitle">Real recorded project events. No fake charts or fake users.</p></div><section class="card" style="margin-top:18px">{% if events %}<div class="list">{% for e in events %}<div class="row"><div><b>{{e.event_type.replace('_',' ')|title}}</b><span>{{e.project_name}} · {{e.created_at}}</span></div></div>{% endfor %}</div>{% else %}<div class="empty"><b>No analytics yet</b>Activity will appear here as Veyra records real events.</div>{% endif %}</section>{% endblock %}

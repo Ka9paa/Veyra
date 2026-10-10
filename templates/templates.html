@@ -1,5 +1,4 @@
-{% extends 'app_base.html' %}{% block title %}Templates — Veyra{% endblock %}{% block top_title %}Templates{% endblock %}
-{% block content %}
-<div class="hero-row"><div><div class="eyebrow">Start faster</div><h1 class="title">Templates</h1><p class="subtitle">Clean starting points. No fake popularity counts, ratings, or social proof.</p></div></div>
-<div class="template-grid">{% for t in templates %}<div class="template-card"><div class="template-preview"></div><span class="tag">{{t.kind}}</span><h3>{{t.name}}</h3><p>{{t.description}}</p><a class="btn primary" href="{{url_for('studio')}}?template={{t.name|urlencode}}">Use template</a></div>{% endfor %}</div>
-{% endblock %}
+{% extends 'app_base.html' %}{% block title %}Templates — Veyra{% endblock %}{% block top_title %}Templates{% endblock %}{% block content %}
+<div><div class="eyebrow">START FASTER</div><h2 class="title">Templates</h2><p class="subtitle">These actually create a real project and open it in Studio.</p></div>
+{% set items=[('saas','SaaS landing page','Marketing','Hero, features, pricing and CTA.'),('portfolio','Portfolio','Personal','Projects, about and contact.'),('dashboard','Admin dashboard','App','Sidebar, metrics and settings.'),('storefront','Storefront','Commerce','Product grid and shopping layout.')] %}
+<div class="grid" style="margin-top:18px">{% for slug,name,kind,desc in items %}<article class="card"><span class="tag">{{kind}}</span><h3>{{name}}</h3><p class="muted">{{desc}}</p><a class="btn primary" href="{{url_for('use_template',slug=slug)}}">Use template →</a></article>{% endfor %}</div>{% endblock %}

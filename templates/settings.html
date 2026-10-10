@@ -1,9 +1,2 @@
-{% extends 'app_base.html' %}{% block title %}Settings — Veyra{% endblock %}{% block top_title %}Settings{% endblock %}
-{% block content %}
-<div class="hero-row"><div><div class="eyebrow">Account</div><h1 class="title">Settings</h1><p class="subtitle">Only controls that are actually connected to your Veyra account.</p></div></div>
-<div class="grid">
-  <div class="card"><div class="card-head"><h3>Profile & security</h3></div><p>{{user.email or 'No email on file'}}</p><a class="btn" href="{{url_for('account')}}">Open account</a></div>
-  <div class="card"><div class="card-head"><h3>Plan & credits</h3></div><div class="metric-value">{{user.credits or 0}}</div><span class="muted">{{(user.plan or 'free')|upper}} plan</span></div>
-  <div class="card"><div class="card-head"><h3>Veyra AI</h3></div><p>Your AI connection is configured server-side. Live successful builds use credits; local fallback builds do not.</p></div>
-</div>
-{% endblock %}
+{% extends 'app_base.html' %}{% block title %}Settings — Veyra{% endblock %}{% block top_title %}Settings{% endblock %}{% block content %}
+<div><div class="eyebrow">PREFERENCES</div><h2 class="title">Settings</h2><p class="subtitle">Account and workspace controls.</p></div><div class="grid" style="margin-top:18px"><article class="card"><h3>Account</h3><p class="muted">Manage your profile, email and connected account information.</p><a class="btn" href="{{url_for('account')}}">Open account</a></article><article class="card"><h3>Billing</h3><p class="muted">Manage plan and credits.</p><a class="btn" href="{{url_for('billing_page')}}">Plans & Billing</a></article><article class="card"><h3>Session</h3><p class="muted">Sign out of this browser.</p><a class="btn danger" href="{{url_for('logout')}}">Log out</a></article></div>{% endblock %}

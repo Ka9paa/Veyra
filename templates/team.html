@@ -1,6 +1,3 @@
-{% extends 'app_base.html' %}{% block title %}Project members — Veyra{% endblock %}{% block top_title %}Project members{% endblock %}
-{% block content %}
-<div class="hero-row"><div><div class="eyebrow">Collaboration</div><h1 class="title">Members belong to projects.</h1><p class="subtitle">There is no account-wide fake team. Choose one project and manage access only for that project.</p></div></div>
-{% if projects %}<div class="list">{% for p in projects %}<div class="list-row"><div class="row-main"><div class="emblem">◎</div><div class="row-copy"><strong>{{p.name}}</strong><span class="muted">Project-specific access</span></div></div><a class="btn" href="{{url_for('project_members_page',project_id=p.id)}}">Manage members</a></div>{% endfor %}</div>
-{% else %}<div class="empty"><div class="empty-icon">◎</div><h3>No project to share</h3><p>Create a project first. Adding someone later only gives them access to that project.</p></div>{% endif %}
-{% endblock %}
+{% extends 'app_base.html' %}{% block title %}Team — Veyra{% endblock %}{% block top_title %}Team{% endblock %}{% block content %}
+<div><div class="eyebrow">COLLABORATION</div><h2 class="title">Project members</h2><p class="subtitle">Members belong to individual projects, not your entire Veyra account.</p></div>
+{% if projects %}<div class="grid" style="margin-top:18px">{% for p in projects %}<article class="card"><h3>{{p.name}}</h3><p class="muted">Manage people who can access this project.</p><a class="btn primary" href="{{url_for('project_members_page',project_id=p.id)}}">Manage members →</a></article>{% endfor %}</div>{% else %}<div class="card empty" style="margin-top:18px"><b>No projects to share</b>Create a project first.</div>{% endif %}{% endblock %}
