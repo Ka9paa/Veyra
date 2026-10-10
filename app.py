@@ -227,7 +227,7 @@ else:
 
 
 class _PgCursor:
-    _ID_TABLES={'users','projects','vouches','support_threads','admin_audit','project_members','agents','project_databases','deployments','analytics_events','ai_conversations','staff_applications'}
+    _ID_TABLES={'users','projects','vouches','support_threads','admin_audit','project_members','agents','project_databases','deployments','analytics_events'}
 
     def __init__(self, cursor):
         self._cursor=cursor
@@ -405,30 +405,6 @@ def init_db():
                 status TEXT NOT NULL DEFAULT 'idle',
                 created_at TEXT NOT NULL
             )''')
-            c.execute('''CREATE TABLE IF NOT EXISTS ai_conversations(
-                id BIGSERIAL PRIMARY KEY,
-                user_id BIGINT,
-                project_id BIGINT,
-                prompt TEXT NOT NULL,
-                answer TEXT NOT NULL DEFAULT '',
-                engine TEXT NOT NULL DEFAULT '',
-                diagnostic_code TEXT NOT NULL DEFAULT '',
-                credits_used INTEGER NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL
-            )''')
-            c.execute('''CREATE TABLE IF NOT EXISTS staff_applications(
-                id BIGSERIAL PRIMARY KEY,
-                user_id BIGINT NOT NULL,
-                discord_username TEXT NOT NULL DEFAULT '',
-                motivation TEXT NOT NULL,
-                experience TEXT NOT NULL,
-                contribution TEXT NOT NULL,
-                availability TEXT NOT NULL,
-                scenario TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at TEXT NOT NULL,
-                reviewed_at TEXT
-            )''')
             c.execute('''CREATE TABLE IF NOT EXISTS project_databases(
                 id BIGSERIAL PRIMARY KEY,
                 user_id BIGINT NOT NULL,
@@ -480,6 +456,41 @@ def init_db():
             )""")
             c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT')
             c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT')
+            c.execute("""CREATE TABLE IF NOT EXISTS staff_applications(
+                id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                discord_name TEXT DEFAULT '',
+                age TEXT DEFAULT '',
+                timezone TEXT DEFAULT '',
+                availability TEXT DEFAULT '',
+                about TEXT NOT NULL,
+                experience TEXT NOT NULL,
+                why_veyra TEXT NOT NULL,
+                support_judgment TEXT NOT NULL,
+                extra TEXT DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                reviewer_id BIGINT,
+                reviewer_note TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                reviewed_at TEXT
+            )""")
+            # Migrate older staff application tables in-place.
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS discord_name TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS age TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS availability TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS about TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS experience TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS why_veyra TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS support_judgment TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS extra TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending'")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS reviewer_id BIGINT")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS reviewer_note TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS created_at TEXT")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS reviewed_at TEXT")
+            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_user ON staff_applications(user_id)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_status ON staff_applications(status)')
         else:
             c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 50,created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
             c.execute('''CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)''')
@@ -509,30 +520,6 @@ def init_db():
             )''')
             c.execute('''CREATE TABLE IF NOT EXISTS project_members(id INTEGER PRIMARY KEY AUTOINCREMENT,project_id INTEGER NOT NULL,user_id INTEGER NOT NULL,role TEXT NOT NULL DEFAULT 'editor',added_by INTEGER NOT NULL,created_at TEXT NOT NULL,UNIQUE(project_id,user_id))''')
             c.execute('''CREATE TABLE IF NOT EXISTS agents(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'idle',created_at TEXT NOT NULL)''')
-            c.execute('''CREATE TABLE IF NOT EXISTS ai_conversations(
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                project_id INTEGER,
-                prompt TEXT NOT NULL,
-                answer TEXT NOT NULL DEFAULT '',
-                engine TEXT NOT NULL DEFAULT '',
-                diagnostic_code TEXT NOT NULL DEFAULT '',
-                credits_used INTEGER NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL
-            )''')
-            c.execute('''CREATE TABLE IF NOT EXISTS staff_applications(
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                discord_username TEXT NOT NULL DEFAULT '',
-                motivation TEXT NOT NULL,
-                experience TEXT NOT NULL,
-                contribution TEXT NOT NULL,
-                availability TEXT NOT NULL,
-                scenario TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at TEXT NOT NULL,
-                reviewed_at TEXT
-            )''')
             c.execute('''CREATE TABLE IF NOT EXISTS project_databases(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER,name TEXT NOT NULL,provider TEXT NOT NULL DEFAULT 'Postgres',status TEXT NOT NULL DEFAULT 'connected',created_at TEXT NOT NULL)''')
             c.execute('''CREATE TABLE IF NOT EXISTS deployments(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER NOT NULL,url TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'ready',created_at TEXT NOT NULL)''')
             c.execute('''CREATE TABLE IF NOT EXISTS analytics_events(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER NOT NULL,event_type TEXT NOT NULL,created_at TEXT NOT NULL)''')
@@ -550,6 +537,37 @@ def init_db():
             user_cols={r['name'] for r in c.execute('PRAGMA table_info(users)').fetchall()}
             if 'stripe_customer_id' not in user_cols: c.execute('ALTER TABLE users ADD COLUMN stripe_customer_id TEXT')
             if 'stripe_subscription_id' not in user_cols: c.execute('ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT')
+            c.execute("""CREATE TABLE IF NOT EXISTS staff_applications(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                discord_name TEXT DEFAULT '',
+                age TEXT DEFAULT '',
+                timezone TEXT DEFAULT '',
+                availability TEXT DEFAULT '',
+                about TEXT NOT NULL,
+                experience TEXT NOT NULL,
+                why_veyra TEXT NOT NULL,
+                support_judgment TEXT NOT NULL,
+                extra TEXT DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                reviewer_id INTEGER,
+                reviewer_note TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                reviewed_at TEXT
+            )""")
+            staff_cols={r['name'] for r in c.execute('PRAGMA table_info(staff_applications)').fetchall()}
+            staff_missing={
+                'discord_name':"TEXT DEFAULT ''",'age':"TEXT DEFAULT ''",'timezone':"TEXT DEFAULT ''",
+                'availability':"TEXT DEFAULT ''",'about':"TEXT DEFAULT ''",'experience':"TEXT DEFAULT ''",
+                'why_veyra':"TEXT DEFAULT ''",'support_judgment':"TEXT DEFAULT ''",'extra':"TEXT DEFAULT ''",
+                'status':"TEXT NOT NULL DEFAULT 'pending'",'reviewer_id':"INTEGER",
+                'reviewer_note':"TEXT DEFAULT ''",'created_at':"TEXT",'reviewed_at':"TEXT",
+            }
+            for col,definition in staff_missing.items():
+                if col not in staff_cols:
+                    c.execute(f'ALTER TABLE staff_applications ADD COLUMN {col} {definition}')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_user ON staff_applications(user_id)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_status ON staff_applications(status)')
             c.execute('''CREATE TABLE IF NOT EXISTS login_events(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,provider TEXT NOT NULL,email TEXT,account_name TEXT,discord_id TEXT,created_at TEXT NOT NULL,delivered INTEGER NOT NULL DEFAULT 0)''')
         c.commit()
 
@@ -1786,26 +1804,50 @@ def admin_dashboard():
     if not is_admin():
         return ('Forbidden',403)
 
+    _ensure_staff_applications_v2()
+
     with db() as c:
-        raw_users=c.execute('SELECT * FROM users ORDER BY created_at DESC').fetchall()
-        users=[dict(r) for r in raw_users]
+        users=[dict(r) for r in c.execute(
+            'SELECT * FROM users ORDER BY created_at DESC'
+        ).fetchall()]
+
+        projects=[dict(r) for r in c.execute(
+            """SELECT p.*,
+                      u.name AS owner_name,
+                      u.email AS owner_email,
+                      (SELECT COUNT(*) FROM project_members pm WHERE pm.project_id=p.id) AS member_count,
+                      (SELECT COUNT(*) FROM deployments d WHERE d.project_id=p.id) AS deployment_count
+               FROM projects p
+               LEFT JOIN users u ON u.id=p.user_id
+               ORDER BY p.updated_at DESC
+               LIMIT 100"""
+        ).fetchall()]
+
+        support_threads=[dict(r) for r in c.execute(
+            'SELECT * FROM support_threads ORDER BY created_at DESC LIMIT 12'
+        ).fetchall()]
+
+        audit_raw=[dict(r) for r in c.execute(
+            'SELECT * FROM admin_audit ORDER BY created_at DESC LIMIT 30'
+        ).fetchall()]
 
         total_users=c.execute('SELECT COUNT(*) AS n FROM users').fetchone()['n']
-        paid_users=c.execute("SELECT COUNT(*) AS n FROM users WHERE lower(COALESCE(plan,'free')) IN ('pro','max')").fetchone()['n']
+        paid_users=c.execute(
+            "SELECT COUNT(*) AS n FROM users WHERE lower(COALESCE(plan,'free')) IN ('pro','max')"
+        ).fetchone()['n']
         project_count=c.execute('SELECT COUNT(*) AS n FROM projects').fetchone()['n']
-        restricted=c.execute('SELECT COUNT(*) AS n FROM users WHERE COALESCE(is_blacklisted,0)=1').fetchone()['n']
-
-        support_threads=[
-            dict(r) for r in c.execute(
-                'SELECT * FROM support_threads ORDER BY created_at DESC LIMIT 8'
-            ).fetchall()
-        ]
-
-        audit_raw=[
-            dict(r) for r in c.execute(
-                'SELECT * FROM admin_audit ORDER BY created_at DESC LIMIT 20'
-            ).fetchall()
-        ]
+        restricted=c.execute(
+            'SELECT COUNT(*) AS n FROM users WHERE COALESCE(is_blacklisted,0)=1'
+        ).fetchone()['n']
+        total_credits=c.execute('SELECT COALESCE(SUM(credits),0) AS n FROM users').fetchone()['n']
+        total_logins=c.execute('SELECT COUNT(*) AS n FROM login_events').fetchone()['n']
+        admin_count=c.execute('SELECT COUNT(*) AS n FROM site_admins').fetchone()['n']
+        discord_linked=c.execute(
+            "SELECT COUNT(*) AS n FROM users WHERE COALESCE(discord_id,'')<>'' OR lower(COALESCE(provider,''))='discord'"
+        ).fetchone()['n']
+        pending_staff=c.execute(
+            "SELECT COUNT(*) AS n FROM staff_applications_v2 WHERE LOWER(status)='pending'"
+        ).fetchone()['n']
 
     for u in users:
         uid=u['id']
@@ -1826,20 +1868,6 @@ def admin_dashboard():
         row['summary']=row.get('details') or ''
         audit_rows.append(row)
 
-    with db() as c:
-        total_credits=c.execute(
-            'SELECT COALESCE(SUM(credits),0) AS n FROM users'
-        ).fetchone()['n']
-        total_logins=c.execute(
-            'SELECT COUNT(*) AS n FROM login_events'
-        ).fetchone()['n']
-        admin_count=c.execute(
-            'SELECT COUNT(*) AS n FROM site_admins'
-        ).fetchone()['n']
-        discord_linked=c.execute(
-            "SELECT COUNT(*) AS n FROM users WHERE COALESCE(discord_id,'')<>'' OR lower(COALESCE(provider,''))='discord'"
-        ).fetchone()['n']
-
     stats={
         'total_users':int(total_users or 0),
         'paid_users':int(paid_users or 0),
@@ -1850,102 +1878,20 @@ def admin_dashboard():
         'total_logins':int(total_logins or 0),
         'admin_count':int(admin_count or 0),
         'discord_linked':int(discord_linked or 0),
+        'pending_staff':int(pending_staff or 0),
         'ai_status':'Ready' if os.getenv('OPENAI_API_KEY','').strip() else 'Local mode',
-        'stripe_status':'Configured' if _stripe_secret() else 'Not configured',
+        'stripe_status':'Configured' if os.getenv('STRIPE_SECRET_KEY','').strip() else 'Not configured',
     }
-
-    with db() as c:
-        stats['ai_conversations']=int(c.execute('SELECT COUNT(*) AS n FROM ai_conversations').fetchone()['n'] or 0)
-        stats['staff_pending']=int(c.execute("SELECT COUNT(*) AS n FROM staff_applications WHERE status='pending'").fetchone()['n'] or 0)
-        recent_ai=[dict(r) for r in c.execute(
-            '''SELECT a.*,u.name AS user_name,u.email AS user_email
-               FROM ai_conversations a
-               LEFT JOIN users u ON u.id=a.user_id
-               ORDER BY a.created_at DESC LIMIT 6'''
-        ).fetchall()]
-        recent_staff=[dict(r) for r in c.execute(
-            '''SELECT s.*,u.name AS user_name,u.email AS user_email
-               FROM staff_applications s
-               LEFT JOIN users u ON u.id=s.user_id
-               ORDER BY s.created_at DESC LIMIT 6'''
-        ).fetchall()]
 
     return render_template(
         'admin_dashboard_v3.html',
         user=current_user(),
         users=users,
+        projects=projects,
         stats=stats,
         support_threads=support_threads,
-        audit_rows=audit_rows,
-        recent_ai=recent_ai,
-        recent_staff=recent_staff
+        audit_rows=audit_rows
     )
-
-@app.route('/admin/support')
-@login_required
-def admin_support():
-    if not is_admin():
-        return ('Forbidden',403)
-    with db() as c:
-        rows=[dict(r) for r in c.execute(
-            '''SELECT s.*,u.name AS user_name,u.email AS user_email
-               FROM support_threads s
-               LEFT JOIN users u ON u.id=s.user_id
-               ORDER BY s.created_at DESC LIMIT 250'''
-        ).fetchall()]
-    return render_template('admin_support.html',user=current_user(),rows=rows)
-
-
-@app.route('/admin/ai-conversations')
-@login_required
-def admin_ai_conversations():
-    if not is_admin():
-        return ('Forbidden',403)
-    with db() as c:
-        rows=[dict(r) for r in c.execute(
-            '''SELECT a.*,u.name AS user_name,u.email AS user_email
-               FROM ai_conversations a
-               LEFT JOIN users u ON u.id=a.user_id
-               ORDER BY a.created_at DESC LIMIT 250'''
-        ).fetchall()]
-    return render_template('admin_ai_conversations.html',user=current_user(),rows=rows)
-
-
-@app.route('/admin/staff-applications')
-@login_required
-def admin_staff_applications():
-    if not is_admin():
-        return ('Forbidden',403)
-    with db() as c:
-        rows=[dict(r) for r in c.execute(
-            '''SELECT s.*,u.name AS user_name,u.email AS user_email
-               FROM staff_applications s
-               LEFT JOIN users u ON u.id=s.user_id
-               ORDER BY CASE WHEN s.status='pending' THEN 0 ELSE 1 END, s.created_at DESC'''
-        ).fetchall()]
-    return render_template('admin_staff_applications.html',user=current_user(),rows=rows)
-
-
-@app.post('/admin/staff-applications/<int:application_id>/<action>')
-@login_required
-def admin_staff_application_action(application_id,action):
-    if not is_admin():
-        return ('Forbidden',403)
-    if action not in {'accept','deny'}:
-        return ('Invalid action',400)
-    status='accepted' if action=='accept' else 'denied'
-    with db() as c:
-        row=c.execute('SELECT id FROM staff_applications WHERE id=?',(application_id,)).fetchone()
-        if not row:
-            return ('Application not found',404)
-        c.execute(
-            'UPDATE staff_applications SET status=?,reviewed_at=? WHERE id=?',
-            (status,now(),application_id)
-        )
-        c.commit()
-    admin_audit('staff_application_'+status,application_id,{})
-    flash(f'Staff application #{application_id} was {status}.','success')
-    return redirect(url_for('admin_staff_applications'))
 
 
 @app.post('/admin/users/<int:user_id>/plan')
@@ -2203,6 +2149,241 @@ def dashboard():
     )
 
 
+
+def _ensure_staff_applications_v2():
+    """Create the production staff application table used by current routes.
+
+    A separate v2 table avoids legacy NOT NULL/column constraints from older
+    staff-application implementations breaking new submissions.
+    """
+    with db() as c:
+        if DATABASE_URL:
+            c.execute("""CREATE TABLE IF NOT EXISTS staff_applications_v2(
+                id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                discord_name TEXT DEFAULT '',
+                age TEXT DEFAULT '',
+                timezone TEXT DEFAULT '',
+                availability TEXT DEFAULT '',
+                about TEXT NOT NULL DEFAULT '',
+                experience TEXT NOT NULL DEFAULT '',
+                why_veyra TEXT NOT NULL DEFAULT '',
+                support_judgment TEXT NOT NULL DEFAULT '',
+                extra TEXT DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                reviewer_id BIGINT,
+                reviewer_note TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                reviewed_at TEXT
+            )""")
+            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_v2_user ON staff_applications_v2(user_id)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_v2_status ON staff_applications_v2(status)')
+        else:
+            c.execute("""CREATE TABLE IF NOT EXISTS staff_applications_v2(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                discord_name TEXT DEFAULT '',
+                age TEXT DEFAULT '',
+                timezone TEXT DEFAULT '',
+                availability TEXT DEFAULT '',
+                about TEXT NOT NULL DEFAULT '',
+                experience TEXT NOT NULL DEFAULT '',
+                why_veyra TEXT NOT NULL DEFAULT '',
+                support_judgment TEXT NOT NULL DEFAULT '',
+                extra TEXT DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                reviewer_id INTEGER,
+                reviewer_note TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                reviewed_at TEXT
+            )""")
+            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_v2_user ON staff_applications_v2(user_id)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_v2_status ON staff_applications_v2(status)')
+        c.commit()
+
+
+
+@app.route('/staff/apply', methods=['GET','POST'])
+@login_required
+def staff_apply():
+    u=current_user()
+    _ensure_staff_applications_v2()
+
+    with db() as c:
+        latest=c.execute(
+            'SELECT * FROM staff_applications_v2 WHERE user_id=? ORDER BY id DESC LIMIT 1',
+            (u['id'],)
+        ).fetchone()
+
+    if request.method=='POST':
+        if latest and str(latest['status']).lower()=='pending':
+            flash('You already have a staff application under review.','error')
+            return redirect(url_for('staff_apply'))
+
+        discord_name=(request.form.get('discord_name') or '').strip()[:100]
+        age=(request.form.get('age') or '').strip()[:20]
+        timezone=(request.form.get('timezone') or '').strip()[:80]
+        availability=(request.form.get('availability') or '').strip()[:500]
+        about=(request.form.get('about') or '').strip()
+        experience=(request.form.get('experience') or '').strip()
+        why_veyra=(request.form.get('why_veyra') or '').strip()
+        support_judgment=(request.form.get('support_judgment') or '').strip()
+        extra=(request.form.get('extra') or '').strip()
+
+        def word_count(value):
+            return len([w for w in re.split(r'\s+', value.strip()) if w])
+
+        required_answers={
+            'Availability':availability,
+            'Tell us about yourself':about,
+            'Experience':experience,
+            'Why Veyra':why_veyra,
+            'Support judgment':support_judgment,
+        }
+        short=[name for name,value in required_answers.items() if word_count(value)<5]
+        if short:
+            flash('Please write at least 5 words for: ' + ', '.join(short) + '.','error')
+            return render_template(
+                'staff_apply.html',
+                user=u,
+                application=dict(latest) if latest else None,
+                form_data=request.form
+            ),400
+
+        if not discord_name:
+            flash('Please enter your Discord username before submitting.','error')
+            return render_template(
+                'staff_apply.html',
+                user=u,
+                application=dict(latest) if latest else None,
+                form_data=request.form
+            ),400
+
+        try:
+            _ensure_staff_applications_v2()
+            with db() as c:
+                existing=c.execute(
+                    """SELECT id FROM staff_applications_v2
+                       WHERE user_id=? AND LOWER(status)='pending'
+                       ORDER BY id DESC LIMIT 1""",
+                    (u['id'],)
+                ).fetchone()
+                if existing:
+                    flash('You already have a staff application under review.','error')
+                    return redirect(url_for('staff_apply'))
+
+                c.execute(
+                    """INSERT INTO staff_applications_v2(
+                        user_id,discord_name,age,timezone,availability,about,experience,
+                        why_veyra,support_judgment,extra,status,created_at
+                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        u['id'],discord_name,age,timezone,availability[:500],
+                        about[:2500],experience[:2500],why_veyra[:2500],
+                        support_judgment[:2500],extra[:2500],'pending',now()
+                    )
+                )
+                c.commit()
+
+            flash('Application submitted successfully. Veyra staff will review it soon.','success')
+            return redirect(url_for('staff_apply'))
+
+        except Exception as exc:
+            app.logger.exception(
+                'Staff application v2 submit failed | user_id=%s | error=%s | detail=%s',
+                u.get('id'),type(exc).__name__,str(exc)[:500]
+            )
+            flash(
+                'We could not submit your application because of a server issue. '
+                'Your answers are still here — please try again.',
+                'error'
+            )
+            return render_template(
+                'staff_apply.html',
+                user=u,
+                application=dict(latest) if latest else None,
+                form_data=request.form
+            ),500
+
+    return render_template(
+        'staff_apply.html',
+        user=u,
+        application=dict(latest) if latest else None,
+        form_data={}
+    )
+
+
+@app.route('/staff/review')
+@login_required
+def staff_review():
+    if not is_admin():
+        return ('Forbidden',403)
+
+    _ensure_staff_applications_v2()
+    status=(request.args.get('status') or 'pending').lower()
+    if status not in {'pending','accepted','denied','all'}:
+        status='pending'
+
+    with db() as c:
+        if status=='all':
+            rows=c.execute(
+                """SELECT sa.*,u.name,u.email,u.discord_id
+                   FROM staff_applications_v2 sa
+                   JOIN users u ON u.id=sa.user_id
+                   ORDER BY sa.created_at DESC"""
+            ).fetchall()
+        else:
+            rows=c.execute(
+                """SELECT sa.*,u.name,u.email,u.discord_id
+                   FROM staff_applications_v2 sa
+                   JOIN users u ON u.id=sa.user_id
+                   WHERE LOWER(sa.status)=?
+                   ORDER BY sa.created_at DESC""",
+                (status,)
+            ).fetchall()
+
+    return render_template(
+        'staff_review.html',
+        user=current_user(),
+        applications=[dict(r) for r in rows],
+        filter_status=status
+    )
+
+
+@app.post('/staff/review/<int:application_id>/<action>')
+@login_required
+def staff_review_action(application_id,action):
+    if not is_admin():
+        return ('Forbidden',403)
+    if action not in {'accept','deny'}:
+        return redirect(url_for('staff_review'))
+
+    _ensure_staff_applications_v2()
+    status='accepted' if action=='accept' else 'denied'
+    note=(request.form.get('reviewer_note') or '').strip()[:1000]
+    reviewer=current_user()
+
+    with db() as c:
+        row=c.execute(
+            'SELECT * FROM staff_applications_v2 WHERE id=?',
+            (application_id,)
+        ).fetchone()
+        if not row:
+            flash('That staff application no longer exists.','error')
+            return redirect(url_for('staff_review'))
+
+        c.execute(
+            """UPDATE staff_applications_v2
+               SET status=?,reviewer_id=?,reviewer_note=?,reviewed_at=?
+               WHERE id=?""",
+            (status,reviewer['id'],note,now(),application_id)
+        )
+        c.commit()
+
+    flash(f'Staff application #{application_id} marked {status}.','success')
+    return redirect(url_for('staff_review'))
+
+
 @app.route('/app/projects')
 @login_required
 def projects_page():
@@ -2237,95 +2418,20 @@ def agents_page():
     u=current_user()
     with db() as c:
         rows=c.execute('SELECT * FROM agents WHERE user_id=? ORDER BY created_at DESC',(u['id'],)).fetchall()
-    agents=[dict(r) for r in rows]
-    stats={
-        'total':len(agents),
-        'active':sum(1 for a in agents if str(a.get('status') or '').lower() in {'active','running'}),
-        'idle':sum(1 for a in agents if str(a.get('status') or '').lower()=='idle'),
-    }
-    return render_template('agents.html',user=u,agents=agents,stats=stats)
+    return render_template('agents.html',user=u,agents=[dict(r) for r in rows])
 
 
 @app.post('/app/agents/create')
 @login_required
 def agents_create():
-    u=current_user()
-    name=(request.form.get('name') or '').strip()[:80]
-    description=(request.form.get('description') or '').strip()[:500]
-    if len(name)<2:
-        flash('Give your agent a name with at least 2 characters.','error')
-        return redirect(url_for('agents_page'))
-    if len(description.split())<3:
-        flash('Describe what this agent should handle in at least 3 words.','error')
-        return redirect(url_for('agents_page'))
+    u=current_user(); name=(request.form.get('name') or '').strip()[:80]
+    description=(request.form.get('description') or '').strip()[:300]
+    if not name:
+        flash('Agent name is required.','error'); return redirect(url_for('agents_page'))
     with db() as c:
-        c.execute(
-            'INSERT INTO agents(user_id,name,description,status,created_at) VALUES(?,?,?,?,?)',
-            (u['id'],name,description,'idle',now())
-        )
+        c.execute('INSERT INTO agents(user_id,name,description,status,created_at) VALUES(?,?,?,?,?)',(u['id'],name,description,'idle',now()))
         c.commit()
-    flash(f'{name} was created and is ready to configure.','success')
     return redirect(url_for('agents_page'))
-
-
-def _word_count(value):
-    return len([w for w in re.split(r'\s+', (value or '').strip()) if w])
-
-
-@app.route('/staff/apply',methods=['GET','POST'])
-def staff_apply():
-    u=current_user()
-    if request.method=='GET':
-        latest=None
-        if u:
-            with db() as c:
-                row=c.execute(
-                    'SELECT * FROM staff_applications WHERE user_id=? ORDER BY created_at DESC LIMIT 1',
-                    (u['id'],)
-                ).fetchone()
-                latest=dict(row) if row else None
-        return render_template('staff_apply.html',user=u,latest=latest)
-
-    if not u:
-        flash('Please sign in before submitting a staff application so we can attach it to your Veyra account.','error')
-        return redirect(url_for('login'))
-
-    fields={
-        'motivation':(request.form.get('motivation') or '').strip(),
-        'experience':(request.form.get('experience') or '').strip(),
-        'contribution':(request.form.get('contribution') or '').strip(),
-        'availability':(request.form.get('availability') or '').strip(),
-        'scenario':(request.form.get('scenario') or '').strip(),
-    }
-    discord_username=(request.form.get('discord_username') or '').strip()[:120]
-
-    short=[name for name,value in fields.items() if _word_count(value)<5]
-    if short:
-        flash('Each written response must contain at least 5 words. Please complete the highlighted responses.','error')
-        return render_template('staff_apply.html',user=u,latest=None,form_values={**fields,'discord_username':discord_username}),400
-
-    with db() as c:
-        pending=c.execute(
-            "SELECT id FROM staff_applications WHERE user_id=? AND status='pending' ORDER BY created_at DESC LIMIT 1",
-            (u['id'],)
-        ).fetchone()
-        if pending:
-            flash('You already have a staff application pending review.','error')
-            return redirect(url_for('staff_apply'))
-
-        c.execute(
-            '''INSERT INTO staff_applications(
-                user_id,discord_username,motivation,experience,contribution,availability,scenario,status,created_at
-            ) VALUES(?,?,?,?,?,?,?,?,?)''',
-            (
-                u['id'],discord_username,fields['motivation'],fields['experience'],
-                fields['contribution'],fields['availability'],fields['scenario'],'pending',now()
-            )
-        )
-        c.commit()
-
-    flash('Your Veyra staff application was submitted successfully.','success')
-    return redirect(url_for('staff_apply'))
 
 
 @app.route('/app/settings')
@@ -2544,35 +2650,6 @@ def local_preview(prompt):
         title='Veyra Launch';html='''<main class="site"><nav><b><i></i> VEYRA</b><div><a>Product</a><a>Solutions</a><a>Pricing</a><a>Resources</a></div><button>Start free</button></nav><section class="hero"><span>✦ BUILT WITH VEYRA</span><h1>Turn your idea into<br><em>working software.</em></h1><p>Describe what you want and Veyra designs, codes, tests, and previews the product while you keep refining it.</p><div><button>Build with Veyra</button><button class="ghost">Explore examples</button></div></section><section class="cards"><article><b>Design + code together</b><p>Move from visual intent to working front-end without losing context.</p></article><article><b>Auto QA</b><p>Check responsiveness, accessibility, and interaction quality before launch.</p></article><article><b>Project memory</b><p>Keep decisions, files, and earlier versions available while you iterate.</p></article></section></main>''';css='''*{box-sizing:border-box}body{margin:0;background:#070914;color:#f8f8ff;font-family:Inter,Arial}.site{min-height:100vh;padding:0 46px;background:radial-gradient(circle at 50% 28%,#7e42df35,transparent 28%),radial-gradient(circle at 85% 5%,#286cff22,transparent 25%),#070914}.site nav{height:76px;display:flex;align-items:center;border-bottom:1px solid #1d2337}.site nav b i{display:inline-block;width:10px;height:10px;border-radius:4px;background:linear-gradient(135deg,#a958fa,#4f87ff)}.site nav div{display:flex;gap:25px;margin:auto;color:#919bb4}.site nav button,.hero button{height:42px;padding:0 17px;border:0;border-radius:12px;background:linear-gradient(135deg,#8249ef,#4f86ff);color:#fff;font-weight:700}.hero{text-align:center;padding:110px 20px 85px}.hero>span{display:inline-block;padding:8px 11px;border:1px solid #313859;border-radius:999px;color:#b39af4;font-size:10px;letter-spacing:.14em}.hero h1{font-size:78px;line-height:.94;letter-spacing:-.06em;margin:20px 0}.hero h1 em{font-style:normal;background:linear-gradient(90deg,#bc61ff,#5c8cff,#58defd);-webkit-background-clip:text;color:transparent}.hero p{max-width:680px;margin:auto;color:#a0a9c0;font-size:17px;line-height:1.65}.hero>div{display:flex;justify-content:center;gap:10px;margin-top:26px}.hero .ghost{background:#14192b;border:1px solid #2b334e}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding-bottom:45px}.cards article{padding:23px;border:1px solid #222a44;border-radius:18px;background:#0f1427}.cards b{font-size:17px}.cards p{color:#8d97b0;line-height:1.55}@media(max-width:700px){.site{padding:0 20px}.site nav div{display:none}.hero h1{font-size:50px}.cards{grid-template-columns:1fr}}'''
     return {'ok':True,'title':title,'assistant_message':'Done — I created a working local preview and updated the core project files. I also refreshed the layout, styling, and responsive behavior so you can see the result immediately.','html':html,'css':css,'js':'','files':['index.html','styles.css','app.js'],'changed_files':[{'file':'index.html','action':'Updated','details':'Rebuilt the page structure and visible content for the requested design.'},{'file':'styles.css','action':'Updated','details':'Applied the visual system, spacing, colors, typography, and responsive states.'},{'file':'app.js','action':'Reviewed','details':'Kept the interaction layer browser-safe and ready for follow-up behavior.'}],'next_steps':['Ask Veyra to refine any section','Open Code to inspect the generated files','Run Auto QA before deployment'],'quality':{'accessibility':96,'performance':93,'responsive':'Ready','security':'Sandboxed'},'engine':'Veyra Local'}
 
-def _log_ai_conversation(user_id, prompt, answer='', engine='', diagnostic_code='', credits_used=0, project_id=None):
-    try:
-        pid=None
-        if project_id not in (None,''):
-            try:
-                pid=int(project_id)
-            except Exception:
-                pid=None
-        with db() as c:
-            c.execute(
-                '''INSERT INTO ai_conversations(
-                    user_id,project_id,prompt,answer,engine,diagnostic_code,credits_used,created_at
-                ) VALUES(?,?,?,?,?,?,?,?)''',
-                (
-                    user_id,
-                    pid,
-                    (prompt or '')[:6000],
-                    (answer or '')[:6000],
-                    (engine or '')[:120],
-                    (diagnostic_code or '')[:120],
-                    int(credits_used or 0),
-                    now(),
-                )
-            )
-            c.commit()
-    except Exception:
-        app.logger.exception('AI conversation logging failed')
-
-
 @app.post('/api/build')
 @login_required
 def api_build():
@@ -2584,7 +2661,6 @@ def api_build():
         return jsonify({'ok':False,'error':'Tell Veyra what you want to build.'}),400
 
     uid=current_user()['id']
-    project_ref=p.get('project_id') or cur.get('project_id')
     is_followup=bool(
         (cur.get('html') or '').strip()
         or (cur.get('css') or '').strip()
@@ -2624,7 +2700,6 @@ def api_build():
             'credit_cost':credit_cost,
             'is_followup':is_followup,
         })
-        _log_ai_conversation(uid,prompt,d.get('assistant_message',''),d.get('engine',''),'OPENAI_NOT_CONFIGURED',0,project_ref)
         return jsonify(d)
 
     if credits_before < credit_cost:
@@ -2760,7 +2835,6 @@ def api_build():
             'is_followup':is_followup,
             'ai_attempts':attempts,
         })
-        _log_ai_conversation(uid,prompt,d.get('assistant_message',''),d.get('engine',''),code,0,project_ref)
         return jsonify(d)
 
     # Debit only after a valid live AI build has been produced.
@@ -2810,7 +2884,6 @@ def api_build():
         'ai_api':'responses',
         'ai_model':used_model,
     })
-    _log_ai_conversation(uid,prompt,data.get('assistant_message',''),'Veyra AI','',credit_cost,project_ref)
     return jsonify(data)
 
 
