@@ -456,41 +456,6 @@ def init_db():
             )""")
             c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT')
             c.execute('ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT')
-            c.execute("""CREATE TABLE IF NOT EXISTS staff_applications(
-                id BIGSERIAL PRIMARY KEY,
-                user_id BIGINT NOT NULL,
-                discord_name TEXT DEFAULT '',
-                age TEXT DEFAULT '',
-                timezone TEXT DEFAULT '',
-                availability TEXT DEFAULT '',
-                about TEXT NOT NULL,
-                experience TEXT NOT NULL,
-                why_veyra TEXT NOT NULL,
-                support_judgment TEXT NOT NULL,
-                extra TEXT DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'pending',
-                reviewer_id BIGINT,
-                reviewer_note TEXT DEFAULT '',
-                created_at TEXT NOT NULL,
-                reviewed_at TEXT
-            )""")
-            # Migrate older staff application tables in-place.
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS discord_name TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS age TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS availability TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS about TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS experience TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS why_veyra TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS support_judgment TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS extra TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending'")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS reviewer_id BIGINT")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS reviewer_note TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS created_at TEXT")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS reviewed_at TEXT")
-            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_user ON staff_applications(user_id)')
-            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_status ON staff_applications(status)')
         else:
             c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 50,created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
             c.execute('''CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)''')
@@ -537,37 +502,6 @@ def init_db():
             user_cols={r['name'] for r in c.execute('PRAGMA table_info(users)').fetchall()}
             if 'stripe_customer_id' not in user_cols: c.execute('ALTER TABLE users ADD COLUMN stripe_customer_id TEXT')
             if 'stripe_subscription_id' not in user_cols: c.execute('ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT')
-            c.execute("""CREATE TABLE IF NOT EXISTS staff_applications(
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                discord_name TEXT DEFAULT '',
-                age TEXT DEFAULT '',
-                timezone TEXT DEFAULT '',
-                availability TEXT DEFAULT '',
-                about TEXT NOT NULL,
-                experience TEXT NOT NULL,
-                why_veyra TEXT NOT NULL,
-                support_judgment TEXT NOT NULL,
-                extra TEXT DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'pending',
-                reviewer_id INTEGER,
-                reviewer_note TEXT DEFAULT '',
-                created_at TEXT NOT NULL,
-                reviewed_at TEXT
-            )""")
-            staff_cols={r['name'] for r in c.execute('PRAGMA table_info(staff_applications)').fetchall()}
-            staff_missing={
-                'discord_name':"TEXT DEFAULT ''",'age':"TEXT DEFAULT ''",'timezone':"TEXT DEFAULT ''",
-                'availability':"TEXT DEFAULT ''",'about':"TEXT DEFAULT ''",'experience':"TEXT DEFAULT ''",
-                'why_veyra':"TEXT DEFAULT ''",'support_judgment':"TEXT DEFAULT ''",'extra':"TEXT DEFAULT ''",
-                'status':"TEXT NOT NULL DEFAULT 'pending'",'reviewer_id':"INTEGER",
-                'reviewer_note':"TEXT DEFAULT ''",'created_at':"TEXT",'reviewed_at':"TEXT",
-            }
-            for col,definition in staff_missing.items():
-                if col not in staff_cols:
-                    c.execute(f'ALTER TABLE staff_applications ADD COLUMN {col} {definition}')
-            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_user ON staff_applications(user_id)')
-            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_status ON staff_applications(status)')
             c.execute('''CREATE TABLE IF NOT EXISTS login_events(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,provider TEXT NOT NULL,email TEXT,account_name TEXT,discord_id TEXT,created_at TEXT NOT NULL,delivered INTEGER NOT NULL DEFAULT 0)''')
         c.commit()
 
@@ -2051,86 +1985,116 @@ def _visible_projects(uid):
     return [dict(r) for r in rows]
 
 
+
+def _safe_fetchall(sql, params=(), label='query'):
+    try:
+        with db() as c:
+            return [dict(r) for r in c.execute(sql, params).fetchall()]
+    except Exception:
+        app.logger.exception('Dashboard safe query failed | %s', label)
+        return []
+
+def _safe_fetchone(sql, params=(), label='query'):
+    try:
+        with db() as c:
+            row=c.execute(sql, params).fetchone()
+            return dict(row) if row else None
+    except Exception:
+        app.logger.exception('Dashboard safe query failed | %s', label)
+        return None
+
+def _safe_count(sql, params=(), label='count'):
+    row=_safe_fetchone(sql, params, label)
+    if not row:
+        return 0
+    try:
+        return int(row.get('n') or 0)
+    except Exception:
+        return 0
+
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    u=current_user(); uid=u['id']
-    with db() as c:
-        rows=c.execute(
-            'SELECT * FROM projects WHERE user_id=? ORDER BY updated_at DESC LIMIT 6',
-            (uid,)
-        ).fetchall()
+    u=current_user()
+    if not u:
+        return redirect(url_for('login'))
+    uid=u['id']
 
-        project_count=c.execute(
-            'SELECT COUNT(*) AS n FROM projects WHERE user_id=?',
-            (uid,)
-        ).fetchone()['n']
-
-        deployment_count=c.execute(
-            'SELECT COUNT(*) AS n FROM deployments WHERE user_id=?',
-            (uid,)
-        ).fetchone()['n']
-
-        analytics_count=c.execute(
-            'SELECT COUNT(*) AS n FROM analytics_events WHERE user_id=?',
-            (uid,)
-        ).fetchone()['n']
-
-        member_count=c.execute(
-            '''SELECT COUNT(DISTINCT pm.user_id) AS n
-               FROM project_members pm
-               JOIN projects p ON p.id=pm.project_id
-               WHERE p.user_id=?''',
-            (uid,)
-        ).fetchone()['n']
-
-        recent_deployments=c.execute(
-            '''SELECT d.*,p.name AS project_name
-               FROM deployments d
-               LEFT JOIN projects p ON p.id=d.project_id
-               WHERE d.user_id=?
-               ORDER BY d.created_at DESC
-               LIMIT 5''',
-            (uid,)
-        ).fetchall()
-
-        recent_activity=c.execute(
-            '''SELECT event_type,project_id,created_at
-               FROM analytics_events
-               WHERE user_id=?
-               ORDER BY created_at DESC
-               LIMIT 6''',
-            (uid,)
-        ).fetchall()
-
-        latest_login=c.execute(
-            '''SELECT provider,created_at
-               FROM login_events
-               WHERE user_id=?
-               ORDER BY id DESC
-               LIMIT 1''',
-            (uid,)
-        ).fetchone()
+    rows=_safe_fetchall(
+        'SELECT * FROM projects WHERE user_id=? ORDER BY updated_at DESC LIMIT 6',
+        (uid,),
+        'dashboard projects'
+    )
+    project_count=_safe_count(
+        'SELECT COUNT(*) AS n FROM projects WHERE user_id=?',
+        (uid,),
+        'dashboard project count'
+    )
+    deployment_count=_safe_count(
+        'SELECT COUNT(*) AS n FROM deployments WHERE user_id=?',
+        (uid,),
+        'dashboard deployment count'
+    )
+    analytics_count=_safe_count(
+        'SELECT COUNT(*) AS n FROM analytics_events WHERE user_id=?',
+        (uid,),
+        'dashboard analytics count'
+    )
+    member_count=_safe_count(
+        '''SELECT COUNT(DISTINCT pm.user_id) AS n
+           FROM project_members pm
+           JOIN projects p ON p.id=pm.project_id
+           WHERE p.user_id=?''',
+        (uid,),
+        'dashboard member count'
+    )
+    recent_deployments=_safe_fetchall(
+        '''SELECT d.*,p.name AS project_name
+           FROM deployments d
+           LEFT JOIN projects p ON p.id=d.project_id
+           WHERE d.user_id=?
+           ORDER BY d.created_at DESC
+           LIMIT 5''',
+        (uid,),
+        'dashboard deployments'
+    )
+    recent_activity=_safe_fetchall(
+        '''SELECT event_type,project_id,created_at
+           FROM analytics_events
+           WHERE user_id=?
+           ORDER BY created_at DESC
+           LIMIT 6''',
+        (uid,),
+        'dashboard activity'
+    )
+    latest_login=_safe_fetchone(
+        '''SELECT provider,created_at
+           FROM login_events
+           WHERE user_id=?
+           ORDER BY id DESC
+           LIMIT 1''',
+        (uid,),
+        'dashboard latest login'
+    )
 
     plan=(u.get('plan') or 'free').lower()
     plan_allowance={'free':50,'pro':3000,'max':7500}.get(plan,0)
     credits=int(u.get('credits') or 0)
-    usage_percent=0
-    if plan_allowance > 0:
-        usage_percent=max(0,min(100,round((credits/plan_allowance)*100)))
+    usage_percent=max(0,min(100,round((credits/plan_allowance)*100))) if plan_allowance else 0
 
     return render_template(
         'dashboard.html',
         user=u,
-        projects=[dict(r) for r in rows],
-        recent_deployments=[dict(r) for r in recent_deployments],
-        recent_activity=[dict(r) for r in recent_activity],
-        latest_login=dict(latest_login) if latest_login else None,
+        projects=rows,
+        recent_deployments=recent_deployments,
+        recent_activity=recent_activity,
+        latest_login=latest_login,
         stats={
-            'projects':int(project_count or 0),
-            'deployments':int(deployment_count or 0),
-            'analytics':int(analytics_count or 0),
-            'members':int(member_count or 0),
+            'projects':project_count,
+            'deployments':deployment_count,
+            'analytics':analytics_count,
+            'members':member_count,
             'credits':credits,
             'plan':plan,
             'plan_allowance':plan_allowance,
@@ -2139,176 +2103,19 @@ def dashboard():
     )
 
 
-
-@app.route('/staff/apply', methods=['GET','POST'])
-@login_required
-def staff_apply():
-    u=current_user()
-
-    with db() as c:
-        latest=c.execute(
-            'SELECT * FROM staff_applications WHERE user_id=? ORDER BY id DESC LIMIT 1',
-            (u['id'],)
-        ).fetchone()
-
-    if request.method=='POST':
-        if latest and str(latest['status']).lower()=='pending':
-            flash('You already have a staff application under review.','error')
-            return redirect(url_for('staff_apply'))
-
-        discord_name=(request.form.get('discord_name') or '').strip()[:100]
-        age=(request.form.get('age') or '').strip()[:20]
-        timezone=(request.form.get('timezone') or '').strip()[:80]
-        availability=(request.form.get('availability') or '').strip()[:500]
-        about=(request.form.get('about') or '').strip()
-        experience=(request.form.get('experience') or '').strip()
-        why_veyra=(request.form.get('why_veyra') or '').strip()
-        support_judgment=(request.form.get('support_judgment') or '').strip()
-        extra=(request.form.get('extra') or '').strip()
-
-        def word_count(value):
-            return len([w for w in re.split(r'\s+', value.strip()) if w])
-
-        required_answers={
-            'Availability':availability,
-            'Tell us about yourself':about,
-            'Experience':experience,
-            'Why Veyra':why_veyra,
-            'Support judgment':support_judgment,
-        }
-        short=[name for name,value in required_answers.items() if word_count(value)<5]
-        if short:
-            flash('Please write at least 5 words for: ' + ', '.join(short) + '.','error')
-            return render_template(
-                'staff_apply.html',
-                user=u,
-                application=dict(latest) if latest else None,
-                form_data=request.form
-            ),400
-
-        try:
-            with db() as c:
-                existing=c.execute(
-                    """SELECT id FROM staff_applications
-                       WHERE user_id=? AND LOWER(status)='pending'
-                       ORDER BY id DESC LIMIT 1""",
-                    (u['id'],)
-                ).fetchone()
-                if existing:
-                    flash('You already have a staff application under review.','error')
-                    return redirect(url_for('staff_apply'))
-
-                c.execute(
-                    """INSERT INTO staff_applications(
-                        user_id,discord_name,age,timezone,availability,about,experience,
-                        why_veyra,support_judgment,extra,status,created_at
-                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (
-                        u['id'],discord_name,age,timezone,availability[:500],
-                        about[:2500],experience[:2500],why_veyra[:2500],
-                        support_judgment[:2500],extra[:2500],'pending',now()
-                    )
-                )
-                c.commit()
-
-            flash('Application submitted successfully. Veyra staff will review it soon.','success')
-            return redirect(url_for('staff_apply'))
-
-        except Exception as exc:
-            app.logger.exception(
-                'Staff application submit failed | user_id=%s | error=%s',
-                u.get('id'),type(exc).__name__
-            )
-            flash('We could not submit your application right now. Your answers are still on this page — please try again.','error')
-            return render_template(
-                'staff_apply.html',
-                user=u,
-                application=dict(latest) if latest else None,
-                form_data=request.form
-            ),500
-
-    return render_template(
-        'staff_apply.html',
-        user=u,
-        application=dict(latest) if latest else None,
-        form_data={}
-    )
-
-
-@app.route('/staff/review')
-@login_required
-def staff_review():
-    if not is_admin():
-        return ('Forbidden',403)
-
-    status=(request.args.get('status') or 'pending').lower()
-    if status not in {'pending','accepted','denied','all'}:
-        status='pending'
-
-    with db() as c:
-        if status=='all':
-            rows=c.execute(
-                """SELECT sa.*,u.name,u.email,u.discord_id
-                   FROM staff_applications sa
-                   JOIN users u ON u.id=sa.user_id
-                   ORDER BY sa.created_at DESC"""
-            ).fetchall()
-        else:
-            rows=c.execute(
-                """SELECT sa.*,u.name,u.email,u.discord_id
-                   FROM staff_applications sa
-                   JOIN users u ON u.id=sa.user_id
-                   WHERE sa.status=?
-                   ORDER BY sa.created_at DESC""",
-                (status,)
-            ).fetchall()
-
-    return render_template(
-        'staff_review.html',
-        user=current_user(),
-        applications=[dict(r) for r in rows],
-        filter_status=status
-    )
-
-
-@app.post('/staff/review/<int:application_id>/<action>')
-@login_required
-def staff_review_action(application_id,action):
-    if not is_admin():
-        return ('Forbidden',403)
-    if action not in {'accept','deny'}:
-        return redirect(url_for('staff_review'))
-
-    status='accepted' if action=='accept' else 'denied'
-    note=(request.form.get('reviewer_note') or '').strip()[:1000]
-    reviewer=current_user()
-
-    with db() as c:
-        row=c.execute(
-            'SELECT * FROM staff_applications WHERE id=?',
-            (application_id,)
-        ).fetchone()
-        if not row:
-            flash('That staff application no longer exists.','error')
-            return redirect(url_for('staff_review'))
-
-        c.execute(
-            """UPDATE staff_applications
-               SET status=?,reviewer_id=?,reviewer_note=?,reviewed_at=?
-               WHERE id=?""",
-            (status,reviewer['id'],note,now(),application_id)
-        )
-        c.commit()
-
-    flash(f'Staff application #{application_id} marked {status}.','success')
-    return redirect(url_for('staff_review'))
-
-
 @app.route('/app/projects')
 @login_required
 def projects_page():
     u=current_user()
-    return render_template('projects.html',user=u,projects=_visible_projects(u['id']))
+    try:
+        projects=_visible_projects(u['id'])
+    except Exception:
+        app.logger.exception('Projects page lookup failed')
+        try:
+            projects=_owned_projects(u['id'])
+        except Exception:
+            projects=[]
+    return render_template('projects.html',user=u,projects=projects)
 
 
 @app.route('/app/templates')
@@ -2323,128 +2130,28 @@ def templates_page():
     return render_template('templates.html',user=current_user(),templates=starter_templates)
 
 
-TEMPLATE_PROJECTS={
-    'saas':{
-        'name':'SaaS Landing Page',
-        'description':'Modern SaaS landing page starter.',
-        'html':'<main class="hero"><nav><b>LaunchKit</b><a>Features</a><a>Pricing</a></nav><section><span>AI-POWERED PRODUCT</span><h1>Build something people want.</h1><p>A polished SaaS starter generated from Veyra Templates.</p><button>Start building</button></section></main>',
-        'css':'*{box-sizing:border-box}body{margin:0;background:#07101d;color:#fff;font-family:Inter,Arial}.hero{min-height:100vh;background:radial-gradient(circle at 80% 10%,#6f4cff38,transparent 30%),#07101d}.hero nav{height:72px;display:flex;align-items:center;gap:28px;padding:0 7%;border-bottom:1px solid #1d2b41}.hero nav b{margin-right:auto}.hero nav a{color:#92a1b7}.hero section{max-width:850px;padding:120px 7%}.hero span{color:#8c78ff;font-size:12px;font-weight:800;letter-spacing:.15em}.hero h1{font-size:72px;line-height:1;margin:18px 0}.hero p{font-size:20px;color:#96a3b6;max-width:650px}.hero button{margin-top:25px;background:#7357ff;color:#fff;border:0;border-radius:12px;padding:14px 20px;font-weight:800}',
-        'js':''
-    },
-    'portfolio':{
-        'name':'Portfolio',
-        'description':'Personal portfolio starter.',
-        'html':'<main><header><b>Alex Morgan</b><nav>Work&nbsp;&nbsp;About&nbsp;&nbsp;Contact</nav></header><section class="intro"><small>DESIGN + DEVELOPMENT</small><h1>I build digital experiences that feel effortless.</h1><p>Selected work, experiments, and product thinking.</p></section></main>',
-        'css':'body{margin:0;background:#0b0b0d;color:#f5f5f7;font-family:Inter,Arial}header{display:flex;justify-content:space-between;padding:28px 7%;border-bottom:1px solid #252529}.intro{padding:140px 7%;max-width:1000px}.intro small{color:#a78bfa;letter-spacing:.14em}.intro h1{font-size:68px;line-height:1.05}.intro p{color:#a1a1aa;font-size:20px}',
-        'js':''
-    },
-    'dashboard':{
-        'name':'Admin Dashboard',
-        'description':'Dashboard starter with cards and sidebar.',
-        'html':'<main class="app"><aside><b>Northstar</b><a class="on">Overview</a><a>Customers</a><a>Revenue</a><a>Settings</a></aside><section><h1>Overview</h1><div class="cards"><article><span>Revenue</span><b>$48,240</b></article><article><span>Customers</span><b>2,481</b></article><article><span>Conversion</span><b>8.4%</b></article></div></section></main>',
-        'css':'body{margin:0;background:#070b12;color:#fff;font-family:Inter,Arial}.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}aside{padding:26px 18px;border-right:1px solid #1c2a3e;display:flex;flex-direction:column;gap:12px}aside b{font-size:20px;margin-bottom:20px}aside a{padding:10px;border-radius:9px;color:#8fa0b8}.on{background:#171b39;color:#fff!important}section{padding:35px}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.cards article{padding:22px;border:1px solid #22324a;border-radius:14px;background:#0c1523}.cards span,.cards b{display:block}.cards span{color:#8494aa}.cards b{font-size:28px;margin-top:8px}',
-        'js':''
-    },
-    'storefront':{
-        'name':'Storefront',
-        'description':'Clean ecommerce starter.',
-        'html':'<main><header><b>ARCHIVE</b><nav>New&nbsp;&nbsp;Shop&nbsp;&nbsp;Cart (0)</nav></header><section class="hero"><h1>Everyday pieces.<br>Built differently.</h1><button>Shop collection</button></section><section class="products"><article>Core Tee</article><article>Utility Hoodie</article><article>Studio Cap</article></section></main>',
-        'css':'body{margin:0;background:#f4f1ea;color:#111;font-family:Arial}header{display:flex;justify-content:space-between;padding:24px 5%;border-bottom:1px solid #c9c4ba}.hero{padding:100px 5%;min-height:55vh}.hero h1{font-size:72px;line-height:.95}.hero button{background:#111;color:#fff;padding:13px 18px;border:0}.products{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;padding:0 5% 60px}.products article{height:260px;background:#ded8cc;padding:18px}',
-        'js':''
-    }
-}
-
-@app.get('/app/templates/use/<slug>')
-@login_required
-def use_template(slug):
-    tpl=TEMPLATE_PROJECTS.get(slug)
-    if not tpl:
-        flash('That template is not available.','error')
-        return redirect(url_for('templates_page'))
-    u=current_user()
-    t=now()
-    with db() as c:
-        row=c.execute(
-            'INSERT INTO projects(user_id,name,description,html,css,js,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id',
-            (u['id'],tpl['name'],tpl['description'],tpl['html'],tpl['css'],tpl['js'],t,t)
-        ).fetchone()
-        c.commit()
-    project_id=int(row['id']) if row else None
-    flash(f'{tpl["name"]} created.','success')
-    return redirect(url_for('studio') + (f'?project={project_id}' if project_id else ''))
-
-@app.post('/app/agents/<int:agent_id>/delete')
-@login_required
-def agents_delete(agent_id):
-    u=current_user()
-    with db() as c:
-        c.execute('DELETE FROM agents WHERE id=? AND user_id=?',(agent_id,u['id']))
-        c.commit()
-    flash('Agent deleted.','success')
-    return redirect(url_for('agents_page'))
-
-@app.post('/app/databases/create')
-@login_required
-def databases_create():
-    u=current_user()
-    name=(request.form.get('name') or '').strip()[:80]
-    project_id=request.form.get('project_id') or None
-    provider=(request.form.get('provider') or 'Postgres').strip()[:40]
-    if not name:
-        flash('Database name is required.','error')
-        return redirect(url_for('databases_page'))
-    with db() as c:
-        c.execute('INSERT INTO project_databases(user_id,project_id,name,provider,status,created_at) VALUES(?,?,?,?,?,?)',
-                  (u['id'],project_id,name,provider,'connected',now()))
-        c.commit()
-    flash('Database connection added.','success')
-    return redirect(url_for('databases_page'))
-
-@app.post('/app/databases/<int:db_id>/delete')
-@login_required
-def databases_delete(db_id):
-    u=current_user()
-    with db() as c:
-        c.execute('DELETE FROM project_databases WHERE id=? AND user_id=?',(db_id,u['id']))
-        c.commit()
-    flash('Database removed.','success')
-    return redirect(url_for('databases_page'))
-
-@app.post('/app/projects/<int:project_id>/delete')
-@login_required
-def project_delete(project_id):
-    u=current_user()
-    project=_project_for_owner(project_id,u['id'])
-    if not project:
-        flash('Project not found or you do not own it.','error')
-        return redirect(url_for('projects_page'))
-    with db() as c:
-        c.execute('DELETE FROM project_members WHERE project_id=?',(project_id,))
-        c.execute('DELETE FROM analytics_events WHERE project_id=?',(project_id,))
-        c.execute('DELETE FROM deployments WHERE project_id=?',(project_id,))
-        c.execute('DELETE FROM project_databases WHERE project_id=?',(project_id,))
-        c.execute('DELETE FROM projects WHERE id=? AND user_id=?',(project_id,u['id']))
-        c.commit()
-    flash('Project deleted.','success')
-    return redirect(url_for('projects_page'))
-
-
 @app.route('/app/deployments')
 @login_required
 def deployments_page():
     u=current_user()
-    with db() as c:
-        rows=c.execute("SELECT d.*,p.name AS project_name FROM deployments d JOIN projects p ON p.id=d.project_id WHERE d.user_id=? ORDER BY d.created_at DESC",(u['id'],)).fetchall()
-    return render_template('deployments.html',user=u,deployments=[dict(r) for r in rows])
+    rows=_safe_fetchall(
+        "SELECT d.*,p.name AS project_name FROM deployments d LEFT JOIN projects p ON p.id=d.project_id WHERE d.user_id=? ORDER BY d.created_at DESC",
+        (u['id'],),
+        'deployments page'
+    )
+    return render_template('deployments.html',user=u,deployments=rows)
 
 
 @app.route('/app/agents')
 @login_required
 def agents_page():
     u=current_user()
-    with db() as c:
-        rows=c.execute('SELECT * FROM agents WHERE user_id=? ORDER BY created_at DESC',(u['id'],)).fetchall()
-    return render_template('agents.html',user=u,agents=[dict(r) for r in rows])
+    rows=_safe_fetchall(
+        'SELECT * FROM agents WHERE user_id=? ORDER BY created_at DESC',
+        (u['id'],),
+        'agents page'
+    )
+    return render_template('agents.html',user=u,agents=rows)
 
 
 @app.post('/app/agents/create')
@@ -2476,25 +2183,36 @@ def profile_page():
 @login_required
 def databases_page():
     u=current_user()
-    with db() as c:
-        rows=c.execute("SELECT d.*,p.name AS project_name FROM project_databases d LEFT JOIN projects p ON p.id=d.project_id WHERE d.user_id=? ORDER BY d.created_at DESC",(u['id'],)).fetchall()
-    return render_template('databases.html',user=u,databases=[dict(r) for r in rows])
+    rows=_safe_fetchall(
+        "SELECT d.*,p.name AS project_name FROM project_databases d LEFT JOIN projects p ON p.id=d.project_id WHERE d.user_id=? ORDER BY d.created_at DESC",
+        (u['id'],),
+        'databases page'
+    )
+    return render_template('databases.html',user=u,databases=rows)
 
 
 @app.route('/app/analytics')
 @login_required
 def analytics_page():
     u=current_user()
-    with db() as c:
-        events=c.execute("SELECT a.*,p.name AS project_name FROM analytics_events a JOIN projects p ON p.id=a.project_id WHERE a.user_id=? ORDER BY a.created_at DESC LIMIT 100",(u['id'],)).fetchall()
-    return render_template('analytics.html',user=u,events=[dict(r) for r in events])
+    events=_safe_fetchall(
+        "SELECT a.*,p.name AS project_name FROM analytics_events a LEFT JOIN projects p ON p.id=a.project_id WHERE a.user_id=? ORDER BY a.created_at DESC LIMIT 100",
+        (u['id'],),
+        'analytics page'
+    )
+    return render_template('analytics.html',user=u,events=events)
 
 
 @app.route('/app/team')
 @login_required
 def team_page():
     u=current_user()
-    return render_template('team.html',user=u,projects=_owned_projects(u['id']))
+    try:
+        projects=_owned_projects(u['id'])
+    except Exception:
+        app.logger.exception('Team page projects lookup failed')
+        projects=[]
+    return render_template('team.html',user=u,projects=projects)
 
 
 @app.route('/app/projects/<int:project_id>/members')
@@ -2996,6 +2714,19 @@ def feature_lab(): return render_template('feature_lab.html',user=current_user()
 
 
 init_db()
+
+@app.errorhandler(500)
+def veyra_internal_error(error):
+    app.logger.error('Unhandled Veyra server error on %s', request.path, exc_info=True)
+    if request.path.startswith('/api/'):
+        return jsonify({
+            'ok':False,
+            'error':'Veyra hit a server error while processing that request.',
+            'code':'VEYRA_SERVER_ERROR'
+        }),500
+    return render_template('error500.html', request_path=request.path),500
+
+
 if __name__=='__main__':
     from waitress import serve
     host=os.getenv('HOST','127.0.0.1');port=int(os.getenv('PORT','8765'));print(f'VEYRA ready at http://{host}:{port}');serve(app,host=host,port=port)

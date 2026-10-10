@@ -1,8 +1,74 @@
-{% extends 'app_base.html' %}{% block title %}Billing — Veyra{% endblock %}{% block top_title %}Plans & Billing{% endblock %}{% block content %}
-<div><div class="eyebrow">BILLING</div><h2 class="title">Plans & Billing</h2><p class="subtitle">Checkout is tied to the signed-in Veyra account.</p></div>
-{% if stripe_mode is defined and stripe_mode!='live' %}<div class="flash error" style="margin-top:16px">Live Stripe billing is not connected. Checkout is blocked until the live Stripe account is configured.</div>{% endif %}
-<div class="grid" style="margin-top:18px">
-<article class="card"><h3>Free</h3><h2>$0</h2><p class="muted">50 starter credits</p><span class="tag">CURRENT if applicable</span></article>
-{% set pro=stripe_catalog.plans.get('pro') if stripe_catalog is defined else None %}<article class="card"><h3>Pro</h3><h2>{% if pro %}${{'%.2f'|format(pro.amount/100)}}{% else %}$19.99{% endif %}</h2><p class="muted">3,000 monthly credits</p>{% if pro and stripe_mode=='live' %}<a class="btn primary" href="{{url_for('billing_start_plan',plan='pro')}}">Choose Pro</a>{% else %}<span class="btn">Unavailable</span>{% endif %}</article>
-{% set maxp=stripe_catalog.plans.get('max') if stripe_catalog is defined else None %}<article class="card"><h3>Max</h3><h2>{% if maxp %}${{'%.2f'|format(maxp.amount/100)}}{% else %}$34.99{% endif %}</h2><p class="muted">7,500 monthly credits</p>{% if maxp and stripe_mode=='live' %}<a class="btn primary" href="{{url_for('billing_start_plan',plan='max')}}">Choose Max</a>{% else %}<span class="btn">Unavailable</span>{% endif %}</article>
-</div>{% endblock %}
+{% extends 'app_base.html' %}
+{% block title %}Plans & Billing — Veyra{% endblock %}
+{% block top_title %}Plans & Billing{% endblock %}
+{% block content %}
+<div class="hero-row">
+  <div>
+    <div class="eyebrow">Account / billing</div>
+    <h1 class="title">Plans that scale with you.</h1>
+    <p class="subtitle">Prices come from the Stripe Product Catalog connected to this deployment. Checkout stays tied to your signed-in Veyra account.</p>
+  </div>
+  <div class="hero-actions"><a class="btn" href="{{url_for('dashboard')}}">← Dashboard</a></div>
+</div>
+
+{% if stripe_mode!='live' %}
+<div class="billing-warning">
+  <b>Live Stripe billing is not connected.</b>
+  <span>This production site is currently connected to a Stripe test/sandbox key. Checkout is blocked until the live Stripe account is connected.</span>
+</div>
+{% endif %}
+
+<div class="stripe-status card">
+  <div class="stripe-logo">S</div>
+  <div><small>STRIPE CONNECTION</small><strong>{{'LIVE PRODUCT CATALOG' if stripe_mode=='live' else ('TEST / SANDBOX CATALOG' if stripe_mode=='test' else 'NOT CONNECTED')}}</strong></div>
+  <span class="{{'live' if stripe_mode=='live' else 'test'}}"></span>
+</div>
+
+<div class="billing-grid">
+  <article class="plan-card {{'current' if (user.plan or 'free')=='free' else ''}}">
+    <div class="plan-head"><b>FREE</b>{% if (user.plan or 'free')=='free' %}<em>CURRENT</em>{% endif %}</div>
+    <h2>$0</h2><p>Start building with Veyra.</p><div class="plan-credit"><strong>50</strong><span>starter credits</span></div>
+    <ul><li>Veyra Studio</li><li>Live preview</li><li>Project saving</li><li>ZIP export</li></ul>
+    <a class="btn" href="{{url_for('studio')}}">Keep building</a>
+  </article>
+
+  {% set pro=stripe_catalog.plans.get('pro') %}
+  <article class="plan-card featured {{'current' if (user.plan or 'free')=='pro' else ''}}">
+    <div class="popular">MOST POPULAR</div>
+    <div class="plan-head"><b>PRO</b>{% if (user.plan or 'free')=='pro' %}<em>CURRENT</em>{% endif %}</div>
+    <h2>{% if pro %}${{'%.2f'|format(pro.amount/100)}}<small>/{{pro.interval or 'mo'}}</small>{% else %}—{% endif %}</h2>
+    <p>{{pro.description if pro and pro.description else 'For creators building regularly.'}}</p>
+    <div class="plan-credit"><strong>3,000</strong><span>monthly credits</span></div>
+    <ul><li>Everything in Free</li><li>Higher Veyra usage</li><li>Project history</li><li>Advanced workflows</li></ul>
+    {% if stripe_mode=='live' and pro %}<a class="btn primary" href="{{url_for('billing_start_plan',plan='pro')}}">Upgrade to Pro →</a>{% else %}<span class="btn disabled">Live checkout unavailable</span>{% endif %}
+  </article>
+
+  {% set maxp=stripe_catalog.plans.get('max') %}
+  <article class="plan-card {{'current' if (user.plan or 'free')=='max' else ''}}">
+    <div class="plan-head"><b>MAX</b>{% if (user.plan or 'free')=='max' %}<em>CURRENT</em>{% endif %}</div>
+    <h2>{% if maxp %}${{'%.2f'|format(maxp.amount/100)}}<small>/{{maxp.interval or 'mo'}}</small>{% else %}—{% endif %}</h2>
+    <p>{{maxp.description if maxp and maxp.description else 'For heavier builds and frequent usage.'}}</p>
+    <div class="plan-credit"><strong>7,500</strong><span>monthly credits</span></div>
+    <ul><li>Everything in Pro</li><li>Priority generations</li><li>Longer project context</li><li>Higher workspace limits</li></ul>
+    {% if stripe_mode=='live' and maxp %}<a class="btn primary" href="{{url_for('billing_start_plan',plan='max')}}">Upgrade to Max →</a>{% else %}<span class="btn disabled">Live checkout unavailable</span>{% endif %}
+  </article>
+</div>
+
+<div class="section">
+  <div class="section-head"><h2>Credit top-ups</h2><span class="muted">One-time purchases from your Stripe catalog</span></div>
+  <div class="credit-grid">
+    {% for amount in [1000,2500,5000,10000] %}
+    {% set item=stripe_catalog.credits.get(amount) %}
+    <article class="credit-card">
+      <div><strong>{{"{:,}".format(amount)}}</strong><span>credits</span></div>
+      <b>{% if item %}${{'%.2f'|format(item.amount/100)}}{% else %}—{% endif %}</b>
+      {% if stripe_mode=='live' and item %}<a href="{{url_for('billing_start_credits',amount=amount)}}">Buy →</a>{% else %}<em>Unavailable</em>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</div>
+
+<style>
+.billing-warning{margin-bottom:16px;padding:14px 16px;border:1px solid #7a3b48;background:#2a1119;color:#ff9cac;border-radius:13px;display:grid;gap:4px}.billing-warning span{color:#e9b8c1}.stripe-status{display:grid;grid-template-columns:42px 1fr 10px;align-items:center;gap:12px;margin-bottom:16px}.stripe-logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#7d58ff,#5670ff);display:grid;place-items:center;font-weight:900}.stripe-status small,.stripe-status strong{display:block}.stripe-status small{color:var(--muted);font-size:10px;letter-spacing:.12em}.stripe-status>span{width:9px;height:9px;border-radius:50%;background:#ffbd59}.stripe-status>span.live{background:#45dfae;box-shadow:0 0 10px #45dfae66}.billing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.plan-card{position:relative;border:1px solid var(--line);background:linear-gradient(180deg,#0d1625,#09121f);border-radius:17px;padding:22px;min-height:420px;display:flex;flex-direction:column}.plan-card.featured{border-color:#715aff}.plan-card.current:after{content:"";position:absolute;inset:-1px;border:1px solid #45dfae;border-radius:17px;pointer-events:none}.popular{position:absolute;right:17px;top:-10px;background:linear-gradient(135deg,#805cff,#5971ff);padding:6px 9px;border-radius:999px;font-size:9px;font-weight:900}.plan-head{display:flex;justify-content:space-between}.plan-head em{font-style:normal;color:#7de9c8;font-size:9px;border:1px solid #2a5a4f;border-radius:999px;padding:5px 7px}.plan-card h2{font-size:39px;margin:24px 0 6px}.plan-card h2 small{font-size:13px;color:var(--muted)}.plan-card p{color:var(--muted);min-height:44px}.plan-credit{display:flex;gap:7px;align-items:baseline;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:14px 0;margin:16px 0}.plan-credit strong{font-size:22px}.plan-credit span{font-size:11px;color:var(--muted)}.plan-card ul{list-style:none;padding:0;display:grid;gap:10px}.plan-card li:before{content:"✓";color:#45dfae;margin-right:8px}.plan-card .btn{margin-top:auto}.disabled{opacity:.5;cursor:not-allowed}.credit-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.credit-card{border:1px solid var(--line);background:#0a1321;border-radius:14px;padding:16px;display:grid;grid-template-columns:1fr auto;gap:8px}.credit-card strong,.credit-card span{display:block}.credit-card strong{font-size:18px}.credit-card span{font-size:11px;color:var(--muted)}.credit-card b{color:#b7a8ff}.credit-card a,.credit-card em{grid-column:1/3;color:#fff;text-decoration:none;font-weight:800;font-size:11px;font-style:normal}.credit-card em{color:#697991}@media(max-width:1000px){.billing-grid{grid-template-columns:1fr}.credit-grid{grid-template-columns:1fr 1fr}}@media(max-width:650px){.credit-grid{grid-template-columns:1fr}}
+</style>
+{% endblock %}
