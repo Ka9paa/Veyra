@@ -462,6 +462,7 @@ def init_db():
                 discord_name TEXT DEFAULT '',
                 age TEXT DEFAULT '',
                 timezone TEXT DEFAULT '',
+                position TEXT DEFAULT '',
                 availability TEXT DEFAULT '',
                 about TEXT NOT NULL,
                 experience TEXT NOT NULL,
@@ -478,6 +479,7 @@ def init_db():
             c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS discord_name TEXT DEFAULT ''")
             c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS age TEXT DEFAULT ''")
             c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT ''")
+            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS position TEXT DEFAULT ''")
             c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS availability TEXT DEFAULT ''")
             c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS about TEXT DEFAULT ''")
             c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS experience TEXT DEFAULT ''")
@@ -543,6 +545,7 @@ def init_db():
                 discord_name TEXT DEFAULT '',
                 age TEXT DEFAULT '',
                 timezone TEXT DEFAULT '',
+                position TEXT DEFAULT '',
                 availability TEXT DEFAULT '',
                 about TEXT NOT NULL,
                 experience TEXT NOT NULL,
@@ -558,7 +561,7 @@ def init_db():
             staff_cols={r['name'] for r in c.execute('PRAGMA table_info(staff_applications)').fetchall()}
             staff_missing={
                 'discord_name':"TEXT DEFAULT ''",'age':"TEXT DEFAULT ''",'timezone':"TEXT DEFAULT ''",
-                'availability':"TEXT DEFAULT ''",'about':"TEXT DEFAULT ''",'experience':"TEXT DEFAULT ''",
+                'position':"TEXT DEFAULT ''",'availability':"TEXT DEFAULT ''",'about':"TEXT DEFAULT ''",'experience':"TEXT DEFAULT ''",
                 'why_veyra':"TEXT DEFAULT ''",'support_judgment':"TEXT DEFAULT ''",'extra':"TEXT DEFAULT ''",
                 'status':"TEXT NOT NULL DEFAULT 'pending'",'reviewer_id':"INTEGER",
                 'reviewer_note':"TEXT DEFAULT ''",'created_at':"TEXT",'reviewed_at':"TEXT",
@@ -1804,50 +1807,26 @@ def admin_dashboard():
     if not is_admin():
         return ('Forbidden',403)
 
-    _ensure_staff_applications_v2()
-
     with db() as c:
-        users=[dict(r) for r in c.execute(
-            'SELECT * FROM users ORDER BY created_at DESC'
-        ).fetchall()]
-
-        projects=[dict(r) for r in c.execute(
-            """SELECT p.*,
-                      u.name AS owner_name,
-                      u.email AS owner_email,
-                      (SELECT COUNT(*) FROM project_members pm WHERE pm.project_id=p.id) AS member_count,
-                      (SELECT COUNT(*) FROM deployments d WHERE d.project_id=p.id) AS deployment_count
-               FROM projects p
-               LEFT JOIN users u ON u.id=p.user_id
-               ORDER BY p.updated_at DESC
-               LIMIT 100"""
-        ).fetchall()]
-
-        support_threads=[dict(r) for r in c.execute(
-            'SELECT * FROM support_threads ORDER BY created_at DESC LIMIT 12'
-        ).fetchall()]
-
-        audit_raw=[dict(r) for r in c.execute(
-            'SELECT * FROM admin_audit ORDER BY created_at DESC LIMIT 30'
-        ).fetchall()]
+        raw_users=c.execute('SELECT * FROM users ORDER BY created_at DESC').fetchall()
+        users=[dict(r) for r in raw_users]
 
         total_users=c.execute('SELECT COUNT(*) AS n FROM users').fetchone()['n']
-        paid_users=c.execute(
-            "SELECT COUNT(*) AS n FROM users WHERE lower(COALESCE(plan,'free')) IN ('pro','max')"
-        ).fetchone()['n']
+        paid_users=c.execute("SELECT COUNT(*) AS n FROM users WHERE lower(COALESCE(plan,'free')) IN ('pro','max')").fetchone()['n']
         project_count=c.execute('SELECT COUNT(*) AS n FROM projects').fetchone()['n']
-        restricted=c.execute(
-            'SELECT COUNT(*) AS n FROM users WHERE COALESCE(is_blacklisted,0)=1'
-        ).fetchone()['n']
-        total_credits=c.execute('SELECT COALESCE(SUM(credits),0) AS n FROM users').fetchone()['n']
-        total_logins=c.execute('SELECT COUNT(*) AS n FROM login_events').fetchone()['n']
-        admin_count=c.execute('SELECT COUNT(*) AS n FROM site_admins').fetchone()['n']
-        discord_linked=c.execute(
-            "SELECT COUNT(*) AS n FROM users WHERE COALESCE(discord_id,'')<>'' OR lower(COALESCE(provider,''))='discord'"
-        ).fetchone()['n']
-        pending_staff=c.execute(
-            "SELECT COUNT(*) AS n FROM staff_applications_v2 WHERE LOWER(status)='pending'"
-        ).fetchone()['n']
+        restricted=c.execute('SELECT COUNT(*) AS n FROM users WHERE COALESCE(is_blacklisted,0)=1').fetchone()['n']
+
+        support_threads=[
+            dict(r) for r in c.execute(
+                'SELECT * FROM support_threads ORDER BY created_at DESC LIMIT 8'
+            ).fetchall()
+        ]
+
+        audit_raw=[
+            dict(r) for r in c.execute(
+                'SELECT * FROM admin_audit ORDER BY created_at DESC LIMIT 20'
+            ).fetchall()
+        ]
 
     for u in users:
         uid=u['id']
@@ -1868,6 +1847,20 @@ def admin_dashboard():
         row['summary']=row.get('details') or ''
         audit_rows.append(row)
 
+    with db() as c:
+        total_credits=c.execute(
+            'SELECT COALESCE(SUM(credits),0) AS n FROM users'
+        ).fetchone()['n']
+        total_logins=c.execute(
+            'SELECT COUNT(*) AS n FROM login_events'
+        ).fetchone()['n']
+        admin_count=c.execute(
+            'SELECT COUNT(*) AS n FROM site_admins'
+        ).fetchone()['n']
+        discord_linked=c.execute(
+            "SELECT COUNT(*) AS n FROM users WHERE COALESCE(discord_id,'')<>'' OR lower(COALESCE(provider,''))='discord'"
+        ).fetchone()['n']
+
     stats={
         'total_users':int(total_users or 0),
         'paid_users':int(paid_users or 0),
@@ -1878,21 +1871,21 @@ def admin_dashboard():
         'total_logins':int(total_logins or 0),
         'admin_count':int(admin_count or 0),
         'discord_linked':int(discord_linked or 0),
-        'pending_staff':int(pending_staff or 0),
         'ai_status':'Ready' if os.getenv('OPENAI_API_KEY','').strip() else 'Local mode',
-        'stripe_status':'Configured' if os.getenv('STRIPE_SECRET_KEY','').strip() else 'Not configured',
+        'stripe_status':'Configured' if (
+            os.getenv('STRIPE_PRO_PAYMENT_LINK','').strip()
+            or os.getenv('STRIPE_MAX_PAYMENT_LINK','').strip()
+        ) else 'Not configured',
     }
 
     return render_template(
         'admin_dashboard_v3.html',
         user=current_user(),
         users=users,
-        projects=projects,
         stats=stats,
         support_threads=support_threads,
         audit_rows=audit_rows
     )
-
 
 @app.post('/admin/users/<int:user_id>/plan')
 @login_required
@@ -2150,68 +2143,37 @@ def dashboard():
 
 
 
-def _ensure_staff_applications_v2():
-    """Create the production staff application table used by current routes.
-
-    A separate v2 table avoids legacy NOT NULL/column constraints from older
-    staff-application implementations breaking new submissions.
-    """
-    with db() as c:
-        if DATABASE_URL:
-            c.execute("""CREATE TABLE IF NOT EXISTS staff_applications_v2(
-                id BIGSERIAL PRIMARY KEY,
-                user_id BIGINT NOT NULL,
-                discord_name TEXT DEFAULT '',
-                age TEXT DEFAULT '',
-                timezone TEXT DEFAULT '',
-                availability TEXT DEFAULT '',
-                about TEXT NOT NULL DEFAULT '',
-                experience TEXT NOT NULL DEFAULT '',
-                why_veyra TEXT NOT NULL DEFAULT '',
-                support_judgment TEXT NOT NULL DEFAULT '',
-                extra TEXT DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'pending',
-                reviewer_id BIGINT,
-                reviewer_note TEXT DEFAULT '',
-                created_at TEXT NOT NULL,
-                reviewed_at TEXT
-            )""")
-            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_v2_user ON staff_applications_v2(user_id)')
-            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_v2_status ON staff_applications_v2(status)')
-        else:
-            c.execute("""CREATE TABLE IF NOT EXISTS staff_applications_v2(
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                discord_name TEXT DEFAULT '',
-                age TEXT DEFAULT '',
-                timezone TEXT DEFAULT '',
-                availability TEXT DEFAULT '',
-                about TEXT NOT NULL DEFAULT '',
-                experience TEXT NOT NULL DEFAULT '',
-                why_veyra TEXT NOT NULL DEFAULT '',
-                support_judgment TEXT NOT NULL DEFAULT '',
-                extra TEXT DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'pending',
-                reviewer_id INTEGER,
-                reviewer_note TEXT DEFAULT '',
-                created_at TEXT NOT NULL,
-                reviewed_at TEXT
-            )""")
-            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_v2_user ON staff_applications_v2(user_id)')
-            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_v2_status ON staff_applications_v2(status)')
-        c.commit()
-
-
+STAFF_POSITIONS={
+    'outreach_partnerships':{
+        'label':'Outreach & Partnerships',
+        'summary':'Connect with Discord communities and creators, build partnerships, and track referrals.'
+    },
+    'content_marketing':{
+        'label':'Content & Marketing',
+        'summary':'Create TikToks, Shorts, demos, launch content, and announcements that show what Veyra can do.'
+    },
+    'support':{
+        'label':'Support Staff',
+        'summary':'Handle tickets, answer product questions, and help users successfully build with Veyra.'
+    },
+    'community_manager':{
+        'label':'Community Manager',
+        'summary':'Keep the community active, run events and giveaways, and collect useful feedback.'
+    },
+    'qa_beta':{
+        'label':'QA / Beta Tester',
+        'summary':'Continuously test Veyra, reproduce issues, and report broken generations, UI, and features.'
+    },
+}
 
 @app.route('/staff/apply', methods=['GET','POST'])
 @login_required
 def staff_apply():
     u=current_user()
-    _ensure_staff_applications_v2()
 
     with db() as c:
         latest=c.execute(
-            'SELECT * FROM staff_applications_v2 WHERE user_id=? ORDER BY id DESC LIMIT 1',
+            'SELECT * FROM staff_applications WHERE user_id=? ORDER BY id DESC LIMIT 1',
             (u['id'],)
         ).fetchone()
 
@@ -2223,7 +2185,18 @@ def staff_apply():
         discord_name=(request.form.get('discord_name') or '').strip()[:100]
         age=(request.form.get('age') or '').strip()[:20]
         timezone=(request.form.get('timezone') or '').strip()[:80]
+        position=(request.form.get('position') or '').strip()
         availability=(request.form.get('availability') or '').strip()[:500]
+
+        if position not in STAFF_POSITIONS:
+            flash('Please select the staff position you are applying for.','error')
+            return render_template(
+                'staff_apply.html',
+                user=u,
+                application=dict(latest) if latest else None,
+                form_data=request.form,
+                staff_positions=STAFF_POSITIONS
+            ),400
         about=(request.form.get('about') or '').strip()
         experience=(request.form.get('experience') or '').strip()
         why_veyra=(request.form.get('why_veyra') or '').strip()
@@ -2247,23 +2220,14 @@ def staff_apply():
                 'staff_apply.html',
                 user=u,
                 application=dict(latest) if latest else None,
-                form_data=request.form
-            ),400
-
-        if not discord_name:
-            flash('Please enter your Discord username before submitting.','error')
-            return render_template(
-                'staff_apply.html',
-                user=u,
-                application=dict(latest) if latest else None,
-                form_data=request.form
+                form_data=request.form,
+                staff_positions=STAFF_POSITIONS
             ),400
 
         try:
-            _ensure_staff_applications_v2()
             with db() as c:
                 existing=c.execute(
-                    """SELECT id FROM staff_applications_v2
+                    """SELECT id FROM staff_applications
                        WHERE user_id=? AND LOWER(status)='pending'
                        ORDER BY id DESC LIMIT 1""",
                     (u['id'],)
@@ -2273,12 +2237,12 @@ def staff_apply():
                     return redirect(url_for('staff_apply'))
 
                 c.execute(
-                    """INSERT INTO staff_applications_v2(
-                        user_id,discord_name,age,timezone,availability,about,experience,
+                    """INSERT INTO staff_applications(
+                        user_id,discord_name,age,timezone,position,availability,about,experience,
                         why_veyra,support_judgment,extra,status,created_at
-                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
-                        u['id'],discord_name,age,timezone,availability[:500],
+                        u['id'],discord_name,age,timezone,position,availability[:500],
                         about[:2500],experience[:2500],why_veyra[:2500],
                         support_judgment[:2500],extra[:2500],'pending',now()
                     )
@@ -2290,26 +2254,24 @@ def staff_apply():
 
         except Exception as exc:
             app.logger.exception(
-                'Staff application v2 submit failed | user_id=%s | error=%s | detail=%s',
-                u.get('id'),type(exc).__name__,str(exc)[:500]
+                'Staff application submit failed | user_id=%s | error=%s',
+                u.get('id'),type(exc).__name__
             )
-            flash(
-                'We could not submit your application because of a server issue. '
-                'Your answers are still here — please try again.',
-                'error'
-            )
+            flash('We could not submit your application right now. Your answers are still on this page — please try again.','error')
             return render_template(
                 'staff_apply.html',
                 user=u,
                 application=dict(latest) if latest else None,
-                form_data=request.form
+                form_data=request.form,
+                staff_positions=STAFF_POSITIONS
             ),500
 
     return render_template(
         'staff_apply.html',
         user=u,
         application=dict(latest) if latest else None,
-        form_data={}
+        form_data={},
+        staff_positions=STAFF_POSITIONS
     )
 
 
@@ -2319,7 +2281,6 @@ def staff_review():
     if not is_admin():
         return ('Forbidden',403)
 
-    _ensure_staff_applications_v2()
     status=(request.args.get('status') or 'pending').lower()
     if status not in {'pending','accepted','denied','all'}:
         status='pending'
@@ -2328,16 +2289,16 @@ def staff_review():
         if status=='all':
             rows=c.execute(
                 """SELECT sa.*,u.name,u.email,u.discord_id
-                   FROM staff_applications_v2 sa
+                   FROM staff_applications sa
                    JOIN users u ON u.id=sa.user_id
                    ORDER BY sa.created_at DESC"""
             ).fetchall()
         else:
             rows=c.execute(
                 """SELECT sa.*,u.name,u.email,u.discord_id
-                   FROM staff_applications_v2 sa
+                   FROM staff_applications sa
                    JOIN users u ON u.id=sa.user_id
-                   WHERE LOWER(sa.status)=?
+                   WHERE sa.status=?
                    ORDER BY sa.created_at DESC""",
                 (status,)
             ).fetchall()
@@ -2346,7 +2307,8 @@ def staff_review():
         'staff_review.html',
         user=current_user(),
         applications=[dict(r) for r in rows],
-        filter_status=status
+        filter_status=status,
+        staff_positions=STAFF_POSITIONS
     )
 
 
@@ -2358,14 +2320,13 @@ def staff_review_action(application_id,action):
     if action not in {'accept','deny'}:
         return redirect(url_for('staff_review'))
 
-    _ensure_staff_applications_v2()
     status='accepted' if action=='accept' else 'denied'
     note=(request.form.get('reviewer_note') or '').strip()[:1000]
     reviewer=current_user()
 
     with db() as c:
         row=c.execute(
-            'SELECT * FROM staff_applications_v2 WHERE id=?',
+            'SELECT * FROM staff_applications WHERE id=?',
             (application_id,)
         ).fetchone()
         if not row:
@@ -2373,7 +2334,7 @@ def staff_review_action(application_id,action):
             return redirect(url_for('staff_review'))
 
         c.execute(
-            """UPDATE staff_applications_v2
+            """UPDATE staff_applications
                SET status=?,reviewer_id=?,reviewer_note=?,reviewed_at=?
                WHERE id=?""",
             (status,reviewer['id'],note,now(),application_id)

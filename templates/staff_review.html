@@ -1,64 +1,77 @@
 {% extends 'app_base.html' %}
-{% block title %}Staff Applications — Veyra{% endblock %}
-{% block top_title %}Review Applications{% endblock %}
+{% block title %}Staff Review — Veyra{% endblock %}
+{% block top_title %}Staff Applications{% endblock %}
 {% block content %}
-<div class="review-head">
-  <div><div class="eyebrow">STAFF / INTERNAL</div><h1 class="title">Staff Applications</h1><p class="subtitle">Review real applications submitted through Veyra.</p></div>
-  <div class="filters">
-    {% for s in ['pending','accepted','denied','all'] %}<a class="btn {% if filter_status==s %}primary{% endif %}" href="/staff/review?status={{s}}">{{s|title}}</a>{% endfor %}
+<div class="sr-head">
+  <div>
+    <div class="eyebrow">STAFF REVIEW</div>
+    <h1 class="title">Staff Applications</h1>
+    <p class="subtitle">Review applicants and see exactly which Veyra position each person applied for.</p>
   </div>
+  <a class="btn" href="/dashboard">← Dashboard</a>
 </div>
 
-{% if applications %}
-<div class="review-list">
+<div class="sr-filters">
+  {% for key,label in [('pending','Pending'),('accepted','Accepted'),('denied','Denied'),('all','All')] %}
+    <a href="/staff/review?status={{key}}" class="{{'active' if filter_status==key else ''}}">{{label}}</a>
+  {% endfor %}
+</div>
+
+<div class="sr-list">
 {% for a in applications %}
-<article class="card review-card">
-  <header>
-    <div>
-      <div class="eyebrow">APPLICATION #{{a.id}}</div>
-      <h2>{{a.name or 'Veyra User'}}</h2>
-      <p>{{a.email or 'No email'}}{% if a.discord_name %} · {{a.discord_name}}{% endif %}</p>
+  <article class="card sr-app">
+    <header>
+      <div>
+        <div class="sr-id">APPLICATION #{{a.id}}</div>
+        <h2>{{a.name or a.discord_name or 'Veyra Applicant'}}</h2>
+        <div class="sr-meta">
+          <span>{{a.email or 'No email'}}</span>
+          {% if a.discord_name %}<span>{{a.discord_name}}</span>{% endif %}
+          <span>{{a.created_at}}</span>
+        </div>
+      </div>
+      <div class="sr-header-tags">
+        <span class="role">{{ staff_positions[a.position].label if a.position and staff_positions.get(a.position) else (a.position or 'Position not recorded') }}</span>
+        <span class="status {{a.status}}">{{a.status|upper}}</span>
+      </div>
+    </header>
+
+    <div class="sr-role-box">
+      <small>APPLIED POSITION</small>
+      <strong>{{ staff_positions[a.position].label if a.position and staff_positions.get(a.position) else (a.position or 'Not recorded') }}</strong>
+      {% if a.position and staff_positions.get(a.position) %}<p>{{staff_positions[a.position].summary}}</p>{% endif %}
     </div>
-    <span class="status {{a.status}}">{{a.status|upper}}</span>
-  </header>
 
-  <div class="meta">
-    <span><b>Age</b>{{a.age or 'Not provided'}}</span>
-    <span><b>Timezone</b>{{a.timezone or 'Not provided'}}</span>
-    <span><b>Submitted</b>{{a.created_at}}</span>
-  </div>
+    <div class="sr-grid">
+      <div><small>Age</small><b>{{a.age or 'Not provided'}}</b></div>
+      <div><small>Timezone</small><b>{{a.timezone or 'Not provided'}}</b></div>
+      <div class="wide"><small>Availability</small><p>{{a.availability}}</p></div>
+      <div class="wide"><small>About</small><p>{{a.about}}</p></div>
+      <div class="wide"><small>Experience</small><p>{{a.experience}}</p></div>
+      <div class="wide"><small>Why Veyra</small><p>{{a.why_veyra}}</p></div>
+      <div class="wide"><small>Support judgment</small><p>{{a.support_judgment}}</p></div>
+      {% if a.extra %}<div class="wide"><small>Anything else</small><p>{{a.extra}}</p></div>{% endif %}
+    </div>
 
-  <div class="answers">
-    <section><b>Availability</b><p>{{a.availability}}</p></section>
-    <section><b>About</b><p>{{a.about}}</p></section>
-    <section><b>Experience</b><p>{{a.experience}}</p></section>
-    <section><b>Why Veyra</b><p>{{a.why_veyra}}</p></section>
-    <section><b>Support judgment</b><p>{{a.support_judgment}}</p></section>
-    {% if a.extra %}<section><b>Extra</b><p>{{a.extra}}</p></section>{% endif %}
-  </div>
-
-  {% if a.status=='pending' %}
-  <div class="review-actions">
-    <form method="post" action="/staff/review/{{a.id}}/accept">
-      <input name="reviewer_note" placeholder="Optional acceptance note">
-      <button class="btn approve" type="submit">Accept application</button>
+    {% if a.status=='pending' %}
+    <form class="sr-review" method="post">
+      <label><span>Reviewer note <small>(optional)</small></span><textarea name="reviewer_note" placeholder="Optional note for this applicant..."></textarea></label>
+      <div>
+        <button class="btn accept" formaction="/staff/review/{{a.id}}/accept">Accept application</button>
+        <button class="btn deny" formaction="/staff/review/{{a.id}}/deny">Deny application</button>
+      </div>
     </form>
-    <form method="post" action="/staff/review/{{a.id}}/deny">
-      <input name="reviewer_note" placeholder="Optional denial note">
-      <button class="btn deny" type="submit">Deny application</button>
-    </form>
-  </div>
-  {% elif a.reviewer_note %}
-  <div class="staff-note"><b>Reviewer note</b><span>{{a.reviewer_note}}</span></div>
-  {% endif %}
-</article>
+    {% elif a.reviewer_note %}
+    <div class="sr-note"><b>Reviewer note</b><span>{{a.reviewer_note}}</span></div>
+    {% endif %}
+  </article>
+{% else %}
+  <div class="card sr-empty"><b>No {{filter_status}} applications.</b><span>Applications matching this filter will appear here.</span></div>
 {% endfor %}
 </div>
-{% else %}
-<div class="card empty"><div class="empty-icon">✓</div><h3>No {{filter_status}} applications</h3><p>Nothing is waiting in this view.</p></div>
-{% endif %}
 
 <style>
-.review-head{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:18px}.filters{display:flex;gap:7px;flex-wrap:wrap}.review-list{display:grid;gap:14px}.review-card{padding:21px}.review-card header{display:flex;justify-content:space-between;gap:20px}.review-card h2{margin:5px 0}.review-card header p{color:var(--muted);margin:0}.status{height:max-content;border:1px solid #34445d;border-radius:999px;padding:6px 9px;font-size:10px;font-weight:900}.status.pending{color:#b3a3ff;border-color:#5f4bb2}.status.accepted{color:#74e8c7;border-color:#286050}.status.denied{color:#ff94a6;border-color:#743a47}.meta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}.meta span{border:1px solid var(--line);background:#08111d;border-radius:10px;padding:10px;color:var(--muted)}.meta b{display:block;color:#fff;font-size:11px;margin-bottom:3px}.answers{display:grid;grid-template-columns:1fr 1fr;gap:10px}.answers section{border:1px solid var(--line);background:#08111d;border-radius:11px;padding:13px}.answers b{font-size:12px}.answers p{white-space:pre-wrap;color:#a8b5c8;line-height:1.55}.review-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:15px}.review-actions form{display:grid;grid-template-columns:1fr auto;gap:8px}.review-actions input{background:#07111e;border:1px solid #283950;border-radius:10px;color:#fff;padding:10px}.approve{background:#124c3e!important;border-color:#286d58!important;color:#8ff0d3!important}.deny{background:#471822!important;border-color:#733847!important;color:#ff9bac!important}.staff-note{margin-top:13px;padding:12px;border:1px solid var(--line);border-radius:10px;display:grid;gap:4px}.staff-note span{color:var(--muted)}@media(max-width:800px){.review-head{align-items:flex-start;flex-direction:column}.meta,.answers,.review-actions{grid-template-columns:1fr}.review-actions form{grid-template-columns:1fr}}
+.sr-head{display:flex;justify-content:space-between;gap:18px;align-items:end;margin-bottom:18px}.sr-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.sr-filters a{text-decoration:none;color:#8e9db3;border:1px solid var(--line);background:#091321;padding:8px 11px;border-radius:999px;font-size:11px;font-weight:800}.sr-filters a.active{color:#fff;border-color:#6f58ff;background:#1a1538}.sr-list{display:grid;gap:14px}.sr-app{padding:20px}.sr-app>header{display:flex;justify-content:space-between;gap:18px;border-bottom:1px solid var(--line);padding-bottom:15px}.sr-id{font-size:9px;color:#8e79ff;font-weight:900;letter-spacing:.14em}.sr-app h2{margin:5px 0 7px}.sr-meta{display:flex;gap:9px;flex-wrap:wrap;color:var(--muted);font-size:11px}.sr-header-tags{display:flex;gap:7px;align-items:flex-start;flex-wrap:wrap;justify-content:flex-end}.sr-header-tags span{padding:6px 9px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.07em}.sr-header-tags .role{color:#c0b3ff;background:#171431;border:1px solid #4b3e7c}.sr-header-tags .status{color:#b7c3d6;border:1px solid #31415a}.sr-header-tags .status.pending{color:#c0b3ff;border-color:#554797}.sr-header-tags .status.accepted{color:#75e9c7;border-color:#286050}.sr-header-tags .status.denied{color:#ff98a9;border-color:#713b48}.sr-role-box{margin:15px 0;border:1px solid #3c356b;background:linear-gradient(135deg,#15142c,#0b1423);border-radius:12px;padding:14px}.sr-role-box small{display:block;color:#8e79ff;letter-spacing:.13em;font-weight:900}.sr-role-box strong{display:block;font-size:17px;margin-top:4px}.sr-role-box p{color:#8595ac;margin:5px 0 0}.sr-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.sr-grid>div{background:#08121f;border:1px solid #1d2d44;border-radius:11px;padding:12px}.sr-grid .wide{grid-column:1/-1}.sr-grid small{color:#798aa2;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:800}.sr-grid b{display:block;margin-top:5px}.sr-grid p{color:#c4cfdf;line-height:1.55;margin:6px 0 0;white-space:pre-wrap}.sr-review{border-top:1px solid var(--line);margin-top:15px;padding-top:15px}.sr-review label{display:grid;gap:7px}.sr-review textarea{background:#07111e;border:1px solid #293b55;border-radius:11px;color:#edf3ff;padding:12px;min-height:82px;resize:vertical}.sr-review>div{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}.btn.accept{background:#113429;border-color:#286452;color:#7fe8c7}.btn.deny{background:#32151e;border-color:#753b49;color:#ff9cae}.sr-note{margin-top:15px;background:#08121f;border:1px solid var(--line);border-radius:11px;padding:12px;display:grid;gap:5px}.sr-note span{color:var(--muted)}.sr-empty{padding:28px;text-align:center;display:grid;gap:5px}.sr-empty span{color:var(--muted)}
+@media(max-width:760px){.sr-app>header{flex-direction:column}.sr-header-tags{justify-content:flex-start}.sr-grid{grid-template-columns:1fr}.sr-grid .wide{grid-column:auto}}
 </style>
 {% endblock %}
