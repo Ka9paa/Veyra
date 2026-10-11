@@ -491,29 +491,6 @@ def init_db():
             c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS reviewed_at TEXT")
             c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_user ON staff_applications(user_id)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_status ON staff_applications(status)')
-            # Canonical staff application table used by the website.
-            # We intentionally use a v2 table because older deployments may have
-            # legacy NOT NULL columns on staff_applications that break new inserts.
-            c.execute("""CREATE TABLE IF NOT EXISTS staff_applications_v2(
-                id BIGSERIAL PRIMARY KEY,
-                user_id BIGINT NOT NULL,
-                discord_name TEXT DEFAULT '',
-                age TEXT DEFAULT '',
-                timezone TEXT DEFAULT '',
-                availability TEXT DEFAULT '',
-                about TEXT NOT NULL,
-                experience TEXT NOT NULL,
-                why_veyra TEXT NOT NULL,
-                support_judgment TEXT NOT NULL,
-                extra TEXT DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'pending',
-                reviewer_id BIGINT,
-                reviewer_note TEXT DEFAULT '',
-                created_at TEXT NOT NULL,
-                reviewed_at TEXT
-            )""")
-            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_v2_user ON staff_applications_v2(user_id)')
-            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_v2_status ON staff_applications_v2(status)')
         else:
             c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 50,created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
             c.execute('''CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)''')
@@ -591,26 +568,6 @@ def init_db():
                     c.execute(f'ALTER TABLE staff_applications ADD COLUMN {col} {definition}')
             c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_user ON staff_applications(user_id)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_status ON staff_applications(status)')
-            c.execute("""CREATE TABLE IF NOT EXISTS staff_applications_v2(
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                discord_name TEXT DEFAULT '',
-                age TEXT DEFAULT '',
-                timezone TEXT DEFAULT '',
-                availability TEXT DEFAULT '',
-                about TEXT NOT NULL,
-                experience TEXT NOT NULL,
-                why_veyra TEXT NOT NULL,
-                support_judgment TEXT NOT NULL,
-                extra TEXT DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'pending',
-                reviewer_id INTEGER,
-                reviewer_note TEXT DEFAULT '',
-                created_at TEXT NOT NULL,
-                reviewed_at TEXT
-            )""")
-            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_v2_user ON staff_applications_v2(user_id)')
-            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_apps_v2_status ON staff_applications_v2(status)')
             c.execute('''CREATE TABLE IF NOT EXISTS login_events(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,provider TEXT NOT NULL,email TEXT,account_name TEXT,discord_id TEXT,created_at TEXT NOT NULL,delivered INTEGER NOT NULL DEFAULT 0)''')
         c.commit()
 
@@ -2188,42 +2145,9 @@ def dashboard():
 def staff_apply():
     u=current_user()
 
-    role_questions={
-        'Outreach & Partnerships':[
-            ("Why do you want to help with Veyra's outreach and partnerships?",8),
-            ("How would you find communities or creators that could benefit from Veyra?",12),
-            ("Write a short example of how you would approach someone about a Veyra partnership.",15),
-            ("Do you have any previous experience with outreach, advertising, sales, or partnerships? If so, explain.",8),
-        ],
-        'Content & Marketing':[
-            ("Why are you interested in creating content for Veyra?",8),
-            ("What platforms are you most experienced with?",6),
-            ("What kind of content would you create to get people interested in Veyra?",12),
-            ("Do you have any previous work you can show us? If so, provide a link.",6),
-        ],
-        'Support Staff':[
-            ("Why do you want to become Veyra Support Staff?",8),
-            ("How familiar are you with Veyra and how the platform works?",10),
-            ("How would you handle a frustrated customer whose website isn't generating correctly?",15),
-            ("Do you have previous customer support or ticket experience? If so, explain.",8),
-        ],
-        'Community Manager':[
-            ("Why do you want to manage the Veyra community?",8),
-            ("What would you do to make the Veyra Discord more active?",12),
-            ("Give us one event or idea you think the Veyra community would enjoy.",12),
-            ("Do you have previous community management experience? If so, explain.",8),
-        ],
-        'QA / Beta Tester':[
-            ("Why are you interested in testing Veyra?",8),
-            ("How would you properly report a bug you discovered?",12),
-            ("What devices and browsers are you able to test Veyra on?",8),
-            ("Do you have previous testing experience? If so, explain.",8),
-        ],
-    }
-
     with db() as c:
         latest=c.execute(
-            'SELECT * FROM staff_applications_v2 WHERE user_id=? ORDER BY id DESC LIMIT 1',
+            'SELECT * FROM staff_applications WHERE user_id=? ORDER BY id DESC LIMIT 1',
             (u['id'],)
         ).fetchone()
 
@@ -2236,83 +2160,46 @@ def staff_apply():
         age=(request.form.get('age') or '').strip()[:20]
         timezone=(request.form.get('timezone') or '').strip()[:80]
         availability=(request.form.get('availability') or '').strip()[:500]
-        about=(request.form.get('about') or '').strip()[:2500]
-        position=(request.form.get('position') or '').strip()
-        role_q1=(request.form.get('role_q1') or '').strip()[:2500]
-        role_q2=(request.form.get('role_q2') or '').strip()[:2500]
-        role_q3=(request.form.get('role_q3') or '').strip()[:2500]
-        role_q4=(request.form.get('role_q4') or '').strip()[:2500]
-        final_answer=(request.form.get('final_answer') or '').strip()[:2500]
-
-        if position not in role_questions:
-            flash('Please choose the Veyra staff position you are applying for.','error')
-            return render_template(
-                'staff_apply.html',
-                user=u,
-                application=dict(latest) if latest else None,
-                form_data=request.form
-            ),400
-
-        def word_count(value):
-            return len([w for w in re.split(r'\s+', value.strip()) if w])
-
-        qdefs=role_questions[position]
-        required=[
-            ('Availability',availability,5),
-            ('Tell us about yourself',about,10),
-            (qdefs[0][0],role_q1,qdefs[0][1]),
-            (qdefs[1][0],role_q2,qdefs[1][1]),
-            (qdefs[2][0],role_q3,qdefs[2][1]),
-            (qdefs[3][0],role_q4,qdefs[3][1]),
-            ('Final question',final_answer,10),
-        ]
-        short=[f'{label} ({word_count(value)}/{minimum} words)' for label,value,minimum in required if word_count(value)<minimum]
-        if short:
-            flash(f'Please complete the required answers for {position}: ' + '; '.join(short) + '.','error')
-            return render_template(
-                'staff_apply.html',
-                user=u,
-                application=dict(latest) if latest else None,
-                form_data=request.form
-            ),400
+        about=(request.form.get('about') or '').strip()
+        experience=(request.form.get('experience') or '').strip()
+        why_veyra=(request.form.get('why_veyra') or '').strip()
+        support_judgment=(request.form.get('support_judgment') or '').strip()
+        extra=(request.form.get('extra') or '').strip()
 
         try:
             with db() as c:
                 existing=c.execute(
-                    "SELECT id FROM staff_applications_v2 WHERE user_id=? AND LOWER(status)='pending' ORDER BY id DESC LIMIT 1",
+                    """SELECT id FROM staff_applications
+                       WHERE user_id=? AND LOWER(status)='pending'
+                       ORDER BY id DESC LIMIT 1""",
                     (u['id'],)
                 ).fetchone()
                 if existing:
                     flash('You already have a staff application under review.','error')
                     return redirect(url_for('staff_apply'))
 
-                # Keep the existing database schema for maximum production compatibility.
-                # Role + all answers are packed into the existing review fields.
-                experience=f"Position: {position}\n\nQ1: {qdefs[0][0]}\n{role_q1}"
-                why_veyra=f"Q2: {qdefs[1][0]}\n{role_q2}"
-                support_judgment=f"Q3: {qdefs[2][0]}\n{role_q3}"
-                extra=f"Q4: {qdefs[3][0]}\n{role_q4}\n\nFINAL: Is there anything else you'd like us to know about you or why you'd be a good fit for the Veyra team?\n{final_answer}"
-
                 c.execute(
-                    "INSERT INTO staff_applications_v2(user_id,discord_name,age,timezone,availability,about,experience,why_veyra,support_judgment,extra,status,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                    """INSERT INTO staff_applications(
+                        user_id,discord_name,age,timezone,availability,about,experience,
+                        why_veyra,support_judgment,extra,status,created_at
+                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
-                        u['id'],discord_name,age,timezone,availability,
-                        about,experience[:2500],why_veyra[:2500],
-                        support_judgment[:2500],extra[:2500],
-                        'pending',now()
+                        u['id'],discord_name,age,timezone,availability[:500],
+                        about[:2500],experience[:2500],why_veyra[:2500],
+                        support_judgment[:2500],extra[:2500],'pending',now()
                     )
                 )
                 c.commit()
 
-            flash(f'Your {position} application was submitted successfully. Veyra staff will review it soon.','success')
+            flash('Application submitted successfully. Veyra staff will review it soon.','success')
             return redirect(url_for('staff_apply'))
 
         except Exception as exc:
             app.logger.exception(
-                'Staff application submit failed | user_id=%s | position=%s | error=%s | detail=%s',
-                u.get('id'),position,type(exc).__name__,str(exc)[:500]
+                'Staff application submit failed | user_id=%s | error=%s',
+                u.get('id'),type(exc).__name__
             )
-            flash('We could not save your application. Your answers are still here — please try again.','error')
+            flash('We could not submit your application right now. Your answers are still on this page — please try again.','error')
             return render_template(
                 'staff_apply.html',
                 user=u,
@@ -2342,14 +2229,14 @@ def staff_review():
         if status=='all':
             rows=c.execute(
                 """SELECT sa.*,u.name,u.email,u.discord_id
-                   FROM staff_applications_v2 sa
+                   FROM staff_applications sa
                    JOIN users u ON u.id=sa.user_id
                    ORDER BY sa.created_at DESC"""
             ).fetchall()
         else:
             rows=c.execute(
                 """SELECT sa.*,u.name,u.email,u.discord_id
-                   FROM staff_applications_v2 sa
+                   FROM staff_applications sa
                    JOIN users u ON u.id=sa.user_id
                    WHERE sa.status=?
                    ORDER BY sa.created_at DESC""",
@@ -2378,7 +2265,7 @@ def staff_review_action(application_id,action):
 
     with db() as c:
         row=c.execute(
-            'SELECT * FROM staff_applications_v2 WHERE id=?',
+            'SELECT * FROM staff_applications WHERE id=?',
             (application_id,)
         ).fetchone()
         if not row:
@@ -2386,7 +2273,7 @@ def staff_review_action(application_id,action):
             return redirect(url_for('staff_review'))
 
         c.execute(
-            """UPDATE staff_applications_v2
+            """UPDATE staff_applications
                SET status=?,reviewer_id=?,reviewer_note=?,reviewed_at=?
                WHERE id=?""",
             (status,reviewer['id'],note,now(),application_id)
