@@ -462,7 +462,6 @@ def init_db():
                 discord_name TEXT DEFAULT '',
                 age TEXT DEFAULT '',
                 timezone TEXT DEFAULT '',
-                position TEXT DEFAULT '',
                 availability TEXT DEFAULT '',
                 about TEXT NOT NULL,
                 experience TEXT NOT NULL,
@@ -479,7 +478,6 @@ def init_db():
             c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS discord_name TEXT DEFAULT ''")
             c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS age TEXT DEFAULT ''")
             c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT ''")
-            c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS position TEXT DEFAULT ''")
             c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS availability TEXT DEFAULT ''")
             c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS about TEXT DEFAULT ''")
             c.execute("ALTER TABLE staff_applications ADD COLUMN IF NOT EXISTS experience TEXT DEFAULT ''")
@@ -545,7 +543,6 @@ def init_db():
                 discord_name TEXT DEFAULT '',
                 age TEXT DEFAULT '',
                 timezone TEXT DEFAULT '',
-                position TEXT DEFAULT '',
                 availability TEXT DEFAULT '',
                 about TEXT NOT NULL,
                 experience TEXT NOT NULL,
@@ -561,7 +558,7 @@ def init_db():
             staff_cols={r['name'] for r in c.execute('PRAGMA table_info(staff_applications)').fetchall()}
             staff_missing={
                 'discord_name':"TEXT DEFAULT ''",'age':"TEXT DEFAULT ''",'timezone':"TEXT DEFAULT ''",
-                'position':"TEXT DEFAULT ''",'availability':"TEXT DEFAULT ''",'about':"TEXT DEFAULT ''",'experience':"TEXT DEFAULT ''",
+                'availability':"TEXT DEFAULT ''",'about':"TEXT DEFAULT ''",'experience':"TEXT DEFAULT ''",
                 'why_veyra':"TEXT DEFAULT ''",'support_judgment':"TEXT DEFAULT ''",'extra':"TEXT DEFAULT ''",
                 'status':"TEXT NOT NULL DEFAULT 'pending'",'reviewer_id':"INTEGER",
                 'reviewer_note':"TEXT DEFAULT ''",'created_at':"TEXT",'reviewed_at':"TEXT",
@@ -2143,33 +2140,43 @@ def dashboard():
 
 
 
-STAFF_POSITIONS={
-    'outreach_partnerships':{
-        'label':'Outreach & Partnerships',
-        'summary':'Connect with Discord communities and creators, build partnerships, and track referrals.'
-    },
-    'content_marketing':{
-        'label':'Content & Marketing',
-        'summary':'Create TikToks, Shorts, demos, launch content, and announcements that show what Veyra can do.'
-    },
-    'support':{
-        'label':'Support Staff',
-        'summary':'Handle tickets, answer product questions, and help users successfully build with Veyra.'
-    },
-    'community_manager':{
-        'label':'Community Manager',
-        'summary':'Keep the community active, run events and giveaways, and collect useful feedback.'
-    },
-    'qa_beta':{
-        'label':'QA / Beta Tester',
-        'summary':'Continuously test Veyra, reproduce issues, and report broken generations, UI, and features.'
-    },
-}
-
 @app.route('/staff/apply', methods=['GET','POST'])
 @login_required
 def staff_apply():
     u=current_user()
+
+    role_questions={
+        'Outreach & Partnerships':[
+            ("Why do you want to help with Veyra's outreach and partnerships?",8),
+            ("How would you find communities or creators that could benefit from Veyra?",12),
+            ("Write a short example of how you would approach someone about a Veyra partnership.",15),
+            ("Do you have any previous experience with outreach, advertising, sales, or partnerships? If so, explain.",8),
+        ],
+        'Content & Marketing':[
+            ("Why are you interested in creating content for Veyra?",8),
+            ("What platforms are you most experienced with?",6),
+            ("What kind of content would you create to get people interested in Veyra?",12),
+            ("Do you have any previous work you can show us? If so, provide a link.",6),
+        ],
+        'Support Staff':[
+            ("Why do you want to become Veyra Support Staff?",8),
+            ("How familiar are you with Veyra and how the platform works?",10),
+            ("How would you handle a frustrated customer whose website isn't generating correctly?",15),
+            ("Do you have previous customer support or ticket experience? If so, explain.",8),
+        ],
+        'Community Manager':[
+            ("Why do you want to manage the Veyra community?",8),
+            ("What would you do to make the Veyra Discord more active?",12),
+            ("Give us one event or idea you think the Veyra community would enjoy.",12),
+            ("Do you have previous community management experience? If so, explain.",8),
+        ],
+        'QA / Beta Tester':[
+            ("Why are you interested in testing Veyra?",8),
+            ("How would you properly report a bug you discovered?",12),
+            ("What devices and browsers are you able to test Veyra on?",8),
+            ("Do you have previous testing experience? If so, explain.",8),
+        ],
+    }
 
     with db() as c:
         latest=c.execute(
@@ -2185,93 +2192,96 @@ def staff_apply():
         discord_name=(request.form.get('discord_name') or '').strip()[:100]
         age=(request.form.get('age') or '').strip()[:20]
         timezone=(request.form.get('timezone') or '').strip()[:80]
-        position=(request.form.get('position') or '').strip()
         availability=(request.form.get('availability') or '').strip()[:500]
+        about=(request.form.get('about') or '').strip()[:2500]
+        position=(request.form.get('position') or '').strip()
+        role_q1=(request.form.get('role_q1') or '').strip()[:2500]
+        role_q2=(request.form.get('role_q2') or '').strip()[:2500]
+        role_q3=(request.form.get('role_q3') or '').strip()[:2500]
+        role_q4=(request.form.get('role_q4') or '').strip()[:2500]
+        final_answer=(request.form.get('final_answer') or '').strip()[:2500]
 
-        if position not in STAFF_POSITIONS:
-            flash('Please select the staff position you are applying for.','error')
+        if position not in role_questions:
+            flash('Please choose the Veyra staff position you are applying for.','error')
             return render_template(
                 'staff_apply.html',
                 user=u,
                 application=dict(latest) if latest else None,
-                form_data=request.form,
-                staff_positions=STAFF_POSITIONS
+                form_data=request.form
             ),400
-        about=(request.form.get('about') or '').strip()
-        experience=(request.form.get('experience') or '').strip()
-        why_veyra=(request.form.get('why_veyra') or '').strip()
-        support_judgment=(request.form.get('support_judgment') or '').strip()
-        extra=(request.form.get('extra') or '').strip()
 
         def word_count(value):
             return len([w for w in re.split(r'\s+', value.strip()) if w])
 
-        required_answers={
-            'Availability':availability,
-            'Tell us about yourself':about,
-            'Experience':experience,
-            'Why Veyra':why_veyra,
-            'Support judgment':support_judgment,
-        }
-        short=[name for name,value in required_answers.items() if word_count(value)<5]
+        qdefs=role_questions[position]
+        required=[
+            ('Availability',availability,5),
+            ('Tell us about yourself',about,10),
+            (qdefs[0][0],role_q1,qdefs[0][1]),
+            (qdefs[1][0],role_q2,qdefs[1][1]),
+            (qdefs[2][0],role_q3,qdefs[2][1]),
+            (qdefs[3][0],role_q4,qdefs[3][1]),
+            ('Final question',final_answer,10),
+        ]
+        short=[f'{label} ({word_count(value)}/{minimum} words)' for label,value,minimum in required if word_count(value)<minimum]
         if short:
-            flash('Please write at least 5 words for: ' + ', '.join(short) + '.','error')
+            flash('Please complete the required answers: ' + '; '.join(short) + '.','error')
             return render_template(
                 'staff_apply.html',
                 user=u,
                 application=dict(latest) if latest else None,
-                form_data=request.form,
-                staff_positions=STAFF_POSITIONS
+                form_data=request.form
             ),400
 
         try:
             with db() as c:
                 existing=c.execute(
-                    """SELECT id FROM staff_applications
-                       WHERE user_id=? AND LOWER(status)='pending'
-                       ORDER BY id DESC LIMIT 1""",
+                    "SELECT id FROM staff_applications WHERE user_id=? AND LOWER(status)='pending' ORDER BY id DESC LIMIT 1",
                     (u['id'],)
                 ).fetchone()
                 if existing:
                     flash('You already have a staff application under review.','error')
                     return redirect(url_for('staff_apply'))
 
+                # Keep the existing database schema for maximum production compatibility.
+                # Role + all answers are packed into the existing review fields.
+                experience=f"Position: {position}\n\nQ1: {qdefs[0][0]}\n{role_q1}"
+                why_veyra=f"Q2: {qdefs[1][0]}\n{role_q2}"
+                support_judgment=f"Q3: {qdefs[2][0]}\n{role_q3}"
+                extra=f"Q4: {qdefs[3][0]}\n{role_q4}\n\nFINAL: Is there anything else you'd like us to know about you or why you'd be a good fit for the Veyra team?\n{final_answer}"
+
                 c.execute(
-                    """INSERT INTO staff_applications(
-                        user_id,discord_name,age,timezone,position,availability,about,experience,
-                        why_veyra,support_judgment,extra,status,created_at
-                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    "INSERT INTO staff_applications(user_id,discord_name,age,timezone,availability,about,experience,why_veyra,support_judgment,extra,status,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                     (
-                        u['id'],discord_name,age,timezone,position,availability[:500],
-                        about[:2500],experience[:2500],why_veyra[:2500],
-                        support_judgment[:2500],extra[:2500],'pending',now()
+                        u['id'],discord_name,age,timezone,availability,
+                        about,experience[:2500],why_veyra[:2500],
+                        support_judgment[:2500],extra[:2500],
+                        'pending',now()
                     )
                 )
                 c.commit()
 
-            flash('Application submitted successfully. Veyra staff will review it soon.','success')
+            flash(f'Your {position} application was submitted successfully. Veyra staff will review it soon.','success')
             return redirect(url_for('staff_apply'))
 
         except Exception as exc:
             app.logger.exception(
-                'Staff application submit failed | user_id=%s | error=%s',
-                u.get('id'),type(exc).__name__
+                'Staff application submit failed | user_id=%s | position=%s | error=%s',
+                u.get('id'),position,type(exc).__name__
             )
-            flash('We could not submit your application right now. Your answers are still on this page — please try again.','error')
+            flash('We could not submit your application because of a server issue. Your answers are still here — please try again.','error')
             return render_template(
                 'staff_apply.html',
                 user=u,
                 application=dict(latest) if latest else None,
-                form_data=request.form,
-                staff_positions=STAFF_POSITIONS
+                form_data=request.form
             ),500
 
     return render_template(
         'staff_apply.html',
         user=u,
         application=dict(latest) if latest else None,
-        form_data={},
-        staff_positions=STAFF_POSITIONS
+        form_data={}
     )
 
 
@@ -2307,8 +2317,7 @@ def staff_review():
         'staff_review.html',
         user=current_user(),
         applications=[dict(r) for r in rows],
-        filter_status=status,
-        staff_positions=STAFF_POSITIONS
+        filter_status=status
     )
 
 
