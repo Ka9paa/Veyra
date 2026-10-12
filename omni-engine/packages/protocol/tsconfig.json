@@ -6,13 +6,3 @@
   },
   "include": ["src/**/*.ts"]
 }
-EOF\
-cat > packages/protocol/tsconfig.json <<'EOF'
-{
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src"
-  },
-  "include": ["src/**/*.ts"]
-}

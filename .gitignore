@@ -16,3 +16,12 @@ omni-engine-backup-before-visual-upgrade/
 
 # Local Omni backup
 omni-engine-backup-before-visual-upgrade/
+
+.vercel
+
+# Local Omni secrets
+.env.omni.local
+
+# Omni build output
+omni-engine/apps/engine/dist/
+omni-engine/packages/protocol/dist/
