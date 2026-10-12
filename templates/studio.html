@@ -696,6 +696,91 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
 
 
 /* ===== STUDIO ATTACHMENTS ===== */
+
+.attach-menu-wrap{
+  position:relative;
+  display:inline-flex;
+}
+
+.attach-menu{
+  position:absolute;
+  left:0;
+  bottom:44px;
+  width:230px;
+  padding:7px;
+  border:1px solid #263653;
+  border-radius:13px;
+  background:rgba(7,14,27,.98);
+  box-shadow:0 18px 50px rgba(0,0,0,.45);
+  backdrop-filter:blur(18px);
+  opacity:0;
+  visibility:hidden;
+  transform:translateY(6px) scale(.98);
+  transform-origin:bottom left;
+  transition:opacity .15s ease,transform .15s ease,visibility .15s;
+  z-index:100;
+}
+
+.attach-menu.show{
+  opacity:1;
+  visibility:visible;
+  transform:translateY(0) scale(1);
+}
+
+.attach-menu button{
+  width:100%;
+  border:0;
+  background:transparent;
+  color:#e7edfa;
+  border-radius:9px;
+  padding:10px;
+  display:flex;
+  align-items:center;
+  gap:11px;
+  text-align:left;
+  cursor:pointer;
+}
+
+.attach-menu button:hover{
+  background:#111d31;
+}
+
+.attach-menu-icon{
+  width:34px;
+  height:34px;
+  border:1px solid #304463;
+  border-radius:9px;
+  background:#0c1728;
+  color:#a78cff;
+  display:grid;
+  place-items:center;
+  flex:0 0 auto;
+  font-size:15px;
+}
+
+.attach-menu button span:last-child{
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+
+.attach-menu b{
+  font-size:11px;
+  font-weight:650;
+}
+
+.attach-menu small{
+  color:#71829d;
+  font-size:9px;
+}
+
+.attach-btn.menu-open{
+  background:#6f4cff;
+  border-color:#8b72ff;
+  color:#fff;
+  transform:rotate(45deg);
+}
+
 .composer.dragging{
   border-color:#7959ff!important;
   box-shadow:0 0 0 2px rgba(121,89,255,.15),0 14px 35px rgba(0,0,0,.22);
@@ -1318,7 +1403,30 @@ body{
         <div class="compose-actions">
           <input id="attachmentInput" type="file" hidden multiple
             accept="image/*,.txt,.md,.html,.htm,.css,.js,.jsx,.ts,.tsx,.json,.xml,.csv,.pdf">
-          <button class="tool-pill attach-btn" id="attachBtn" type="button" title="Attach files or images" aria-label="Attach files or images">＋</button>
+          <input id="imageAttachmentInput" type="file" hidden multiple accept="image/*">
+
+          <div class="attach-menu-wrap">
+            <button class="tool-pill attach-btn" id="attachBtn" type="button"
+              title="Add to your prompt" aria-label="Add to your prompt">＋</button>
+
+            <div class="attach-menu" id="attachMenu">
+              <button type="button" id="attachImagesBtn">
+                <span class="attach-menu-icon">▧</span>
+                <span>
+                  <b>Add images</b>
+                  <small>PNG, JPG, WEBP</small>
+                </span>
+              </button>
+
+              <button type="button" id="attachFilesBtn">
+                <span class="attach-menu-icon">⌘</span>
+                <span>
+                  <b>Add files</b>
+                  <small>Code, text, JSON, PDF</small>
+                </span>
+              </button>
+            </div>
+          </div>
           <span class="engine-label" id="engineStatus">Veyra AI</span><span class="ai-diagnostic" id="aiDiagnostic"></span>
           <button class="send" id="sendBtn">➜</button>
         </div>
@@ -1559,11 +1667,53 @@ async function addFiles(fileList){
   renderAttachments();
 }
 
-attachBtn.onclick=()=>attachmentInput.click();
+const attachMenu=$("attachMenu");
+const imageAttachmentInput=$("imageAttachmentInput");
+const attachImagesBtn=$("attachImagesBtn");
+const attachFilesBtn=$("attachFilesBtn");
+
+function closeAttachMenu(){
+  attachMenu?.classList.remove("show");
+  attachBtn?.classList.remove("menu-open");
+}
+
+attachBtn.onclick=(e)=>{
+  e.stopPropagation();
+  const opening=!attachMenu.classList.contains("show");
+  closeAttachMenu();
+  if(opening){
+    attachMenu.classList.add("show");
+    attachBtn.classList.add("menu-open");
+  }
+};
+
+attachImagesBtn.onclick=()=>{
+  closeAttachMenu();
+  imageAttachmentInput.click();
+};
+
+attachFilesBtn.onclick=()=>{
+  closeAttachMenu();
+  attachmentInput.click();
+};
+
+imageAttachmentInput.onchange=async()=>{
+  await addFiles(imageAttachmentInput.files||[]);
+  imageAttachmentInput.value="";
+};
+
 attachmentInput.onchange=async()=>{
   await addFiles(attachmentInput.files||[]);
   attachmentInput.value="";
 };
+
+document.addEventListener("click",(e)=>{
+  if(!e.target.closest(".attach-menu-wrap"))closeAttachMenu();
+});
+
+document.addEventListener("keydown",(e)=>{
+  if(e.key==="Escape")closeAttachMenu();
+});
 
 ["dragenter","dragover"].forEach(type=>composer.addEventListener(type,e=>{
   e.preventDefault();

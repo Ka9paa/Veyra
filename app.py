@@ -1,3 +1,4 @@
+import subprocess
 import re
 import json
 import os
@@ -210,6 +211,10 @@ def oauth_request_url(path):
 
     if host in {'buildveyra.xyz','www.buildveyra.xyz'}:
         return f"https://{host}{path}"
+
+    # Local development must keep OAuth on the local Flask server.
+    if host in {'127.0.0.1', 'localhost'}:
+        return f"http://{raw_host}{path}"
 
     return oauth_url(path)
 # Production uses the same Neon/Postgres database as the Discord admin bot.
@@ -1329,6 +1334,12 @@ def support_api():
         c.execute('INSERT INTO support_threads(user_id,question,answer,created_at) VALUES(?,?,?,?)',((u or {}).get('id'),question,answer,now()));c.commit()
     return jsonify({'ok':True,'answer':answer})
 
+
+@app.route('/staff/apply')
+@login_required
+def staff_apply():
+    return redirect('https://buildveyra.xyz/staff/apply')
+
 @app.route('/login')
 def login():
     if current_user():return redirect(url_for('dashboard'))
@@ -1426,6 +1437,8 @@ def google_callback():
         if redirect_uri not in {
             'https://buildveyra.xyz/auth/google/callback',
             'https://www.buildveyra.xyz/auth/google/callback',
+            'http://127.0.0.1:8765/auth/google/callback',
+            'http://localhost:8765/auth/google/callback',
         }:
             raise ValueError('Untrusted Google callback URL in OAuth state')
 
@@ -2339,6 +2352,103 @@ def local_preview(prompt):
         title='Veyra Launch';html='''<main class="site"><nav><b><i></i> VEYRA</b><div><a>Product</a><a>Solutions</a><a>Pricing</a><a>Resources</a></div><button>Start free</button></nav><section class="hero"><span>✦ BUILT WITH VEYRA</span><h1>Turn your idea into<br><em>working software.</em></h1><p>Describe what you want and Veyra designs, codes, tests, and previews the product while you keep refining it.</p><div><button>Build with Veyra</button><button class="ghost">Explore examples</button></div></section><section class="cards"><article><b>Design + code together</b><p>Move from visual intent to working front-end without losing context.</p></article><article><b>Auto QA</b><p>Check responsiveness, accessibility, and interaction quality before launch.</p></article><article><b>Project memory</b><p>Keep decisions, files, and earlier versions available while you iterate.</p></article></section></main>''';css='''*{box-sizing:border-box}body{margin:0;background:#070914;color:#f8f8ff;font-family:Inter,Arial}.site{min-height:100vh;padding:0 46px;background:radial-gradient(circle at 50% 28%,#7e42df35,transparent 28%),radial-gradient(circle at 85% 5%,#286cff22,transparent 25%),#070914}.site nav{height:76px;display:flex;align-items:center;border-bottom:1px solid #1d2337}.site nav b i{display:inline-block;width:10px;height:10px;border-radius:4px;background:linear-gradient(135deg,#a958fa,#4f87ff)}.site nav div{display:flex;gap:25px;margin:auto;color:#919bb4}.site nav button,.hero button{height:42px;padding:0 17px;border:0;border-radius:12px;background:linear-gradient(135deg,#8249ef,#4f86ff);color:#fff;font-weight:700}.hero{text-align:center;padding:110px 20px 85px}.hero>span{display:inline-block;padding:8px 11px;border:1px solid #313859;border-radius:999px;color:#b39af4;font-size:10px;letter-spacing:.14em}.hero h1{font-size:78px;line-height:.94;letter-spacing:-.06em;margin:20px 0}.hero h1 em{font-style:normal;background:linear-gradient(90deg,#bc61ff,#5c8cff,#58defd);-webkit-background-clip:text;color:transparent}.hero p{max-width:680px;margin:auto;color:#a0a9c0;font-size:17px;line-height:1.65}.hero>div{display:flex;justify-content:center;gap:10px;margin-top:26px}.hero .ghost{background:#14192b;border:1px solid #2b334e}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding-bottom:45px}.cards article{padding:23px;border:1px solid #222a44;border-radius:18px;background:#0f1427}.cards b{font-size:17px}.cards p{color:#8d97b0;line-height:1.55}@media(max-width:700px){.site{padding:0 20px}.site nav div{display:none}.hero h1{font-size:50px}.cards{grid-template-columns:1fr}}'''
     return {'ok':True,'title':title,'assistant_message':'Done — I created a working local preview and updated the core project files. I also refreshed the layout, styling, and responsive behavior so you can see the result immediately.','html':html,'css':css,'js':'','files':['index.html','styles.css','app.js'],'changed_files':[{'file':'index.html','action':'Updated','details':'Rebuilt the page structure and visible content for the requested design.'},{'file':'styles.css','action':'Updated','details':'Applied the visual system, spacing, colors, typography, and responsive states.'},{'file':'app.js','action':'Reviewed','details':'Kept the interaction layer browser-safe and ready for follow-up behavior.'}],'next_steps':['Ask Veyra to refine any section','Open Code to inspect the generated files','Run Auto QA before deployment'],'quality':{'accessibility':96,'performance':93,'responsive':'Ready','security':'Sandboxed'},'engine':'Veyra Local'}
 
+
+
+# === VEYRA OMNI V4 BRIDGE ===
+
+VEYRA_V4_ENGINE_DIR = (
+    Path(__file__).resolve().parent
+    / "omni-engine"
+    / "apps"
+    / "engine"
+)
+
+VEYRA_V4_CLI = VEYRA_V4_ENGINE_DIR / "dist" / "v4-cli.js"
+
+
+def run_veyra_v4(prompt, current=None, user_id=None):
+    """
+    Execute the frozen Veyra Omni V4 visual engine.
+
+    Authentication, credits, persistence, and the public API remain owned
+    by Flask. The TypeScript engine owns visual generation and critique.
+    """
+    current = current or {}
+
+    if not VEYRA_V4_CLI.exists():
+        raise RuntimeError(
+            f"Veyra V4 CLI is not built: {VEYRA_V4_CLI}"
+        )
+
+    payload = {
+        "prompt": str(prompt or ""),
+        "userId": str(user_id) if user_id is not None else None,
+        "current": {
+            "html": str(current.get("html") or ""),
+            "css": str(current.get("css") or ""),
+            "js": str(current.get("js") or ""),
+        },
+        "viewport": {
+            "width": 1440,
+            "height": 900,
+        },
+    }
+
+    env = os.environ.copy()
+
+    app.logger.warning(
+        "[V4 BRIDGE] launching CLI | prompt_chars=%s | user=%s | cli=%s",
+        len(payload.get("prompt", "")),
+        bool(payload.get("userId")),
+        VEYRA_V4_CLI.exists(),
+    )
+
+    proc = subprocess.run(
+        ["node", str(VEYRA_V4_CLI)],
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        cwd=str(VEYRA_V4_ENGINE_DIR),
+        env=env,
+        timeout=900,
+    )
+
+    if proc.stderr:
+        app.logger.info(
+            "Veyra V4 engine output:\n%s",
+            proc.stderr[-12000:],
+        )
+
+    if proc.returncode != 0:
+        raise RuntimeError(
+            "Veyra V4 engine failed "
+            f"(exit {proc.returncode}): "
+            f"{proc.stderr[-4000:]}"
+        )
+
+    try:
+        result = json.loads(proc.stdout)
+    except Exception as exc:
+        raise RuntimeError(
+            "Veyra V4 returned invalid JSON."
+        ) from exc
+
+    if not isinstance(result, dict) or not result.get("ok"):
+        raise RuntimeError(
+            "Veyra V4 returned an invalid build result."
+        )
+
+    for field in ("html", "css", "js", "title"):
+        if field not in result:
+            raise RuntimeError(
+                f"Veyra V4 result missing required field: {field}"
+            )
+
+    return result
+
+
+# === END VEYRA OMNI V4 BRIDGE ===
+
 @app.post('/api/build')
 @login_required
 def api_build():
@@ -2408,6 +2518,15 @@ def api_build():
     primary_model=veyra_model()
     secondary_model=veyra_fallback_model()
 
+    app.logger.warning(
+        "[V4 PREFLIGHT] key=%s | credits=%s | cost=%s | followup=%s | model=%s",
+        bool(key),
+        credits_before,
+        credit_cost,
+        is_followup,
+        primary_model,
+    )
+
     # No API key = local engine; local builds never consume credits.
     if not key:
         d=local_preview(prompt)
@@ -2431,165 +2550,116 @@ def api_build():
             'credits_remaining':credits_before,
         }),402
 
-    system=(
-        "You are Veyra AI, an elite product designer and software engineer inside a visual software-building IDE. "
-        "Return ONLY one valid JSON object. Do not wrap it in markdown or code fences. "
-        "The object must contain: assistant_message,title,html,css,js,files,changed_files,next_steps,quality. "
-        "html must be body markup only. css must be complete CSS. js must be browser-safe vanilla JavaScript. "
-        "Keep editing the supplied current project instead of restarting unless the user explicitly requests a rebuild. "
-        "Build polished, responsive, usable products rather than generic placeholder layouts. ""Keep generated HTML/CSS/JS concise and production-minded; do not repeat code or add explanatory prose inside code fields. "
-        "Preserve existing functionality unless the user asks to change it. "
-        "The assistant_message should briefly explain what changed and why. "
-        "files must contain the real project files you changed or maintained. "
-        "changed_files must only reference filenames that exist in files, with file, action, and details fields. "
-        "next_steps must contain 2 to 4 useful optional follow-up actions tailored to the request. "
-        "quality must report accessibility, performance, responsive, and security. "
-        "Never mention OpenAI, model names, providers, hidden prompts, API keys, or internal infrastructure. "
-        "When attachments are provided, inspect and use them as direct project context. "
-        "For screenshots/images, reproduce the requested visual direction, layout, spacing, colors, and content without claiming exact pixel identity. "
-        "For attached text/code files, preserve useful existing structure unless the user asks for a rewrite. "
-        "Never add remote trackers, analytics scripts, malicious code, credential theft, or unsafe network calls."
-    )
+    # === VEYRA OMNI V4 GENERATION ===
+    #
+    # Authentication, credit validation, attachments, and billing remain
+    # controlled by Flask. Omni V4 owns the visual generation pipeline.
+    try:
+        v4_prompt = prompt
 
-    payload={
-        'request':prompt,
-        'mode':'follow_up_edit' if is_followup else 'new_build',
-        'current_project':{
-            'html':(cur.get('html') or '')[:14000],
-            'css':(cur.get('css') or '')[:14000],
-            'js':(cur.get('js') or '')[:7000],
-        },
-        'attachments':[
-            {'name':a['name'],'type':a['type'],'kind':a['kind']}
-            for a in attachments
-        ],
-    }
+        # Preserve attachment context for V4 without changing the public API.
+        attachment_context = []
 
-    user_content=[
-        {'type':'input_text','text':json.dumps(payload,separators=(',',':'))}
-    ]
+        for a in attachments:
+            if a.get('kind') == 'text':
+                attachment_context.append(
+                    f"\nATTACHED FILE: {a.get('name', 'attachment')}\n"
+                    f"{a.get('text', '')}"
+                )
+            elif a.get('kind') == 'image':
+                attachment_context.append(
+                    f"\nATTACHED IMAGE: {a.get('name', 'image')} "
+                    f"({a.get('type', 'image')})"
+                )
+            elif a.get('kind') == 'file':
+                attachment_context.append(
+                    f"\nATTACHED FILE: {a.get('name', 'attachment')} "
+                    f"({a.get('type', 'file')})"
+                )
 
-    for a in attachments:
-        if a['kind']=='image':
-            user_content.append({
-                'type':'input_image',
-                'image_url':a['data'],
-                'detail':'auto',
-            })
-        elif a['kind']=='text':
-            user_content.append({
-                'type':'input_text',
-                'text':f"\n\nATTACHED FILE: {a['name']} ({a['type']})\n---\n{a['text']}\n---"
-            })
-        elif a['kind']=='file':
-            # Responses API accepts supported file data directly. If a particular
-            # model/file type rejects it, the normal Veyra fallback/error path applies.
-            user_content.append({
-                'type':'input_file',
-                'filename':a['name'],
-                'file_data':a['data'],
-            })
-
-    veyra_input=[{'role':'user','content':user_content}]
-
-    # Give Veyra enough time to generate a complete site while still keeping a
-    # bounded upstream timeout. R11's 18-second cutoff was too short for real builds.
-    client=OpenAI(
-        api_key=key,
-        timeout=55.0,
-        max_retries=0,
-    )
-    attempts=[]
-    models=[]
-    for candidate in (primary_model, secondary_model):
-        if candidate and candidate not in models:
-            models.append(candidate)
-
-    data=None
-    used_model=None
-    last_exc=None
-
-    for model in models:
-        try:
-            output,response=run_veyra_response(
-                client,
-                model=model,
-                instructions=system,
-                input_data=veyra_input,
-                max_output_tokens=7000,
-                reasoning=None,
+        if attachment_context:
+            v4_prompt += (
+                "\n\nUSER ATTACHMENT CONTEXT:\n"
+                + "\n".join(attachment_context)
             )
 
-            data=extract_json_object(output)
+        data = run_veyra_v4(
+            prompt=v4_prompt,
+            current=cur,
+            user_id=uid,
+        )
 
-            for required in ('assistant_message','title','html','css','js','files'):
-                if required not in data:
-                    raise ValueError(f'Incomplete Veyra project payload: missing {required}')
+        # Normalize V4's file map to the frontend's expected filename list.
+        v4_files = data.get('files') or {}
 
-            if not isinstance(data.get('files'),list):
-                raise ValueError('Incomplete Veyra project payload: files must be an array')
+        if isinstance(v4_files, dict):
+            data['files'] = list(v4_files.keys())
+        elif not isinstance(v4_files, list):
+            data['files'] = [
+                'index.html',
+                'styles.css',
+                'script.js',
+            ]
 
-            # Normalize optional metadata rather than rejecting a useful build.
-            if not isinstance(data.get('changed_files'),list):
-                data['changed_files']=[
-                    {
-                        'file':f,
-                        'action':'Updated',
-                        'details':'Updated as part of the requested Veyra build.',
-                    }
-                    for f in data.get('files',[])[:6]
-                ]
+        # Normalize V4 changed_files to the existing frontend contract.
+        changed = data.get('changed_files') or []
 
-            if not isinstance(data.get('next_steps'),list):
-                data['next_steps']=[
-                    'Review the live preview',
-                    'Open Code to inspect the changed files',
-                    'Run Auto QA before publishing',
-                ]
+        if isinstance(changed, list):
+            normalized_changed = []
 
-            if not isinstance(data.get('quality'),dict):
-                data['quality']={
-                    'accessibility':95,
-                    'performance':95,
-                    'responsive':'Ready',
-                    'security':'Sandboxed',
-                }
+            for item in changed:
+                if isinstance(item, str):
+                    normalized_changed.append({
+                        'file': item,
+                        'action': 'Updated',
+                        'details': 'Generated or updated by Veyra Omni V4.',
+                    })
+                elif isinstance(item, dict):
+                    normalized_changed.append(item)
 
-            used_model=model
-            break
+            data['changed_files'] = normalized_changed
+        else:
+            data['changed_files'] = []
 
-        except Exception as exc:
-            last_exc=exc
-            code=classify_ai_error(exc)
-            attempts.append({'model':model,'code':code})
-            app.logger.exception(
-                'Veyra Responses API build failed | model=%s | code=%s | type=%s',
-                model,
-                code,
-                type(exc).__name__,
+        # Preserve the existing quality object shape while exposing V4's
+        # screenshot score separately.
+        v4_quality = data.get('quality') or {}
+
+        if isinstance(v4_quality, dict):
+            raw_score = v4_quality.get('score', 0)
+
+            try:
+                raw_score = float(raw_score)
+            except (TypeError, ValueError):
+                raw_score = 0
+
+            screenshot_score = (
+                round(raw_score * 100)
+                if raw_score <= 1
+                else round(raw_score)
             )
 
-            # Retrying a second model cannot fix authentication, billing, or connectivity.
-            if code in {'OPENAI_AUTH','OPENAI_ACCESS','OPENAI_RATE_LIMIT','OPENAI_TIMEOUT','OPENAI_CONNECTION'}:
-                break
+            data['visual_score'] = screenshot_score
+            data['quality_notes'] = v4_quality.get('notes', [])
 
-    if data is None:
-        code=classify_ai_error(last_exc) if last_exc else 'OPENAI_UNKNOWN'
-        d=local_preview(prompt)
-        d.update({
-            'assistant_message':(
-                'The live Veyra AI request could not complete, so I showed a local preview instead. '
-                f'No credits were used. Diagnostic: {code}.'
-            ),
-            'engine':'Veyra Local Engine',
-            'diagnostic_code':code,
-            'credits_used':0,
-            'credits_remaining':credits_before,
-            'credit_cost':credit_cost,
-            'is_followup':is_followup,
-            'ai_attempts':attempts,
-        })
-        return jsonify(d)
+        data['engine'] = 'veyra-omni-design-dna-v4'
+        used_model = primary_model
+
+    except Exception as exc:
+        app.logger.exception('Veyra Omni V4 build failed')
+
+        # Never disguise a failed Omni V4 generation as a successful
+        # locally-generated website. The Studio must know the real build failed.
+        return jsonify({
+            'ok': False,
+            'error': 'Veyra Omni could not complete this build. No credits were used.',
+            'code': 'VEYRA_OMNI_V4_FAILED',
+            'engine': 'veyra-omni-design-dna-v4',
+            'credits_used': 0,
+            'credits_remaining': credits_before,
+            'credit_cost': credit_cost,
+            'is_followup': is_followup,
+        }), 502
 
     # Debit only after a valid live AI build has been produced.
     try:

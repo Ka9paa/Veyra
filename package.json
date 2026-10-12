@@ -1,0 +1,10 @@
+{
+  "name": "veyra-production",
+  "private": true,
+  "scripts": {
+    "vercel-build": "cd omni-engine && pnpm install --frozen-lockfile && cd apps/engine && node node_modules/typescript/lib/tsc.js -p tsconfig.json && node node_modules/playwright/cli.js install chromium"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+}
