@@ -694,6 +694,83 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
 }
 
 
+
+/* ===== STUDIO ATTACHMENTS ===== */
+.composer.dragging{
+  border-color:#7959ff!important;
+  box-shadow:0 0 0 2px rgba(121,89,255,.15),0 14px 35px rgba(0,0,0,.22);
+}
+.attach-btn{
+  width:34px;
+  padding:0;
+  font-size:17px;
+  font-weight:600;
+}
+.attachment-tray{
+  display:none;
+  gap:7px;
+  flex-wrap:wrap;
+  padding:0 0 9px;
+}
+.attachment-tray.show{display:flex}
+.attachment-chip{
+  max-width:100%;
+  height:34px;
+  padding:4px 7px 4px 5px;
+  border:1px solid #2c3d5d;
+  background:#0a1423;
+  border-radius:9px;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  color:#b9c5d8;
+  font-size:11px;
+}
+.attachment-chip .thumb{
+  width:25px;height:25px;
+  border-radius:6px;
+  object-fit:cover;
+  background:#151a31;
+  display:grid;
+  place-items:center;
+  color:#9d88ff;
+  flex:0 0 auto;
+}
+.attachment-chip .file-lines{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  line-height:1.15;
+}
+.attachment-chip .file-lines b{
+  max-width:145px;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  font-size:10px;
+  color:#dce5f4;
+}
+.attachment-chip .file-lines small{
+  color:#64758e;
+  font-size:9px;
+}
+.attachment-chip button{
+  width:20px;height:20px;
+  border:0;
+  border-radius:6px;
+  color:#7f90aa;
+  background:transparent;
+  cursor:pointer;
+  font-size:14px;
+}
+.attachment-chip button:hover{background:#1a2132;color:#fff}
+.attachment-note{
+  width:100%;
+  color:#687992;
+  font-size:9px;
+  padding-left:2px;
+}
+
 /* ===== VEYRA STUDIO CLEANUP ===== */
 .workspace{grid-template-rows:54px minmax(0,1fr)}
 .inspector{
@@ -1237,8 +1314,11 @@ body{
     <div class="composer-wrap">
       <div class="composer">
         <textarea id="prompt" placeholder="Ask Veyra to build, edit, redesign, debug, or improve anything..."></textarea>
+        <div class="attachment-tray" id="attachmentTray"></div>
         <div class="compose-actions">
-          <button class="tool-pill">＋</button>
+          <input id="attachmentInput" type="file" hidden multiple
+            accept="image/*,.txt,.md,.html,.htm,.css,.js,.jsx,.ts,.tsx,.json,.xml,.csv,.pdf">
+          <button class="tool-pill attach-btn" id="attachBtn" type="button" title="Attach files or images" aria-label="Attach files or images">＋</button>
           <span class="engine-label" id="engineStatus">Veyra AI</span><span class="ai-diagnostic" id="aiDiagnostic"></span>
           <button class="send" id="sendBtn">➜</button>
         </div>
@@ -1363,6 +1443,142 @@ const frame=$("preview");
 const canvas=$("canvas");
 const typingRow=$("typingRow");
 const loadingShroud=$("loadingShroud");
+const attachmentInput=$("attachmentInput");
+const attachBtn=$("attachBtn");
+const attachmentTray=$("attachmentTray");
+const composer=document.querySelector(".composer");
+let pendingAttachments=[];
+
+const TEXT_FILE_RE=/\.(txt|md|html?|css|js|jsx|ts|tsx|json|xml|csv)$/i;
+const MAX_ATTACHMENTS=4;
+const MAX_TOTAL_BYTES=4*1024*1024;
+
+function humanBytes(n){
+  if(n<1024)return n+" B";
+  if(n<1024*1024)return (n/1024).toFixed(1)+" KB";
+  return (n/(1024*1024)).toFixed(1)+" MB";
+}
+
+function fileToDataURL(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve(String(r.result||""));
+    r.onerror=()=>reject(r.error||new Error("Could not read file"));
+    r.readAsDataURL(file);
+  });
+}
+
+function fileToText(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve(String(r.result||""));
+    r.onerror=()=>reject(r.error||new Error("Could not read file"));
+    r.readAsText(file);
+  });
+}
+
+async function compressImage(file){
+  // Preserve animated GIFs; browser canvas would flatten them.
+  if(file.type==="image/gif")return fileToDataURL(file);
+  const source=await fileToDataURL(file);
+  if(file.size<750*1024)return source;
+
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
+      const max=1600;
+      const scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+      const c=document.createElement("canvas");
+      c.width=Math.max(1,Math.round(img.naturalWidth*scale));
+      c.height=Math.max(1,Math.round(img.naturalHeight*scale));
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      resolve(c.toDataURL("image/jpeg",.82));
+    };
+    img.onerror=()=>resolve(source);
+    img.src=source;
+  });
+}
+
+function renderAttachments(){
+  attachmentTray.innerHTML="";
+  attachmentTray.classList.toggle("show",pendingAttachments.length>0);
+  pendingAttachments.forEach((a,index)=>{
+    const chip=document.createElement("div");
+    chip.className="attachment-chip";
+    const preview=a.kind==="image"
+      ? `<img class="thumb" src="${a.data}" alt="">`
+      : `<div class="thumb">${a.kind==="text"?"</>":"▤"}</div>`;
+    chip.innerHTML=`${preview}<div class="file-lines"><b>${esc(a.name)}</b><small>${esc(a.type||a.kind)} · ${humanBytes(a.size||0)}</small></div><button type="button" data-remove="${index}" title="Remove">×</button>`;
+    attachmentTray.appendChild(chip);
+  });
+  if(pendingAttachments.length){
+    const note=document.createElement("div");
+    note.className="attachment-note";
+    note.textContent="Images are analyzed visually. Code/text files are included as build context.";
+    attachmentTray.appendChild(note);
+  }
+  attachmentTray.querySelectorAll("[data-remove]").forEach(btn=>{
+    btn.onclick=()=>{
+      pendingAttachments.splice(Number(btn.dataset.remove),1);
+      renderAttachments();
+    };
+  });
+}
+
+async function addFiles(fileList){
+  const incoming=[...fileList];
+  for(const file of incoming){
+    if(pendingAttachments.length>=MAX_ATTACHMENTS){
+      addMessage("assistant",`You can attach up to ${MAX_ATTACHMENTS} files at once.`);
+      break;
+    }
+
+    const existingBytes=pendingAttachments.reduce((n,a)=>n+(a.size||0),0);
+    if(existingBytes+file.size>MAX_TOTAL_BYTES){
+      addMessage("assistant","Those attachments are too large together. Keep the total under 4 MB.");
+      break;
+    }
+
+    try{
+      if(file.type.startsWith("image/")){
+        const data=await compressImage(file);
+        pendingAttachments.push({kind:"image",name:file.name,type:file.type||"image/*",size:file.size,data});
+      }else if(file.type.startsWith("text/")||TEXT_FILE_RE.test(file.name)){
+        const text=await fileToText(file);
+        pendingAttachments.push({kind:"text",name:file.name,type:file.type||"text/plain",size:file.size,text});
+      }else if(file.type==="application/pdf"){
+        const data=await fileToDataURL(file);
+        pendingAttachments.push({kind:"file",name:file.name,type:file.type,size:file.size,data});
+      }else{
+        addMessage("assistant",`${file.name} isn't supported yet. Attach an image, PDF, or code/text file.`);
+      }
+    }catch(e){
+      addMessage("assistant",`I couldn't attach ${file.name}: ${e.message||"file read failed"}`);
+    }
+  }
+  renderAttachments();
+}
+
+attachBtn.onclick=()=>attachmentInput.click();
+attachmentInput.onchange=async()=>{
+  await addFiles(attachmentInput.files||[]);
+  attachmentInput.value="";
+};
+
+["dragenter","dragover"].forEach(type=>composer.addEventListener(type,e=>{
+  e.preventDefault();
+  composer.classList.add("dragging");
+}));
+["dragleave","drop"].forEach(type=>composer.addEventListener(type,e=>{
+  e.preventDefault();
+  composer.classList.remove("dragging");
+}));
+composer.addEventListener("drop",e=>addFiles(e.dataTransfer?.files||[]));
+
+promptEl.addEventListener("paste",e=>{
+  const files=[...(e.clipboardData?.files||[])];
+  if(files.length)addFiles(files);
+});
 
 function esc(v){
   return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
@@ -1613,9 +1829,11 @@ function scheduleAutosave(reason="Changes autosaved"){
 
 async function build(prompt){
   prompt=(prompt||"").trim();
-  if(!prompt)return;
+  if(!prompt && !pendingAttachments.length)return;
 
-  addMessage("user",prompt);
+  const attachmentsForBuild=pendingAttachments.map(a=>({...a}));
+  const attachmentNames=attachmentsForBuild.map(a=>a.name);
+  addMessage("user",prompt || `Attached ${attachmentNames.length} file${attachmentNames.length===1?"":"s"}: ${attachmentNames.join(", ")}`);
   promptEl.value="";
   sendBtn.disabled=true;
   $("engineStatus").textContent="Veyra is thinking…";
@@ -1625,7 +1843,11 @@ async function build(prompt){
     const res=await fetch("/api/build",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({prompt,current:{html:state.html,css:state.css,js:state.js}})
+      body:JSON.stringify({
+        prompt,
+        current:{html:state.html,css:state.css,js:state.js},
+        attachments:attachmentsForBuild
+      })
     });
     const data=await readJsonResponse(res);
     if(!res.ok||data.ok===false)throw new Error(data.error||data.code||"Build failed");
@@ -1635,6 +1857,8 @@ async function build(prompt){
     state.css=data.css||"";
     state.js=data.js||"";
     state.dirty=true;
+    pendingAttachments=[];
+    renderAttachments();
 
     if(Number.isFinite(Number(data.credits_remaining))){
       const creditEl=$("studioCreditCount");
@@ -1702,30 +1926,16 @@ async function save(quiet=false){
 
 async function publish(){
   if(!state.project_id||state.dirty)await save();
-
   const res=await fetch("/api/projects/publish",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({project_id:state.project_id})
   });
-
-  const data=await readJsonResponse(res);
-
-  if(!res.ok||data.ok===false){
-    throw new Error(data.error||data.code||"Publish failed");
-  }
-
+  const data=await res.json();
+  if(!res.ok||data.ok===false)throw new Error(data.error||"Publish failed");
   state.published_url=data.url;
   syncUI();
-
-  addMessage(
-    "assistant",
-    "Your site is live. The current saved version was published successfully.\n\nLive URL: "+data.url
-  );
-
-  try{
-    window.open(data.url,"_blank","noopener");
-  }catch(_){}
+  addMessage("assistant","Your site is live. I published the current saved version successfully.");
 }
 
 async function loadProject(id){
