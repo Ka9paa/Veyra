@@ -1,0 +1,3 @@
+import {z} from "zod";import {runModel} from "../providers/model-router.js";import {featureAmplifierPrompt} from "../agents/prompts.js";
+const FeatureRequest=z.object({projectId:z.string(),userId:z.string(),request:z.string().min(3).max(20000),framework:z.enum(["react","next","vue","html-tailwind"]),existingSchema:z.string().optional(),existingFiles:z.record(z.string(),z.string()).default({})});
+export async function amplifyFeature(raw:unknown){const req=FeatureRequest.parse(raw);const planText=await runModel("planner",featureAmplifierPrompt,JSON.stringify(req));return{projectId:req.projectId,plan:planText,next:["validate-plan","generate-schema","generate-auth","generate-api","compile","test","repair-if-needed"]}}

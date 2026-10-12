@@ -1,0 +1,2 @@
+import {runModel} from "../providers/model-router.js";import {repairPrompt} from "../agents/prompts.js";
+export async function selfHeal(input:{projectId:string;files:Record<string,string>;diagnostics:string[];attempt:number}){if(input.attempt>3)return{status:"manual-review",reason:"Maximum automated repair rounds reached"};const output=await runModel("repair",repairPrompt,JSON.stringify(input));return{status:"proposed",attempt:input.attempt,repairPlan:output}}

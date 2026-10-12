@@ -1,0 +1,1 @@
+import type {FastifyRequest} from "fastify";import {nanoid} from "nanoid";export function requestContext(req:FastifyRequest){return{requestId:String(req.headers["x-request-id"]??nanoid()),userId:String(req.headers["x-veyra-user-id"]??""),projectId:String(req.headers["x-veyra-project-id"]??"")}}

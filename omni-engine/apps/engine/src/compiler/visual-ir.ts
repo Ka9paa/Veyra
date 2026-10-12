@@ -1,0 +1,5 @@
+export type IRNode={id:string;tag:string;props:Record<string,unknown>;classes:string[];children:IRNode[]};
+export type VisualIR={root:IRNode[];tokens:{colors:Record<string,string>;spacing:Record<string,string>;radius:Record<string,string>;typography:Record<string,string>};breakpoints:Record<string,number>};
+export function normalizeVisualTree(nodes:any[]):VisualIR{const walk=(node:any):IRNode=>({id:node.id,tag:inferTag(node),props:{},classes:styleToClasses(node),children:(node.children??[]).map(walk)});return{root:nodes.map(walk),tokens:{colors:{},spacing:{},radius:{},typography:{}},breakpoints:{sm:640,md:768,lg:1024,xl:1280}}}
+function inferTag(node:any){if(node.kind==="button")return"button";if(node.kind==="input")return"input";if(node.kind==="image")return"img";if(node.kind==="text")return node.styles?.role==="heading"?"h2":"p";return"div"}
+function styleToClasses(node:any){const out:string[]=[];if(node.layout?.mode==="flex")out.push("flex");if(node.layout?.direction==="column")out.push("flex-col");if(typeof node.layout?.gap==="number")out.push(`gap-[${node.layout.gap}px]`);return out}

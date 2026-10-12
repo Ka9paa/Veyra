@@ -1,0 +1,2 @@
+import {CanvasRequestSchema,AgentResultSchema} from "@veyra/protocol";import {orchestrateCanvas} from "../agents/orchestrator.js";import {appendEvent} from "../state/project-store.js";import {nanoid} from "nanoid";
+export async function routeCanvas(raw:unknown){const req=CanvasRequestSchema.parse(raw);const result=AgentResultSchema.parse(await orchestrateCanvas(req));const idempotencyKey=`canvas:${req.projectId}:${nanoid()}`;await appendEvent({projectId:req.projectId,userId:req.userId,kind:"canvas.mutation",payload:result,idempotencyKey});return{...result,idempotencyKey}}
