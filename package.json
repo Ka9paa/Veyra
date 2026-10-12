@@ -2,9 +2,13 @@
   "name": "veyra-production",
   "private": true,
   "scripts": {
-    "vercel-build": "cd omni-engine && pnpm install --frozen-lockfile && cd apps/engine && node node_modules/typescript/lib/tsc.js -p tsconfig.json && node node_modules/playwright/cli.js install chromium"
+    "vercel-build": "npm install --ignore-scripts && corepack pnpm@12.11.2 --version && cd omni-engine && corepack pnpm@12.11.2 install --frozen-lockfile && cd apps/engine && node node_modules/typescript/lib/tsc.js -p tsconfig.json && cd ../../.. && node scripts/bundle-v4-function.mjs"
   },
   "engines": {
     "node": "24.x"
+  },
+  "packageManager": "pnpm@12.11.2",
+  "devDependencies": {
+    "esbuild": "^0.25.0"
   }
 }

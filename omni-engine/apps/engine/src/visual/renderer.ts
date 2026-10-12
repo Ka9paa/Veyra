@@ -42,7 +42,13 @@ export async function renderWebsite(
   const width = input.width ?? 1440;
   const height = input.height ?? 900;
 
-  const browser = await chromium.launch({ headless: true });
+  const executablePath =
+    process.env.VEYRA_CHROMIUM_EXECUTABLE || undefined;
+
+  const browser = await chromium.launch({
+    headless: true,
+    ...(executablePath ? { executablePath } : {})
+  });
 
   try {
     const page = await browser.newPage({

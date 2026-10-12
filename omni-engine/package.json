@@ -1,1 +1,11 @@
-{"name":"veyra-build-omni-engine","private":true,"packageManager":"pnpm@10.0.0","scripts":{"dev":"pnpm --parallel --filter ./apps/** dev","build":"pnpm -r build","typecheck":"pnpm -r typecheck","test":"pnpm -r test"}}
+{
+  "name": "veyra-build-omni-engine",
+  "private": true,
+  "packageManager": "pnpm@12.11.2",
+  "scripts": {
+    "dev": "pnpm --parallel --filter ./apps/** dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  }
+}

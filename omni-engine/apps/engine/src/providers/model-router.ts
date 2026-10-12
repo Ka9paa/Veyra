@@ -6,6 +6,7 @@ export type ModelLane = "planner" | "code" | "design" | "repair";
 
 export interface ModelRunOptions {
   maxOutputTokens?: number;
+  reasoningEffort?: "low" | "medium" | "high";
 }
 
 export async function runModel(
@@ -14,6 +15,34 @@ export async function runModel(
   input: string,
   options: ModelRunOptions = {}
 ) {
+  const startedAt = Date.now();
+  const label =
+    system.includes("Design DNA Director") ? "design-dna" :
+    system.includes("Principal Composition Architect") ? "composition" :
+    system.includes("ASSET") ? "assets" :
+    lane === "code" ? "builder" :
+    lane === "repair" ? "repair" :
+    lane;
+
+  console.error(
+    `[V4 MODEL] START ${label} | lane=${lane} | max_tokens=${options.maxOutputTokens ?? "default"}`
+  );
+
+  const timed = async <T>(provider: string, fn: () => Promise<T>): Promise<T> => {
+    try {
+      const result = await fn();
+      console.error(
+        `[V4 MODEL] DONE ${label} | provider=${provider} | seconds=${((Date.now() - startedAt) / 1000).toFixed(1)}`
+      );
+      return result;
+    } catch (error) {
+      console.error(
+        `[V4 MODEL] FAIL ${label} | provider=${provider} | seconds=${((Date.now() - startedAt) / 1000).toFixed(1)}`
+      );
+      throw error;
+    }
+  };
+
   const hasOpenAI = Boolean(env.OPENAI_API_KEY);
   const hasAnthropic = Boolean(env.ANTHROPIC_API_KEY);
 
@@ -25,10 +54,10 @@ export async function runModel(
 
   if (lane === "design" && hasAnthropic) {
     try {
-      return await callAnthropic(system, input);
+      return await timed("anthropic", () => callAnthropic(system, input));
     } catch (anthropicError) {
       if (hasOpenAI) {
-        return await callOpenAI(system, input, options);
+        return await timed("openai", () => callOpenAI(system, input, options));
       }
       throw anthropicError;
     }
@@ -36,14 +65,14 @@ export async function runModel(
 
   if (hasOpenAI) {
     try {
-      return await callOpenAI(system, input, options);
+      return await timed("openai", () => callOpenAI(system, input, options));
     } catch (openAIError) {
       if (hasAnthropic) {
-        return await callAnthropic(system, input);
+        return await timed("anthropic", () => callAnthropic(system, input));
       }
       throw openAIError;
     }
   }
 
-  return await callAnthropic(system, input);
+  return await timed("anthropic", () => callAnthropic(system, input));
 }

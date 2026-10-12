@@ -25,3 +25,11 @@ omni-engine-backup-before-visual-upgrade/
 # Omni build output
 omni-engine/apps/engine/dist/
 omni-engine/packages/protocol/dist/
+
+# Veyra generated browser bundle
+api/_chromium/
+
+omni-engine/apps/engine/chromium-runtime/
+
+omni-engine/apps/engine/.playwright-browsers/
+api/_chromium-runtime/

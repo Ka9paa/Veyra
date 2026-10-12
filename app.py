@@ -212,6 +212,10 @@ def oauth_request_url(path):
     if host in {'buildveyra.xyz','www.buildveyra.xyz'}:
         return f"https://{host}{path}"
 
+    # Veyra Vercel Preview deployments should stay on their Preview host.
+    if host.endswith('-kappas-projects-25de5b43.vercel.app'):
+        return f"https://{host}{path}"
+
     # Local development must keep OAuth on the local Flask server.
     if host in {'127.0.0.1', 'localhost'}:
         return f"http://{raw_host}{path}"
@@ -1338,7 +1342,7 @@ def support_api():
 @app.route('/staff/apply')
 @login_required
 def staff_apply():
-    return redirect('https://buildveyra.xyz/staff/apply')
+    return render_template('staff_apply.html')
 
 @app.route('/login')
 def login():
@@ -1434,12 +1438,21 @@ def google_callback():
         state_data=serializer.loads(raw_state, max_age=600)
         redirect_uri=str(state_data.get('redirect_uri') or '').strip()
 
-        if redirect_uri not in {
+        trusted_google_callbacks = {
             'https://buildveyra.xyz/auth/google/callback',
             'https://www.buildveyra.xyz/auth/google/callback',
             'http://127.0.0.1:8765/auth/google/callback',
             'http://localhost:8765/auth/google/callback',
-        }:
+        }
+
+        is_vercel_preview = (
+            redirect_uri.startswith('https://')
+            and redirect_uri.endswith(
+                '-kappas-projects-25de5b43.vercel.app/auth/google/callback'
+            )
+        )
+
+        if redirect_uri not in trusted_google_callbacks and not is_vercel_preview:
             raise ValueError('Untrusted Google callback URL in OAuth state')
 
         token_body=urlencode({
@@ -2368,17 +2381,12 @@ VEYRA_V4_CLI = VEYRA_V4_ENGINE_DIR / "dist" / "v4-cli.js"
 
 def run_veyra_v4(prompt, current=None, user_id=None):
     """
-    Execute the frozen Veyra Omni V4 visual engine.
+    Execute Veyra Omni V4.
 
-    Authentication, credits, persistence, and the public API remain owned
-    by Flask. The TypeScript engine owns visual generation and critique.
+    On Vercel, Flask delegates visual generation to the native Node function.
+    Locally, the existing Node CLI remains available for development.
     """
     current = current or {}
-
-    if not VEYRA_V4_CLI.exists():
-        raise RuntimeError(
-            f"Veyra V4 CLI is not built: {VEYRA_V4_CLI}"
-        )
 
     payload = {
         "prompt": str(prompt or ""),
@@ -2394,10 +2402,85 @@ def run_veyra_v4(prompt, current=None, user_id=None):
         },
     }
 
+    # Vercel Python functions do not expose the Node runtime to subprocesses.
+    # Delegate V4 to the native Node serverless function on the same deployment.
+    if os.getenv("VERCEL"):
+        internal_secret = (os.getenv("VEYRA_INTERNAL_SECRET") or "").strip()
+
+        if not internal_secret:
+            raise RuntimeError("VEYRA_INTERNAL_SECRET is not configured.")
+
+        forwarded = (
+            request.headers.get("X-Forwarded-Host") or ""
+        ).split(",")[0].strip()
+
+        host = forwarded or (request.host or "").strip()
+
+        if not host:
+            raise RuntimeError("Unable to determine Veyra deployment host.")
+
+        endpoint = f"https://{host}/api/omni-v4"
+
+        app.logger.warning(
+            "[V4 BRIDGE] delegating to Node | prompt_chars=%s | user=%s | host=%s",
+            len(payload.get("prompt", "")),
+            bool(payload.get("userId")),
+            host,
+        )
+
+        body = json.dumps(payload).encode("utf-8")
+
+        req = UrlRequest(
+            endpoint,
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "X-Veyra-Internal-Secret": internal_secret,
+            },
+            method="POST",
+        )
+
+        try:
+            with urlopen(req, timeout=295) as response:
+                raw = response.read().decode("utf-8")
+        except Exception as exc:
+            detail = ""
+
+            try:
+                detail = exc.read().decode("utf-8", errors="replace")
+            except Exception:
+                pass
+
+            raise RuntimeError(
+                f"Veyra V4 Node function request failed: {exc}"
+                + (f" | {detail[-3000:]}" if detail else "")
+            ) from exc
+
+        try:
+            result = json.loads(raw)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Veyra V4 Node function returned invalid JSON: {raw[-3000:]}"
+            ) from exc
+
+        if not isinstance(result, dict) or result.get("ok") is not True:
+            raise RuntimeError(
+                "Veyra V4 Node function returned an unsuccessful result: "
+                + json.dumps(result)[-3000:]
+            )
+
+        return result
+
+    # Local development keeps the known-good CLI bridge.
+    if not VEYRA_V4_CLI.exists():
+        raise RuntimeError(
+            f"Veyra V4 CLI is not built: {VEYRA_V4_CLI}"
+        )
+
     env = os.environ.copy()
 
     app.logger.warning(
-        "[V4 BRIDGE] launching CLI | prompt_chars=%s | user=%s | cli=%s",
+        "[V4 BRIDGE] launching local CLI | prompt_chars=%s | user=%s | cli=%s",
         len(payload.get("prompt", "")),
         bool(payload.get("userId")),
         VEYRA_V4_CLI.exists(),
@@ -2430,24 +2513,10 @@ def run_veyra_v4(prompt, current=None, user_id=None):
         result = json.loads(proc.stdout)
     except Exception as exc:
         raise RuntimeError(
-            "Veyra V4 returned invalid JSON."
+            f"Veyra V4 engine returned invalid JSON: {proc.stdout[-3000:]}"
         ) from exc
 
-    if not isinstance(result, dict) or not result.get("ok"):
-        raise RuntimeError(
-            "Veyra V4 returned an invalid build result."
-        )
-
-    for field in ("html", "css", "js", "title"):
-        if field not in result:
-            raise RuntimeError(
-                f"Veyra V4 result missing required field: {field}"
-            )
-
     return result
-
-
-# === END VEYRA OMNI V4 BRIDGE ===
 
 @app.post('/api/build')
 @login_required

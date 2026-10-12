@@ -1,10 +1,4 @@
 import { runModel } from "../providers/model-router.js";
-import { renderWebsite, type RenderDiagnostics } from "../visual/renderer.js";
-import {
-  critiqueScreenshot,
-  type VisualReview
-} from "../visual/visual-critic.js";
-
 export interface StudioBuildRequest {
   projectId?: string;
   userId?: string;
@@ -49,12 +43,6 @@ interface SiteCode {
   js: string;
   next_steps: string[];
   quality_notes: string[];
-}
-
-interface Candidate {
-  site: SiteCode;
-  review: VisualReview;
-  diagnostics: RenderDiagnostics;
 }
 
 function extractJson(raw: string): any {
@@ -560,65 +548,6 @@ Never use href="#".
 The next screenshot must be materially better, not merely different.
 `;
 
-async function evaluateCandidate(
-  site: SiteCode,
-  req: StudioBuildRequest
-): Promise<Candidate> {
-  const rendered = await renderWebsite({
-    title: site.title,
-    html: site.html,
-    css: site.css,
-    js: site.js,
-    width: req.viewport?.width ?? 1440,
-    height: req.viewport?.height ?? 900
-  });
-
-  const review = await critiqueScreenshot(
-    rendered.screenshotBase64,
-    req.prompt,
-    rendered.diagnostics
-  );
-
-  if (rendered.diagnostics.hardFailures.length) {
-    review.pass = false;
-
-    if (rendered.diagnostics.brokenImages.length) {
-      review.score = Math.min(review.score, 45);
-    } else {
-      review.score = Math.min(review.score, 69);
-    }
-  }
-
-  return {
-    site,
-    review,
-    diagnostics: rendered.diagnostics
-  };
-}
-
-function better(
-  currentBest: Candidate,
-  challenger: Candidate
-): Candidate {
-  const bestFailures =
-    currentBest.diagnostics.hardFailures.length;
-
-  const challengerFailures =
-    challenger.diagnostics.hardFailures.length;
-
-  if (bestFailures === 0 && challengerFailures > 0) {
-    return currentBest;
-  }
-
-  if (challengerFailures === 0 && bestFailures > 0) {
-    return challenger;
-  }
-
-  return challenger.review.score > currentBest.review.score
-    ? challenger
-    : currentBest;
-}
-
 export async function orchestrateStudio(
   req: StudioBuildRequest
 ): Promise<StudioBuildResult> {
@@ -635,7 +564,8 @@ export async function orchestrateStudio(
     DESIGN_DNA_SYSTEM,
     ctx,
     {
-      maxOutputTokens: 7000
+      maxOutputTokens: 7000,
+      reasoningEffort: "medium"
     }
   );
 
@@ -649,7 +579,8 @@ export async function orchestrateStudio(
       COMPOSITION_SYSTEM,
       `${ctx}\n\nDESIGN DNA:\n${designDNA}`,
       {
-        maxOutputTokens: 8000
+        maxOutputTokens: 8000,
+        reasoningEffort: "medium"
       }
     ),
 
@@ -658,7 +589,8 @@ export async function orchestrateStudio(
       ASSET_SYSTEM,
       `${ctx}\n\nDESIGN DNA:\n${designDNA}`,
       {
-        maxOutputTokens: 5000
+        maxOutputTokens: 5000,
+        reasoningEffort: "medium"
       }
     )
   ]);
@@ -675,107 +607,23 @@ export async function orchestrateStudio(
       `ASSET STRATEGY:\n${assets}`
     ].join("\n\n"),
     {
-      maxOutputTokens: 32000
+      maxOutputTokens: 32000,
+      reasoningEffort: "medium"
     }
   );
 
   const firstSite = parseSite(firstRaw);
 
-  console.error("[Veyra V4] Rendering first composition...");
+  console.error("[Veyra V4] Direct AI build complete.");
 
-  const firstCandidate =
-    await evaluateCandidate(firstSite, req);
-
-  console.error(
-    `[Veyra V4] First screenshot score: ${firstCandidate.review.score}/100`
-  );
-
-  let best = firstCandidate;
-  let current = firstCandidate;
-
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    if (
-      current.review.pass &&
-      current.review.score >= 88 &&
-      current.diagnostics.hardFailures.length === 0
-    ) {
-      console.error(
-        "[Veyra V4] Visual quality gate passed."
-      );
-      break;
-    }
-
-    console.error(
-      `[Veyra V4] Recomposing visual design (${attempt}/2)...`
-    );
-
-    const repairRaw = await runModel(
-      "repair",
-      RECOMPOSE_SYSTEM,
-      [
-        `ORIGINAL PROJECT:\n${ctx}`,
-
-        `DESIGN DNA:\n${designDNA}`,
-
-        `COMPOSITION BLUEPRINT:\n${composition}`,
-
-        `ASSET STRATEGY:\n${assets}`,
-
-        `CURRENT HTML:\n${current.site.html}`,
-
-        `CURRENT CSS:\n${current.site.css}`,
-
-        `CURRENT JS:\n${current.site.js}`,
-
-        `SCREENSHOT REVIEW:\n${JSON.stringify(
-          current.review,
-          null,
-          2
-        )}`,
-
-        `BROWSER DIAGNOSTICS:\n${JSON.stringify(
-          current.diagnostics,
-          null,
-          2
-        )}`,
-
-        `RECOMPOSITION ATTEMPT: ${attempt} of 2`,
-
-        "Fix the visual cause, not merely the symptom."
-      ].join("\n\n"),
-      {
-        maxOutputTokens: 36000
-      }
-    );
-
-    const repairedSite = parseSite(repairRaw);
-
-    const repairedCandidate =
-      await evaluateCandidate(repairedSite, req);
-
-    console.error(
-      `[Veyra V4] Recomposition ${attempt} score: ${repairedCandidate.review.score}/100`
-    );
-
-    best = better(best, repairedCandidate);
-    current = repairedCandidate;
-  }
-
-  const site = best.site;
-  const review = best.review;
-  const diagnostics = best.diagnostics;
-
-  console.error(
-    `[Veyra V4] Selected final candidate: ${review.score}/100`
-  );
+  const site = firstSite;
 
   return {
     ok: true,
 
     title: site.title,
 
-    assistant_message:
-      site.assistant_message,
+    assistant_message: site.assistant_message,
 
     html: site.html,
     css: site.css,
@@ -796,31 +644,11 @@ export async function orchestrateStudio(
     next_steps: site.next_steps,
 
     quality: {
-      score: review.score / 100,
-
+      score: 0,
       notes: [
-        `SCREENSHOT SCORE: ${review.score}/100`,
-        `VERDICT: ${review.verdict}`,
-        `FIRST VIEWPORT: ${review.firstViewport}/100`,
-        `COMPOSITION: ${review.composition}/100`,
-        `TYPOGRAPHY: ${review.typography}/100`,
-        `HIERARCHY: ${review.hierarchy}/100`,
-        `IMAGERY: ${review.imagery}/100`,
-        `POLISH: ${review.polish}/100`,
-        `ORIGINALITY: ${review.originality}/100`,
-        `BRAND SPECIFICITY: ${review.brandSpecificity}/100`,
-
-        ...diagnostics.hardFailures.map(
-          x => `HARD FAILURE: ${x}`
-        ),
-
-        ...review.issues.map(
-          x => `VISUAL ISSUE: ${x}`
-        ),
-
-        ...review.strengths.map(
-          x => `STRENGTH: ${x}`
-        )
+        "V4 DIRECT AI BUILD",
+        "Server-side screenshot audit skipped in live Vercel mode.",
+        ...site.quality_notes
       ]
     },
 

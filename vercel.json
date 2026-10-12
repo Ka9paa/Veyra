@@ -3,20 +3,10 @@
   "buildCommand": "npm run vercel-build",
   "functions": {
     "app.py": {
-      "includeFiles": "omni-engine/apps/engine/**",
+      "maxDuration": 300
+    },
+    "api/omni-v4.mjs": {
       "maxDuration": 300
     }
-  },
-  "builds": [
-    {
-      "src": "app.py",
-      "use": "@vercel/python"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "app.py"
-    }
-  ]
+  }
 }
