@@ -1592,433 +1592,6 @@ body{
 
 </div>
 
-<script>
-const state={
-  title:"Untitled Project",
-  html:"",
-  css:"",
-  js:"",
-  project_id:null,
-  access_role:"owner",
-  published_url:"",
-  quality:null,
-  dirty:false
-};
-
-let codeType="html";
-let viewportWidth="100%";
-const $=id=>document.getElementById(id);
-const messages=$("messages");
-const promptEl=$("prompt");
-const sendBtn=$("sendBtn");
-const frame=$("preview");
-const canvas=$("canvas");
-const typingRow=$("typingRow");
-const loadingShroud=$("loadingShroud");
-const attachmentInput=$("attachmentInput");
-const attachBtn=$("attachBtn");
-const attachmentTray=$("attachmentTray");
-const composer=document.querySelector(".composer");
-let pendingAttachments=[];
-
-const TEXT_FILE_RE=/\.(txt|md|html?|css|js|jsx|ts|tsx|json|xml|csv)$/i;
-const MAX_ATTACHMENTS=4;
-const MAX_TOTAL_BYTES=4*1024*1024;
-
-function humanBytes(n){
-  if(n<1024)return n+" B";
-  if(n<1024*1024)return (n/1024).toFixed(1)+" KB";
-  return (n/(1024*1024)).toFixed(1)+" MB";
-}
-
-function fileToDataURL(file){
-  return new Promise((resolve,reject)=>{
-    const r=new FileReader();
-    r.onload=()=>resolve(String(r.result||""));
-    r.onerror=()=>reject(r.error||new Error("Could not read file"));
-    r.readAsDataURL(file);
-  });
-}
-
-function fileToText(file){
-  return new Promise((resolve,reject)=>{
-    const r=new FileReader();
-    r.onload=()=>resolve(String(r.result||""));
-    r.onerror=()=>reject(r.error||new Error("Could not read file"));
-    r.readAsText(file);
-  });
-}
-
-async function compressImage(file){
-  // Preserve animated GIFs; browser canvas would flatten them.
-  if(file.type==="image/gif")return fileToDataURL(file);
-  const source=await fileToDataURL(file);
-  if(file.size<750*1024)return source;
-
-  return new Promise(resolve=>{
-    const img=new Image();
-    img.onload=()=>{
-      const max=1600;
-      const scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
-      const c=document.createElement("canvas");
-      c.width=Math.max(1,Math.round(img.naturalWidth*scale));
-      c.height=Math.max(1,Math.round(img.naturalHeight*scale));
-      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
-      resolve(c.toDataURL("image/jpeg",.82));
-    };
-    img.onerror=()=>resolve(source);
-    img.src=source;
-  });
-}
-
-function renderAttachments(){
-  attachmentTray.innerHTML="";
-  attachmentTray.classList.toggle("show",pendingAttachments.length>0);
-  pendingAttachments.forEach((a,index)=>{
-    const chip=document.createElement("div");
-    chip.className="attachment-chip";
-    const preview=a.kind==="image"
-      ? `<img class="thumb" src="${a.data}" alt="">`
-      : `<div class="thumb">${a.kind==="text"?"</>":"▤"}</div>`;
-    chip.innerHTML=`${preview}<div class="file-lines"><b>${esc(a.name)}</b><small>${esc(a.type||a.kind)} · ${humanBytes(a.size||0)}</small></div><button type="button" data-remove="${index}" title="Remove">×</button>`;
-    attachmentTray.appendChild(chip);
-  });
-  if(pendingAttachments.length){
-    const note=document.createElement("div");
-    note.className="attachment-note";
-    note.textContent="Images are analyzed visually. Code/text files are included as build context.";
-    attachmentTray.appendChild(note);
-  }
-  attachmentTray.querySelectorAll("[data-remove]").forEach(btn=>{
-    btn.onclick=()=>{
-      pendingAttachments.splice(Number(btn.dataset.remove),1);
-      renderAttachments();
-    };
-  });
-}
-
-async function addFiles(fileList){
-  const incoming=[...fileList];
-  for(const file of incoming){
-    if(pendingAttachments.length>=MAX_ATTACHMENTS){
-      addMessage("assistant",`You can attach up to ${MAX_ATTACHMENTS} files at once.`);
-      break;
-    }
-
-    const existingBytes=pendingAttachments.reduce((n,a)=>n+(a.size||0),0);
-    if(existingBytes+file.size>MAX_TOTAL_BYTES){
-      addMessage("assistant","Those attachments are too large together. Keep the total under 4 MB.");
-      break;
-    }
-
-    try{
-      if(file.type.startsWith("image/")){
-        const data=await compressImage(file);
-        pendingAttachments.push({kind:"image",name:file.name,type:file.type||"image/*",size:file.size,data});
-      }else if(file.type.startsWith("text/")||TEXT_FILE_RE.test(file.name)){
-        const text=await fileToText(file);
-        pendingAttachments.push({kind:"text",name:file.name,type:file.type||"text/plain",size:file.size,text});
-      }else if(file.type==="application/pdf"){
-        const data=await fileToDataURL(file);
-        pendingAttachments.push({kind:"file",name:file.name,type:file.type,size:file.size,data});
-      }else{
-        addMessage("assistant",`${file.name} isn't supported yet. Attach an image, PDF, or code/text file.`);
-      }
-    }catch(e){
-      addMessage("assistant",`I couldn't attach ${file.name}: ${e.message||"file read failed"}`);
-    }
-  }
-  renderAttachments();
-}
-
-const attachMenu=$("attachMenu");
-const imageAttachmentInput=$("imageAttachmentInput");
-const attachImagesBtn=$("attachImagesBtn");
-const attachFilesBtn=$("attachFilesBtn");
-
-function closeAttachMenu(){
-  attachMenu?.classList.remove("show");
-  attachBtn?.classList.remove("menu-open");
-}
-
-attachBtn.onclick=(e)=>{
-  e.stopPropagation();
-  const opening=!attachMenu.classList.contains("show");
-  closeAttachMenu();
-  if(opening){
-    attachMenu.classList.add("show");
-    attachBtn.classList.add("menu-open");
-  }
-};
-
-attachImagesBtn.onclick=()=>{
-  closeAttachMenu();
-  imageAttachmentInput.click();
-};
-
-attachFilesBtn.onclick=()=>{
-  closeAttachMenu();
-  attachmentInput.click();
-};
-
-imageAttachmentInput.onchange=async()=>{
-  await addFiles(imageAttachmentInput.files||[]);
-  imageAttachmentInput.value="";
-};
-
-attachmentInput.onchange=async()=>{
-  await addFiles(attachmentInput.files||[]);
-  attachmentInput.value="";
-};
-
-document.addEventListener("click",(e)=>{
-  if(!e.target.closest(".attach-menu-wrap"))closeAttachMenu();
-});
-
-document.addEventListener("keydown",(e)=>{
-  if(e.key==="Escape")closeAttachMenu();
-});
-
-["dragenter","dragover"].forEach(type=>composer.addEventListener(type,e=>{
-  e.preventDefault();
-  composer.classList.add("dragging");
-}));
-["dragleave","drop"].forEach(type=>composer.addEventListener(type,e=>{
-  e.preventDefault();
-  composer.classList.remove("dragging");
-}));
-composer.addEventListener("drop",e=>addFiles(e.dataTransfer?.files||[]));
-
-promptEl.addEventListener("paste",e=>{
-  const files=[...(e.clipboardData?.files||[])];
-  if(files.length)addFiles(files);
-});
-
-function esc(v){
-  return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
-}
-
-function messageTimestamp(date=new Date()){
-  return date.toLocaleTimeString([],{
-    hour:"numeric",
-    minute:"2-digit"
-  });
-}
-
-function messageTimestampTitle(date=new Date()){
-  return date.toLocaleString([],{
-    month:"short",
-    day:"numeric",
-    year:"numeric",
-    hour:"numeric",
-    minute:"2-digit"
-  });
-}
-
-
-document.querySelectorAll(".initial-message-time").forEach(el=>{
-  const now=new Date();
-  el.textContent=messageTimestamp(now);
-  el.title=messageTimestampTitle(now);
-});
-
-function scrollChat(){
-  requestAnimationFrame(()=>messages.scrollTop=messages.scrollHeight);
-}
-
-function setTyping(show,text="Building your project…"){
-  typingRow.classList.toggle("visible",show);
-  loadingShroud.classList.toggle("visible",show);
-  $("loadingText").textContent=text;
-  if(show)scrollChat();
-}
-
-function setDirty(dirty=true){
-  state.dirty=dirty;
-  const box=$("savedIndicator");
-  box.classList.toggle("saved",!dirty && !!state.project_id);
-  $("savedText").textContent=dirty?"Unsaved changes":state.project_id?"Saved":"Not saved";
-  $("savedState").textContent=dirty?"Unsaved":state.project_id?"Saved":"Not saved";
-}
-
-function syncUI(){
-  $("topProjectName").textContent=state.title;
-  $("projectTitle").textContent=state.title==="Untitled Project"?"Build, iterate, and launch with AI.":state.title;
-  $("sideName").textContent=state.title;
-  $("accessBadge").textContent=state.access_role||"viewer";
-
-  const owner=state.access_role==="owner";
-  $("publishBtn").disabled=!owner;
-  $("sidePublish").style.display=state.project_id&&owner?"block":"none";
-  $("deployEmpty").style.display=state.project_id?"none":"block";
-  $("membersBtn").disabled=!state.project_id||!owner;
-  $("shareBtn").disabled=!state.project_id||!owner;
-
-  if(state.published_url){
-    $("liveUrl").textContent=state.published_url;
-    $("liveUrl").href=state.published_url;
-    $("addressText").textContent=state.published_url;
-    $("deployBadge").textContent="Live";
-    $("deployBadge").classList.add("green");
-  }else{
-    $("liveUrl").textContent="";
-    $("liveUrl").removeAttribute("href");
-    $("addressText").textContent="Live preview";
-    $("deployBadge").textContent="Not published";
-    $("deployBadge").classList.remove("green");
-  }
-  setDirty(state.dirty);
-}
-
-function formatWorkDuration(ms){
-  const total=Math.max(1,Math.round(Number(ms||0)/1000));
-  if(total<60)return `${total}s`;
-  const mins=Math.floor(total/60);
-  const secs=total%60;
-  return secs ? `${mins}m ${secs}s` : `${mins}m`;
-}
-
-function fileLabel(file){
-  if(typeof file==="string")return file;
-  if(file && typeof file==="object"){
-    return file.path||file.name||file.file||file.filename||"Updated file";
-  }
-  return "Updated file";
-}
-
-function addMessage(role,text,card=null,steps=null,details=null){
-  const wrap=document.createElement("div");
-  wrap.className="message "+(role==="assistant"?"assistant":"user");
-
-  const avatar=role==="assistant"
-    ? `<div class="avatar-ai"><img class="real-logo small" src="{{ url_for('static', filename='veyra-mark.png') }}" alt=""></div>`
-    : `<div class="avatar-user">{{ (user.name or user.email or 'VE')[:2]|upper if user else 'VE' }}</div>`;
-
-  let agentResult="";
-
-  if(card){
-    const duration=details?.duration
-      ? `<button class="work-duration" type="button">
-           <span class="work-spark"></span>
-           Worked for ${esc(formatWorkDuration(details.duration))}
-           <span class="work-chevron">›</span>
-         </button>`
-      : "";
-
-    const changed=(details?.changedFiles||[])
-      .map(fileLabel)
-      .filter(Boolean)
-      .slice(0,8);
-
-    const next=(details?.nextSteps||[])
-      .filter(Boolean)
-      .slice(0,4);
-
-    const changedHtml=changed.length
-      ? `<div class="agent-section">
-           <div class="agent-section-title">What changed</div>
-           <div class="change-list">
-             ${changed.map(f=>`
-               <div class="change-row">
-                 <span class="change-check">✓</span>
-                 <span>${esc(f)}</span>
-               </div>
-             `).join("")}
-           </div>
-         </div>`
-      : "";
-
-    const nextHtml=next.length
-      ? `<div class="agent-section agent-next">
-           <div class="agent-section-title">Suggested next</div>
-           <div class="agent-next-list">
-             ${next.map(n=>`
-               <button type="button" class="agent-next-btn" data-agent-prompt="${esc(n)}">
-                 ${esc(n)}
-                 <span>↗</span>
-               </button>
-             `).join("")}
-           </div>
-         </div>`
-      : "";
-
-    const stepHtml=(steps||[]).map(s=>`
-      <div class="step done">
-        <span class="step-dot"></span>
-        <span>${esc(s)}</span>
-      </div>
-    `).join("");
-
-    const credits=details?.creditsUsed!==null &&
-                  details?.creditsUsed!==undefined
-      ? `<span class="build-credit-cost">${esc(details.creditsUsed)} credits</span>`
-      : "";
-
-    agentResult=`
-      ${duration}
-
-      ${changedHtml}
-
-      <div class="build-card agent-build-card">
-        <div class="build-card-head">
-          <div class="build-mini">
-            <img src="{{ url_for('static', filename='veyra-mark.png') }}" alt="">
-          </div>
-
-          <div class="build-result-copy">
-            <b>${esc(card)}</b>
-            <div class="small-note">Build completed</div>
-          </div>
-
-          <span class="done">Ready</span>
-        </div>
-
-        ${stepHtml ? `<div class="build-steps">${stepHtml}</div>` : ""}
-
-        <div class="build-result-footer">
-          <span><i></i> Preview ready</span>
-          ${credits}
-        </div>
-      </div>
-
-      ${nextHtml}
-    `;
-  }
-
-  wrap.innerHTML=`
-    ${avatar}
-    <div class="message-body">
-      <div class="message-meta">
-        <b>${role==="assistant"?"Veyra Assistant":"You"}</b>
-        <time title="${esc(messageTimestampTitle())}">${esc(messageTimestamp())}</time>
-      </div>
-
-      <p>${esc(text)}</p>
-
-      ${agentResult}
-    </div>
-  `;
-
-  messages.insertBefore(wrap,typingRow);
-
-  wrap.querySelectorAll("[data-agent-prompt]").forEach(btn=>{
-    btn.addEventListener("click",()=>{
-      promptEl.value=btn.dataset.agentPrompt||"";
-      promptEl.focus();
-    });
-  });
-
-  scrollChat();
-}
-
-function renderPreview(){
-  const safe=(state.js||"").replace(/<\/script>/gi,"<\\/script>");
-  frame.srcdoc=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{min-height:100%}${state.css||""}</style></head><body>${state.html||""}<script>${safe}<\/script>
-
-
-
-
-
 <style>
 /* ==========================================================
    VEYRA STUDIO R13 — AGENT WORKSPACE
@@ -3763,6 +3336,428 @@ document.addEventListener("DOMContentLoaded",()=>{
 });
 </script>
 
+<script>
+const state={
+  title:"Untitled Project",
+  html:"",
+  css:"",
+  js:"",
+  project_id:null,
+  access_role:"owner",
+  published_url:"",
+  quality:null,
+  dirty:false
+};
+
+let codeType="html";
+let viewportWidth="100%";
+const $=id=>document.getElementById(id);
+const messages=$("messages");
+const promptEl=$("prompt");
+const sendBtn=$("sendBtn");
+const frame=$("preview");
+const canvas=$("canvas");
+const typingRow=$("typingRow");
+const loadingShroud=$("loadingShroud");
+const attachmentInput=$("attachmentInput");
+const attachBtn=$("attachBtn");
+const attachmentTray=$("attachmentTray");
+const composer=document.querySelector(".composer");
+let pendingAttachments=[];
+
+const TEXT_FILE_RE=/\.(txt|md|html?|css|js|jsx|ts|tsx|json|xml|csv)$/i;
+const MAX_ATTACHMENTS=4;
+const MAX_TOTAL_BYTES=4*1024*1024;
+
+function humanBytes(n){
+  if(n<1024)return n+" B";
+  if(n<1024*1024)return (n/1024).toFixed(1)+" KB";
+  return (n/(1024*1024)).toFixed(1)+" MB";
+}
+
+function fileToDataURL(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve(String(r.result||""));
+    r.onerror=()=>reject(r.error||new Error("Could not read file"));
+    r.readAsDataURL(file);
+  });
+}
+
+function fileToText(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve(String(r.result||""));
+    r.onerror=()=>reject(r.error||new Error("Could not read file"));
+    r.readAsText(file);
+  });
+}
+
+async function compressImage(file){
+  // Preserve animated GIFs; browser canvas would flatten them.
+  if(file.type==="image/gif")return fileToDataURL(file);
+  const source=await fileToDataURL(file);
+  if(file.size<750*1024)return source;
+
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
+      const max=1600;
+      const scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+      const c=document.createElement("canvas");
+      c.width=Math.max(1,Math.round(img.naturalWidth*scale));
+      c.height=Math.max(1,Math.round(img.naturalHeight*scale));
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      resolve(c.toDataURL("image/jpeg",.82));
+    };
+    img.onerror=()=>resolve(source);
+    img.src=source;
+  });
+}
+
+function renderAttachments(){
+  attachmentTray.innerHTML="";
+  attachmentTray.classList.toggle("show",pendingAttachments.length>0);
+  pendingAttachments.forEach((a,index)=>{
+    const chip=document.createElement("div");
+    chip.className="attachment-chip";
+    const preview=a.kind==="image"
+      ? `<img class="thumb" src="${a.data}" alt="">`
+      : `<div class="thumb">${a.kind==="text"?"</>":"▤"}</div>`;
+    chip.innerHTML=`${preview}<div class="file-lines"><b>${esc(a.name)}</b><small>${esc(a.type||a.kind)} · ${humanBytes(a.size||0)}</small></div><button type="button" data-remove="${index}" title="Remove">×</button>`;
+    attachmentTray.appendChild(chip);
+  });
+  if(pendingAttachments.length){
+    const note=document.createElement("div");
+    note.className="attachment-note";
+    note.textContent="Images are analyzed visually. Code/text files are included as build context.";
+    attachmentTray.appendChild(note);
+  }
+  attachmentTray.querySelectorAll("[data-remove]").forEach(btn=>{
+    btn.onclick=()=>{
+      pendingAttachments.splice(Number(btn.dataset.remove),1);
+      renderAttachments();
+    };
+  });
+}
+
+async function addFiles(fileList){
+  const incoming=[...fileList];
+  for(const file of incoming){
+    if(pendingAttachments.length>=MAX_ATTACHMENTS){
+      addMessage("assistant",`You can attach up to ${MAX_ATTACHMENTS} files at once.`);
+      break;
+    }
+
+    const existingBytes=pendingAttachments.reduce((n,a)=>n+(a.size||0),0);
+    if(existingBytes+file.size>MAX_TOTAL_BYTES){
+      addMessage("assistant","Those attachments are too large together. Keep the total under 4 MB.");
+      break;
+    }
+
+    try{
+      if(file.type.startsWith("image/")){
+        const data=await compressImage(file);
+        pendingAttachments.push({kind:"image",name:file.name,type:file.type||"image/*",size:file.size,data});
+      }else if(file.type.startsWith("text/")||TEXT_FILE_RE.test(file.name)){
+        const text=await fileToText(file);
+        pendingAttachments.push({kind:"text",name:file.name,type:file.type||"text/plain",size:file.size,text});
+      }else if(file.type==="application/pdf"){
+        const data=await fileToDataURL(file);
+        pendingAttachments.push({kind:"file",name:file.name,type:file.type,size:file.size,data});
+      }else{
+        addMessage("assistant",`${file.name} isn't supported yet. Attach an image, PDF, or code/text file.`);
+      }
+    }catch(e){
+      addMessage("assistant",`I couldn't attach ${file.name}: ${e.message||"file read failed"}`);
+    }
+  }
+  renderAttachments();
+}
+
+const attachMenu=$("attachMenu");
+const imageAttachmentInput=$("imageAttachmentInput");
+const attachImagesBtn=$("attachImagesBtn");
+const attachFilesBtn=$("attachFilesBtn");
+
+function closeAttachMenu(){
+  attachMenu?.classList.remove("show");
+  attachBtn?.classList.remove("menu-open");
+}
+
+attachBtn.onclick=(e)=>{
+  e.stopPropagation();
+  const opening=!attachMenu.classList.contains("show");
+  closeAttachMenu();
+  if(opening){
+    attachMenu.classList.add("show");
+    attachBtn.classList.add("menu-open");
+  }
+};
+
+attachImagesBtn.onclick=()=>{
+  closeAttachMenu();
+  imageAttachmentInput.click();
+};
+
+attachFilesBtn.onclick=()=>{
+  closeAttachMenu();
+  attachmentInput.click();
+};
+
+imageAttachmentInput.onchange=async()=>{
+  await addFiles(imageAttachmentInput.files||[]);
+  imageAttachmentInput.value="";
+};
+
+attachmentInput.onchange=async()=>{
+  await addFiles(attachmentInput.files||[]);
+  attachmentInput.value="";
+};
+
+document.addEventListener("click",(e)=>{
+  if(!e.target.closest(".attach-menu-wrap"))closeAttachMenu();
+});
+
+document.addEventListener("keydown",(e)=>{
+  if(e.key==="Escape")closeAttachMenu();
+});
+
+["dragenter","dragover"].forEach(type=>composer.addEventListener(type,e=>{
+  e.preventDefault();
+  composer.classList.add("dragging");
+}));
+["dragleave","drop"].forEach(type=>composer.addEventListener(type,e=>{
+  e.preventDefault();
+  composer.classList.remove("dragging");
+}));
+composer.addEventListener("drop",e=>addFiles(e.dataTransfer?.files||[]));
+
+promptEl.addEventListener("paste",e=>{
+  const files=[...(e.clipboardData?.files||[])];
+  if(files.length)addFiles(files);
+});
+
+function esc(v){
+  return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+
+function messageTimestamp(date=new Date()){
+  return date.toLocaleTimeString([],{
+    hour:"numeric",
+    minute:"2-digit"
+  });
+}
+
+function messageTimestampTitle(date=new Date()){
+  return date.toLocaleString([],{
+    month:"short",
+    day:"numeric",
+    year:"numeric",
+    hour:"numeric",
+    minute:"2-digit"
+  });
+}
+
+
+document.querySelectorAll(".initial-message-time").forEach(el=>{
+  const now=new Date();
+  el.textContent=messageTimestamp(now);
+  el.title=messageTimestampTitle(now);
+});
+
+function scrollChat(){
+  requestAnimationFrame(()=>messages.scrollTop=messages.scrollHeight);
+}
+
+function setTyping(show,text="Building your project…"){
+  typingRow.classList.toggle("visible",show);
+  loadingShroud.classList.toggle("visible",show);
+  $("loadingText").textContent=text;
+  if(show)scrollChat();
+}
+
+function setDirty(dirty=true){
+  state.dirty=dirty;
+  const box=$("savedIndicator");
+  box.classList.toggle("saved",!dirty && !!state.project_id);
+  $("savedText").textContent=dirty?"Unsaved changes":state.project_id?"Saved":"Not saved";
+  $("savedState").textContent=dirty?"Unsaved":state.project_id?"Saved":"Not saved";
+}
+
+function syncUI(){
+  $("topProjectName").textContent=state.title;
+  $("projectTitle").textContent=state.title==="Untitled Project"?"Build, iterate, and launch with AI.":state.title;
+  $("sideName").textContent=state.title;
+  $("accessBadge").textContent=state.access_role||"viewer";
+
+  const owner=state.access_role==="owner";
+  $("publishBtn").disabled=!owner;
+  $("sidePublish").style.display=state.project_id&&owner?"block":"none";
+  $("deployEmpty").style.display=state.project_id?"none":"block";
+  $("membersBtn").disabled=!state.project_id||!owner;
+  $("shareBtn").disabled=!state.project_id||!owner;
+
+  if(state.published_url){
+    $("liveUrl").textContent=state.published_url;
+    $("liveUrl").href=state.published_url;
+    $("addressText").textContent=state.published_url;
+    $("deployBadge").textContent="Live";
+    $("deployBadge").classList.add("green");
+  }else{
+    $("liveUrl").textContent="";
+    $("liveUrl").removeAttribute("href");
+    $("addressText").textContent="Live preview";
+    $("deployBadge").textContent="Not published";
+    $("deployBadge").classList.remove("green");
+  }
+  setDirty(state.dirty);
+}
+
+function formatWorkDuration(ms){
+  const total=Math.max(1,Math.round(Number(ms||0)/1000));
+  if(total<60)return `${total}s`;
+  const mins=Math.floor(total/60);
+  const secs=total%60;
+  return secs ? `${mins}m ${secs}s` : `${mins}m`;
+}
+
+function fileLabel(file){
+  if(typeof file==="string")return file;
+  if(file && typeof file==="object"){
+    return file.path||file.name||file.file||file.filename||"Updated file";
+  }
+  return "Updated file";
+}
+
+function addMessage(role,text,card=null,steps=null,details=null){
+  const wrap=document.createElement("div");
+  wrap.className="message "+(role==="assistant"?"assistant":"user");
+
+  const avatar=role==="assistant"
+    ? `<div class="avatar-ai"><img class="real-logo small" src="{{ url_for('static', filename='veyra-mark.png') }}" alt=""></div>`
+    : `<div class="avatar-user">{{ (user.name or user.email or 'VE')[:2]|upper if user else 'VE' }}</div>`;
+
+  let agentResult="";
+
+  if(card){
+    const duration=details?.duration
+      ? `<button class="work-duration" type="button">
+           <span class="work-spark"></span>
+           Worked for ${esc(formatWorkDuration(details.duration))}
+           <span class="work-chevron">›</span>
+         </button>`
+      : "";
+
+    const changed=(details?.changedFiles||[])
+      .map(fileLabel)
+      .filter(Boolean)
+      .slice(0,8);
+
+    const next=(details?.nextSteps||[])
+      .filter(Boolean)
+      .slice(0,4);
+
+    const changedHtml=changed.length
+      ? `<div class="agent-section">
+           <div class="agent-section-title">What changed</div>
+           <div class="change-list">
+             ${changed.map(f=>`
+               <div class="change-row">
+                 <span class="change-check">✓</span>
+                 <span>${esc(f)}</span>
+               </div>
+             `).join("")}
+           </div>
+         </div>`
+      : "";
+
+    const nextHtml=next.length
+      ? `<div class="agent-section agent-next">
+           <div class="agent-section-title">Suggested next</div>
+           <div class="agent-next-list">
+             ${next.map(n=>`
+               <button type="button" class="agent-next-btn" data-agent-prompt="${esc(n)}">
+                 ${esc(n)}
+                 <span>↗</span>
+               </button>
+             `).join("")}
+           </div>
+         </div>`
+      : "";
+
+    const stepHtml=(steps||[]).map(s=>`
+      <div class="step done">
+        <span class="step-dot"></span>
+        <span>${esc(s)}</span>
+      </div>
+    `).join("");
+
+    const credits=details?.creditsUsed!==null &&
+                  details?.creditsUsed!==undefined
+      ? `<span class="build-credit-cost">${esc(details.creditsUsed)} credits</span>`
+      : "";
+
+    agentResult=`
+      ${duration}
+
+      ${changedHtml}
+
+      <div class="build-card agent-build-card">
+        <div class="build-card-head">
+          <div class="build-mini">
+            <img src="{{ url_for('static', filename='veyra-mark.png') }}" alt="">
+          </div>
+
+          <div class="build-result-copy">
+            <b>${esc(card)}</b>
+            <div class="small-note">Build completed</div>
+          </div>
+
+          <span class="done">Ready</span>
+        </div>
+
+        ${stepHtml ? `<div class="build-steps">${stepHtml}</div>` : ""}
+
+        <div class="build-result-footer">
+          <span><i></i> Preview ready</span>
+          ${credits}
+        </div>
+      </div>
+
+      ${nextHtml}
+    `;
+  }
+
+  wrap.innerHTML=`
+    ${avatar}
+    <div class="message-body">
+      <div class="message-meta">
+        <b>${role==="assistant"?"Veyra Assistant":"You"}</b>
+        <time title="${esc(messageTimestampTitle())}">${esc(messageTimestamp())}</time>
+      </div>
+
+      <p>${esc(text)}</p>
+
+      ${agentResult}
+    </div>
+  `;
+
+  messages.insertBefore(wrap,typingRow);
+
+  wrap.querySelectorAll("[data-agent-prompt]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      promptEl.value=btn.dataset.agentPrompt||"";
+      promptEl.focus();
+    });
+  });
+
+  scrollChat();
+}
+
+function renderPreview(){
+  const safe=(state.js||"").replace(/<\/script>/gi,"<\\/script>");
+  frame.srcdoc=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{min-height:100%}${state.css||""}</style></head><body>${state.html||""}<script>${safe}<\/script>
 </body></html>`;
   frame.style.width=viewportWidth;
   frame.style.left="50%";
