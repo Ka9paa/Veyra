@@ -2154,6 +2154,143 @@ def templates_page():
     return render_template('templates.html',user=current_user(),templates=starter_templates)
 
 
+@app.route('/app/templates/<slug>/use')
+@login_required
+def use_template(slug):
+    templates={
+        'saas':{
+            'name':'SaaS Landing Page',
+            'description':'Premium SaaS landing page starter.',
+            'html':'''<main class="template-shell">
+  <nav class="template-nav">
+    <strong>YOUR BRAND</strong>
+    <div><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#contact">Contact</a></div>
+  </nav>
+  <section class="template-hero">
+    <span class="template-kicker">BUILT FOR WHAT'S NEXT</span>
+    <h1>Turn your idea into something people remember.</h1>
+    <p>A polished starting point for your product, platform, or next big idea.</p>
+    <div class="template-actions"><button>Get started</button><button class="secondary">Learn more</button></div>
+  </section>
+  <section id="features" class="template-grid">
+    <article><span>01</span><h3>Move faster</h3><p>Launch with a focused experience built around your product.</p></article>
+    <article><span>02</span><h3>Stay flexible</h3><p>Customize every section as your business grows.</p></article>
+    <article><span>03</span><h3>Look established</h3><p>Start with a clean visual system and strong hierarchy.</p></article>
+  </section>
+</main>'''
+        },
+        'portfolio':{
+            'name':'Portfolio',
+            'description':'Premium personal portfolio starter.',
+            'html':'''<main class="template-shell">
+  <nav class="template-nav">
+    <strong>YOUR NAME</strong>
+    <div><a href="#work">Work</a><a href="#about">About</a><a href="#contact">Contact</a></div>
+  </nav>
+  <section class="template-hero">
+    <span class="template-kicker">DESIGNER · DEVELOPER · CREATOR</span>
+    <h1>I create digital work that makes an impact.</h1>
+    <p>Selected projects, experience, and the ideas behind the work.</p>
+  </section>
+  <section id="work" class="template-grid">
+    <article><span>PROJECT 01</span><h3>Featured project</h3><p>Describe your strongest project and what made it successful.</p></article>
+    <article><span>PROJECT 02</span><h3>Selected work</h3><p>Showcase another project, case study, or collaboration.</p></article>
+    <article><span>ABOUT</span><h3>Your story</h3><p>Introduce your skills, experience, and what you care about.</p></article>
+  </section>
+</main>'''
+        },
+        'dashboard':{
+            'name':'Admin Dashboard',
+            'description':'Application dashboard starter.',
+            'html':'''<main class="template-shell">
+  <nav class="template-nav">
+    <strong>CONTROL CENTER</strong>
+    <div><a href="#">Overview</a><a href="#">Analytics</a><a href="#">Settings</a></div>
+  </nav>
+  <section class="template-hero">
+    <span class="template-kicker">OVERVIEW</span>
+    <h1>Everything important, in one place.</h1>
+    <p>A clean starting point for an admin panel, internal tool, or SaaS dashboard.</p>
+  </section>
+  <section class="template-grid">
+    <article><span>USERS</span><h3>12,480</h3><p>Active accounts across your workspace.</p></article>
+    <article><span>ACTIVITY</span><h3>84.2%</h3><p>Current engagement across the platform.</p></article>
+    <article><span>STATUS</span><h3>Healthy</h3><p>All core systems are operating normally.</p></article>
+  </section>
+</main>'''
+        },
+        'storefront':{
+            'name':'Storefront',
+            'description':'Modern commerce storefront starter.',
+            'html':'''<main class="template-shell">
+  <nav class="template-nav">
+    <strong>YOUR STORE</strong>
+    <div><a href="#shop">Shop</a><a href="#">New arrivals</a><a href="#">Cart</a></div>
+  </nav>
+  <section class="template-hero">
+    <span class="template-kicker">NEW COLLECTION</span>
+    <h1>Products worth paying attention to.</h1>
+    <p>A premium storefront foundation ready for your products and brand.</p>
+    <div class="template-actions"><button>Shop collection</button></div>
+  </section>
+  <section id="shop" class="template-grid">
+    <article><span>FEATURED</span><h3>Product One</h3><p>$89 · Your featured product description.</p></article>
+    <article><span>NEW</span><h3>Product Two</h3><p>$120 · A second product ready to customize.</p></article>
+    <article><span>POPULAR</span><h3>Product Three</h3><p>$74 · Add imagery, variants, and product details.</p></article>
+  </section>
+</main>'''
+        }
+    }
+
+    template=templates.get((slug or '').strip().lower())
+    if not template:
+        return ('Template not found',404)
+
+    css='''.template-shell{min-height:100vh;background:#090b10;color:#f7f7fa;font-family:Inter,Arial,sans-serif;padding:0 7% 80px}
+.template-nav{height:84px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #252832}
+.template-nav strong{letter-spacing:.12em}
+.template-nav div{display:flex;gap:28px}
+.template-nav a{color:#aeb3c2;text-decoration:none;font-size:14px}
+.template-hero{padding:110px 0 90px;max-width:900px}
+.template-kicker{font-size:12px;letter-spacing:.18em;color:#8d7cff;font-weight:800}
+.template-hero h1{font-size:clamp(48px,7vw,92px);line-height:.98;letter-spacing:-.055em;margin:20px 0}
+.template-hero p{max-width:620px;color:#9ca3b5;font-size:18px;line-height:1.7}
+.template-actions{display:flex;gap:12px;margin-top:32px}
+.template-actions button{border:0;border-radius:9px;padding:13px 20px;background:#745cff;color:white;font-weight:800}
+.template-actions .secondary{background:#171a22;color:#e7e8ed}
+.template-grid{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #252832;border-left:1px solid #252832}
+.template-grid article{min-height:220px;padding:30px;border-right:1px solid #252832;border-bottom:1px solid #252832}
+.template-grid article span{font-size:10px;letter-spacing:.14em;color:#747b8c;font-weight:800}
+.template-grid h3{font-size:24px;margin:42px 0 10px}
+.template-grid p{color:#858c9d;line-height:1.6}
+@media(max-width:760px){.template-nav div{display:none}.template-hero{padding:80px 0 60px}.template-grid{grid-template-columns:1fr}}'''
+
+    u=current_user()
+
+    with db() as c:
+        cur=c.execute(
+            '''INSERT INTO projects(user_id,name,description,html,css,js,created_at,updated_at)
+               VALUES(?,?,?,?,?,?,?,?)''',
+            (
+                u['id'],
+                template['name'],
+                template['description'],
+                template['html'],
+                css,
+                '',
+                now(),
+                now()
+            )
+        )
+        project_id=cur.lastrowid
+        c.commit()
+
+    if not project_id:
+        return ('Could not create template project',500)
+
+    return redirect(url_for('studio',project=project_id))
+
+
 @app.route('/app/deployments')
 @login_required
 def deployments_page():
