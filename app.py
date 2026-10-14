@@ -2166,8 +2166,16 @@ def dashboard():
 @app.route('/app/projects')
 @login_required
 def projects_page():
-    u=current_user()
-    return render_template('projects.html',user=u,projects=_visible_projects(u['id']))
+    try:
+        u=current_user()
+        projects=_visible_projects(u['id'])
+        return render_template('projects.html',user=u,projects=projects)
+    except Exception:
+        import traceback
+        print("=== PROJECTS PAGE ERROR ===", flush=True)
+        traceback.print_exc()
+        print("=== END PROJECTS PAGE ERROR ===", flush=True)
+        raise
 
 
 @app.route('/app/templates')
