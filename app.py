@@ -1773,6 +1773,32 @@ def admin_dashboard():
         project_count=c.execute('SELECT COUNT(*) AS n FROM projects').fetchone()['n']
         restricted=c.execute('SELECT COUNT(*) AS n FROM users WHERE COALESCE(is_blacklisted,0)=1').fetchone()['n']
 
+        projects=[
+            dict(r) for r in c.execute(
+                '''SELECT
+                       p.id,
+                       p.user_id,
+                       p.name,
+                       p.description,
+                       p.created_at,
+                       p.updated_at,
+                       u.name AS owner_name,
+                       u.email AS owner_email,
+                       d.url AS published_url,
+                       d.status AS deployment_status
+                   FROM projects p
+                   LEFT JOIN users u ON u.id=p.user_id
+                   LEFT JOIN deployments d ON d.id=(
+                       SELECT d2.id
+                       FROM deployments d2
+                       WHERE d2.project_id=p.id
+                       ORDER BY d2.id DESC
+                       LIMIT 1
+                   )
+                   ORDER BY p.updated_at DESC'''
+            ).fetchall()
+        ]
+
         support_threads=[
             dict(r) for r in c.execute(
                 'SELECT * FROM support_threads ORDER BY created_at DESC LIMIT 8'

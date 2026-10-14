@@ -164,8 +164,86 @@
   </section>
 
   <section id="pane-projects" class="tab-pane panel">
-    <div class="panel-head"><div><h2>Projects</h2><p>{{stats.projects or 0}} projects currently exist across Veyra.</p></div></div>
-    <div class="empty">Project count is shown from the real database. No fake project rows are added.</div>
+    <div class="panel-head">
+      <div>
+        <h2>Projects</h2>
+        <p>{{stats.projects or 0}} projects currently exist across Veyra.</p>
+      </div>
+      <input id="projectSearch" class="search" type="search" placeholder="Search project, owner, email, ID...">
+    </div>
+
+    {% if projects %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Project</th>
+            <th>Owner</th>
+            <th>ID</th>
+            <th>Updated</th>
+            <th>Publish Status</th>
+            <th>Live URL</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="projectRows">
+        {% for p in projects %}
+          <tr data-search="{{(p.name or '')|lower}} {{(p.owner_name or '')|lower}} {{(p.owner_email or '')|lower}} {{p.id}}">
+            <td>
+              <div class="identity">
+                <b>{{p.name or 'Untitled Project'}}</b>
+                <span>{{(p.description or 'No description')[:80]}}</span>
+              </div>
+            </td>
+
+            <td>
+              <div class="identity">
+                <b>{{p.owner_name or 'Unknown user'}}</b>
+                <span>{{p.owner_email or 'No email'}}</span>
+              </div>
+            </td>
+
+            <td>
+              <span class="discord-id">#{{p.id}}</span>
+            </td>
+
+            <td>
+              <span style="color:#9aabc0">{{p.updated_at or '—'}}</span>
+            </td>
+
+            <td>
+              {% if p.deployment_status == 'ready' and p.published_url %}
+                <span class="status active"><i></i>Published</span>
+              {% else %}
+                <span class="provider">Draft</span>
+              {% endif %}
+            </td>
+
+            <td>
+              {% if p.deployment_status == 'ready' and p.published_url %}
+                <a href="{{p.published_url}}" target="_blank" rel="noopener"
+                   style="color:#a996ff;font-weight:800">Open live ↗</a>
+              {% else %}
+                <span class="discord-empty">Not published</span>
+              {% endif %}
+            </td>
+
+            <td>
+              <div class="actions">
+                {% if p.deployment_status == 'ready' and p.published_url %}
+                  <a class="mini" href="{{p.published_url}}" target="_blank" rel="noopener">View</a>
+                {% endif %}
+                <a class="mini" href="/studio?project={{p.id}}" target="_blank">Studio</a>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="empty">No projects have been created yet.</div>
+    {% endif %}
   </section>
 
   <section id="pane-support" class="tab-pane panel">
@@ -188,6 +266,13 @@ document.querySelectorAll('.tab').forEach(btn=>{
     document.getElementById('pane-'+btn.dataset.tab)?.classList.add('active');
   });
 });
+document.getElementById('projectSearch')?.addEventListener('input',e=>{
+  const q=e.target.value.trim().toLowerCase();
+  document.querySelectorAll('#projectRows tr').forEach(row=>{
+    row.style.display=(row.dataset.search||'').includes(q)?'':'none';
+  });
+});
+
 document.getElementById('userSearch')?.addEventListener('input',e=>{
   const q=e.target.value.trim().toLowerCase();
   document.querySelectorAll('#userRows tr').forEach(row=>row.style.display=(row.dataset.search||'').includes(q)?'':'none');
