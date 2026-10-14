@@ -2266,7 +2266,7 @@ def publish_project():
         return jsonify({'ok':False,'error':'Only the project owner can publish.'}),403
 
     public_path=f"/p/{int(project_id)}"
-    public_url=public_url(public_path)
+    published_url=public_url(public_path)
 
     with db() as c:
         existing=c.execute(
@@ -2276,16 +2276,16 @@ def publish_project():
         if existing:
             c.execute(
                 "UPDATE deployments SET url=?,status='ready',created_at=? WHERE id=?",
-                (public_url,now(),existing['id'])
+                (published_url,now(),existing['id'])
             )
         else:
             c.execute(
                 'INSERT INTO deployments(user_id,project_id,url,status,created_at) VALUES(?,?,?,?,?)',
-                (u['id'],project_id,public_url,'ready',now())
+                (u['id'],project_id,published_url,'ready',now())
             )
         c.commit()
 
-    return jsonify({'ok':True,'url':public_url,'project_id':int(project_id)})
+    return jsonify({'ok':True,'url':published_url,'project_id':int(project_id)})
 
 
 @app.get('/p/<int:project_id>')
