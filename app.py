@@ -2779,6 +2779,8 @@ def run_veyra_v4(
         ["node", str(VEYRA_V4_CLI)],
         input=json.dumps(payload),
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         cwd=str(VEYRA_V4_ENGINE_DIR),
         env=env,
@@ -2795,17 +2797,95 @@ def run_veyra_v4(
         raise RuntimeError(
             "Veyra V4 engine failed "
             f"(exit {proc.returncode}): "
-            f"{proc.stderr[-4000:]}"
+            f"{(proc.stderr or "")[-4000:]}"
         )
 
     try:
-        result = json.loads(proc.stdout)
+        result = json.loads(proc.stdout or "")
     except Exception as exc:
         raise RuntimeError(
-            f"Veyra V4 engine returned invalid JSON: {proc.stdout[-3000:]}"
+            f"Veyra V4 engine returned invalid JSON: {(proc.stdout or "")[-3000:]}"
         ) from exc
 
     return result
+
+@app.post('/api/studio/chat')
+@login_required
+def studio_chat():
+    p=request.get_json(silent=True) or {}
+    message=(p.get('message') or '').strip()[:4000]
+
+    if not message:
+        return jsonify({
+            'ok':False,
+            'error':'Enter a message.'
+        }),400
+
+    key=os.getenv('OPENAI_API_KEY','').strip()
+
+    if not key:
+        return jsonify({
+            'ok':True,
+            'assistant_message':(
+                "I'm Veyra Assistant. I can help you plan, understand, and improve "
+                "your project. Ask me anything about what you're building."
+            ),
+            'engine':'Veyra Assistant',
+            'credits_used':0
+        })
+
+    try:
+        client=OpenAI(api_key=key)
+
+        assistant_model=(
+            os.getenv('VEYRA_ASSISTANT_MODEL')
+            or os.getenv('VEYRA_SUPPORT_MODEL')
+            or 'gpt-6-luna'
+        ).strip()
+
+        response=client.responses.create(
+            model=assistant_model,
+            instructions=(
+                'You are Veyra Assistant inside Veyra Studio, an AI website and '
+                'web application builder. Respond conversationally and quickly. '
+                'Help with planning, design questions, explanations, brainstorming, '
+                'and questions about the current project. Be concise unless the user '
+                'asks for detail. Do not claim you changed project files because this '
+                'chat route cannot modify them. If the user asks you to actually make '
+                'a change, tell them to describe the change and Veyra Studio will build it.'
+            ),
+            input=message,
+            max_output_tokens=650,
+            store=False,
+        )
+
+        output=(getattr(response,'output_text',None) or '').strip()
+
+        if not output:
+            raise ValueError('Veyra Assistant returned an empty response')
+
+        return jsonify({
+            'ok':True,
+            'assistant_message':output,
+            'engine':'Veyra Assistant',
+            'credits_used':0
+        })
+
+    except Exception as exc:
+        app.logger.warning(
+            'Veyra Studio chat unavailable | code=%s | type=%s | error=%s',
+            classify_ai_error(exc),
+            type(exc).__name__,
+            str(exc),
+        )
+
+        return jsonify({
+            'ok':False,
+            'error':'Veyra Assistant could not respond right now.',
+            'code':classify_ai_error(exc),
+            'credits_used':0
+        }),502
+
 
 @app.post('/api/build')
 @login_required
