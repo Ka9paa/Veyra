@@ -1783,21 +1783,31 @@ def admin_dashboard():
                        p.created_at,
                        p.updated_at,
                        u.name AS owner_name,
-                       u.email AS owner_email,
-                       d.url AS published_url,
-                       d.status AS deployment_status
+                       u.email AS owner_email
                    FROM projects p
                    LEFT JOIN users u ON u.id=p.user_id
-                   LEFT JOIN deployments d ON d.id=(
-                       SELECT d2.id
-                       FROM deployments d2
-                       WHERE d2.project_id=p.id
-                       ORDER BY d2.id DESC
-                       LIMIT 1
-                   )
                    ORDER BY p.updated_at DESC'''
             ).fetchall()
         ]
+
+        deployment_rows=[
+            dict(r) for r in c.execute(
+                '''SELECT id,project_id,url,status,created_at
+                   FROM deployments
+                   ORDER BY id DESC'''
+            ).fetchall()
+        ]
+
+        latest_deployment={}
+        for deployment in deployment_rows:
+            project_key=int(deployment['project_id'])
+            if project_key not in latest_deployment:
+                latest_deployment[project_key]=deployment
+
+        for project in projects:
+            deployment=latest_deployment.get(int(project['id']))
+            project['published_url']=(deployment or {}).get('url') or ''
+            project['deployment_status']=(deployment or {}).get('status') or ''
 
         support_threads=[
             dict(r) for r in c.execute(
