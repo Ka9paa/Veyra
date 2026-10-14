@@ -2305,15 +2305,38 @@ def deployments_page():
 def agents_page():
     u=current_user()
     with db() as c:
-        rows=c.execute('SELECT * FROM agents WHERE user_id=? ORDER BY created_at DESC',(u['id'],)).fetchall()
-    return render_template('agents.html',user=u,agents=[dict(r) for r in rows])
+        rows=c.execute(
+            'SELECT * FROM agents WHERE user_id=? ORDER BY created_at DESC',
+            (u['id'],)
+        ).fetchall()
+
+    agents=[dict(r) for r in rows]
+
+    stats={
+        'total':len(agents),
+        'active':sum(
+            1 for agent in agents
+            if str(agent.get('status') or '').lower() in ('active','running')
+        ),
+        'idle':sum(
+            1 for agent in agents
+            if str(agent.get('status') or '').lower() == 'idle'
+        )
+    }
+
+    return render_template(
+        'agents.html',
+        user=u,
+        agents=agents,
+        stats=stats
+    )
 
 
 @app.post('/app/agents/create')
 @login_required
 def agents_create():
     u=current_user(); name=(request.form.get('name') or '').strip()[:80]
-    description=(request.form.get('description') or '').strip()[:300]
+    description=(request.form.get('description') or '').strip()[:500]
     if not name:
         flash('Agent name is required.','error'); return redirect(url_for('agents_page'))
     with db() as c:
