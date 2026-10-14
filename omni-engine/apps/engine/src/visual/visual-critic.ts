@@ -140,8 +140,8 @@ export async function critiqueScreenshot(
     ].join("\n"),
     screenshotBase64,
     {
-      maxOutputTokens: 6000,
-      reasoningEffort: "high"
+      maxOutputTokens: 3500,
+      reasoningEffort: "medium"
     }
   );
 

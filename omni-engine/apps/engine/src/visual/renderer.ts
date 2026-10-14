@@ -1,4 +1,4 @@
-import { chromium } from "playwright";
+import { chromium } from "playwright-core";
 
 export interface RenderInput {
   title?: string;
@@ -42,13 +42,40 @@ export async function renderWebsite(
   const width = input.width ?? 1440;
   const height = input.height ?? 900;
 
-  const executablePath =
-    process.env.VEYRA_CHROMIUM_EXECUTABLE || undefined;
+  console.error("[V4 BROWSER] chromium.launch START");
 
-  const browser = await chromium.launch({
-    headless: true,
-    ...(executablePath ? { executablePath } : {})
-  });
+  const isVercel = Boolean(process.env.VERCEL);
+
+  let browser;
+
+  if (isVercel) {
+    const [{ chromium: serverlessChromium }, { default: sparticuzChromium }] =
+      await Promise.all([
+        import("playwright-core"),
+        import("@sparticuz/chromium")
+      ]);
+
+    // Veyra renders standard HTML/CSS websites and does not require WebGL.
+    // Disabling Sparticuz graphics mode avoids extracting/loading SwiftShader
+    // in Vercel's constrained /tmp filesystem, leaving more room for screenshots.
+    sparticuzChromium.setGraphicsMode = false;
+
+    const executablePath = await sparticuzChromium.executablePath();
+
+    console.error(
+      `[V4 BROWSER] serverless executable=${executablePath} | graphicsMode=disabled`
+    );
+
+    browser = await serverlessChromium.launch({
+      args: sparticuzChromium.args,
+      executablePath,
+      headless: true
+    });
+  } else {
+    browser = await chromium.launch({ headless: true });
+  }
+
+  console.error("[V4 BROWSER] chromium.launch DONE");
 
   try {
     const page = await browser.newPage({

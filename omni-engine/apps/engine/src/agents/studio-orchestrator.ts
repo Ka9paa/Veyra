@@ -1,4 +1,10 @@
 import { runModel } from "../providers/model-router.js";
+import { renderWebsite, type RenderDiagnostics } from "../visual/renderer.js";
+import {
+  critiqueScreenshot,
+  type VisualReview
+} from "../visual/visual-critic.js";
+
 export interface StudioBuildRequest {
   projectId?: string;
   userId?: string;
@@ -43,6 +49,12 @@ interface SiteCode {
   js: string;
   next_steps: string[];
   quality_notes: string[];
+}
+
+interface Candidate {
+  site: SiteCode;
+  review: VisualReview;
+  diagnostics: RenderDiagnostics;
 }
 
 function extractJson(raw: string): any {
@@ -548,6 +560,79 @@ Never use href="#".
 The next screenshot must be materially better, not merely different.
 `;
 
+async function evaluateCandidate(
+  site: SiteCode,
+  req: StudioBuildRequest
+): Promise<Candidate> {
+  const renderStartedAt = Date.now();
+  console.error("[V4 TIMING] Chromium render START");
+
+  const rendered = await renderWebsite({
+    title: site.title,
+    html: site.html,
+    css: site.css,
+    js: site.js,
+    width: req.viewport?.width ?? 1440,
+    height: req.viewport?.height ?? 900
+  });
+
+  console.error(
+    `[V4 TIMING] Chromium render DONE | seconds=${((Date.now() - renderStartedAt) / 1000).toFixed(1)}`
+  );
+
+  const criticStartedAt = Date.now();
+  console.error("[V4 TIMING] Screenshot critic START");
+
+  const review = await critiqueScreenshot(
+    rendered.screenshotBase64,
+    req.prompt,
+    rendered.diagnostics
+  );
+
+  console.error(
+    `[V4 TIMING] Screenshot critic DONE | seconds=${((Date.now() - criticStartedAt) / 1000).toFixed(1)} | score=${review.score}`
+  );
+
+  if (rendered.diagnostics.hardFailures.length) {
+    review.pass = false;
+
+    if (rendered.diagnostics.brokenImages.length) {
+      review.score = Math.min(review.score, 45);
+    } else {
+      review.score = Math.min(review.score, 69);
+    }
+  }
+
+  return {
+    site,
+    review,
+    diagnostics: rendered.diagnostics
+  };
+}
+
+function better(
+  currentBest: Candidate,
+  challenger: Candidate
+): Candidate {
+  const bestFailures =
+    currentBest.diagnostics.hardFailures.length;
+
+  const challengerFailures =
+    challenger.diagnostics.hardFailures.length;
+
+  if (bestFailures === 0 && challengerFailures > 0) {
+    return currentBest;
+  }
+
+  if (challengerFailures === 0 && bestFailures > 0) {
+    return challenger;
+  }
+
+  return challenger.review.score > currentBest.review.score
+    ? challenger
+    : currentBest;
+}
+
 export async function orchestrateStudio(
   req: StudioBuildRequest
 ): Promise<StudioBuildResult> {
@@ -564,8 +649,8 @@ export async function orchestrateStudio(
     DESIGN_DNA_SYSTEM,
     ctx,
     {
-      maxOutputTokens: 7000,
-      reasoningEffort: "medium"
+      maxOutputTokens: 3000,
+      reasoningEffort: "low"
     }
   );
 
@@ -579,8 +664,8 @@ export async function orchestrateStudio(
       COMPOSITION_SYSTEM,
       `${ctx}\n\nDESIGN DNA:\n${designDNA}`,
       {
-        maxOutputTokens: 8000,
-        reasoningEffort: "medium"
+        maxOutputTokens: 3500,
+        reasoningEffort: "low"
       }
     ),
 
@@ -589,8 +674,8 @@ export async function orchestrateStudio(
       ASSET_SYSTEM,
       `${ctx}\n\nDESIGN DNA:\n${designDNA}`,
       {
-        maxOutputTokens: 5000,
-        reasoningEffort: "medium"
+        maxOutputTokens: 3000,
+        reasoningEffort: "low"
       }
     )
   ]);
@@ -607,22 +692,201 @@ export async function orchestrateStudio(
       `ASSET STRATEGY:\n${assets}`
     ].join("\n\n"),
     {
-      maxOutputTokens: 32000,
-      reasoningEffort: "medium"
+      maxOutputTokens: 24000,
+      reasoningEffort: "low"
     }
   );
 
   const firstSite = parseSite(firstRaw);
 
-  console.error("[Veyra V4] Direct AI build complete.");
+  console.error("[Veyra V4] Rendering first composition...");
 
-  const site = firstSite;
+  const firstCandidate =
+    await evaluateCandidate(firstSite, req);
+
+  console.error(
+    `[Veyra V4] First screenshot score: ${firstCandidate.review.score}/100`
+  );
+
+  let best = firstCandidate;
+  let current = firstCandidate;
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    if (
+      current.review.pass &&
+      current.review.score >= 88 &&
+      current.diagnostics.hardFailures.length === 0
+    ) {
+      console.error(
+        "[Veyra V4] Visual quality gate passed."
+      );
+      break;
+    }
+
+    console.error(
+      `[Veyra V4] Recomposing visual design (${attempt}/2)...`
+    );
+
+    const repairRaw = await runModel(
+      "repair",
+      RECOMPOSE_SYSTEM,
+      [
+        `ORIGINAL PROJECT:\n${ctx}`,
+
+        `DESIGN DNA:\n${designDNA}`,
+
+        `COMPOSITION BLUEPRINT:\n${composition}`,
+
+        `ASSET STRATEGY:\n${assets}`,
+
+        `CURRENT HTML:\n${current.site.html}`,
+
+        `CURRENT CSS:\n${current.site.css}`,
+
+        `CURRENT JS:\n${current.site.js}`,
+
+        `SCREENSHOT REVIEW:\n${JSON.stringify(
+          current.review,
+          null,
+          2
+        )}`,
+
+        `BROWSER DIAGNOSTICS:\n${JSON.stringify(
+          current.diagnostics,
+          null,
+          2
+        )}`,
+
+        `RECOMPOSITION ATTEMPT: ${attempt} of 2`,
+
+        "Fix the visual cause, not merely the symptom."
+      ].join("\n\n"),
+      {
+        maxOutputTokens: 26000,
+        reasoningEffort: "low"
+      }
+    );
+
+    const repairedSite = parseSite(repairRaw);
+
+    const repairedCandidate =
+      await evaluateCandidate(repairedSite, req);
+
+    console.error(
+      `[Veyra V4] Recomposition ${attempt} score: ${repairedCandidate.review.score}/100`
+    );
+
+    best = better(best, repairedCandidate);
+    current = repairedCandidate;
+  }
+
+  const site = best.site;
+  const review = best.review;
+  const diagnostics = best.diagnostics;
+
+  console.error(
+    `[Veyra V4] Selected final candidate: ${review.score}/100`
+  );
 
   return {
     ok: true,
 
     title: site.title,
 
+    assistant_message:
+      site.assistant_message,
+
+    html: site.html,
+    css: site.css,
+    js: site.js,
+
+    files: {
+      "index.html": site.html,
+      "styles.css": site.css,
+      "script.js": site.js
+    },
+
+    changed_files: [
+      "index.html",
+      "styles.css",
+      "script.js"
+    ],
+
+    next_steps: site.next_steps,
+
+    quality: {
+      score: review.score / 100,
+
+      notes: [
+        `SCREENSHOT SCORE: ${review.score}/100`,
+        `VERDICT: ${review.verdict}`,
+        `FIRST VIEWPORT: ${review.firstViewport}/100`,
+        `COMPOSITION: ${review.composition}/100`,
+        `TYPOGRAPHY: ${review.typography}/100`,
+        `HIERARCHY: ${review.hierarchy}/100`,
+        `IMAGERY: ${review.imagery}/100`,
+        `POLISH: ${review.polish}/100`,
+        `ORIGINALITY: ${review.originality}/100`,
+        `BRAND SPECIFICITY: ${review.brandSpecificity}/100`,
+
+        ...diagnostics.hardFailures.map(
+          x => `HARD FAILURE: ${x}`
+        ),
+
+        ...review.issues.map(
+          x => `VISUAL ISSUE: ${x}`
+        ),
+
+        ...review.strengths.map(
+          x => `STRENGTH: ${x}`
+        )
+      ]
+    },
+
+    engine: "veyra-omni-design-dna-v4"
+  };
+}
+
+/* ============================================================
+   VEYRA V4 STAGED EXECUTION
+   Each exported stage is intentionally bounded so Vercel gets
+   a fresh runtime window for every expensive part of V4.
+   ============================================================ */
+
+export interface V4PlanState {
+  designDNA: string;
+  composition: string;
+  assets: string;
+}
+
+export interface V4CandidateState {
+  site: SiteCode;
+  review: VisualReview;
+  diagnostics: RenderDiagnostics;
+}
+
+export interface V4StageResult {
+  ok: true;
+  stage: "plan" | "build" | "recompose" | "complete";
+  plan?: V4PlanState;
+  candidate?: V4CandidateState;
+  best?: V4CandidateState;
+  attempt?: number;
+  complete?: boolean;
+  result?: StudioBuildResult;
+}
+
+function candidateToResult(
+  candidate: Candidate
+): StudioBuildResult {
+  const site = candidate.site;
+  const review = candidate.review;
+  const diagnostics = candidate.diagnostics;
+
+  return {
+    ok: true,
+
+    title: site.title,
     assistant_message: site.assistant_message,
 
     html: site.html,
@@ -644,14 +908,263 @@ export async function orchestrateStudio(
     next_steps: site.next_steps,
 
     quality: {
-      score: 0,
+      score: review.score / 100,
+
       notes: [
-        "V4 DIRECT AI BUILD",
-        "Server-side screenshot audit skipped in live Vercel mode.",
-        ...site.quality_notes
+        `SCREENSHOT SCORE: ${review.score}/100`,
+        `VERDICT: ${review.verdict}`,
+        `FIRST VIEWPORT: ${review.firstViewport}/100`,
+        `COMPOSITION: ${review.composition}/100`,
+        `TYPOGRAPHY: ${review.typography}/100`,
+        `HIERARCHY: ${review.hierarchy}/100`,
+        `IMAGERY: ${review.imagery}/100`,
+        `POLISH: ${review.polish}/100`,
+        `ORIGINALITY: ${review.originality}/100`,
+        `BRAND SPECIFICITY: ${review.brandSpecificity}/100`,
+
+        ...diagnostics.hardFailures.map(
+          x => `HARD FAILURE: ${x}`
+        ),
+
+        ...review.issues.map(
+          x => `VISUAL ISSUE: ${x}`
+        ),
+
+        ...review.strengths.map(
+          x => `STRENGTH: ${x}`
+        )
       ]
     },
 
     engine: "veyra-omni-design-dna-v4"
+  };
+}
+
+function candidatePasses(candidate: Candidate): boolean {
+  return (
+    candidate.review.pass &&
+    candidate.review.score >= 88 &&
+    candidate.diagnostics.hardFailures.length === 0
+  );
+}
+
+export async function orchestrateStudioPlan(
+  req: StudioBuildRequest
+): Promise<V4StageResult> {
+  if (!req?.prompt?.trim()) {
+    throw new Error("A build prompt is required.");
+  }
+
+  const ctx = projectContext(req);
+
+  console.error("[Veyra V4 STAGE] PLAN: Design DNA");
+
+  const designDNA = await runModel(
+    "design",
+    DESIGN_DNA_SYSTEM,
+    ctx,
+    {
+      maxOutputTokens: 3000,
+      reasoningEffort: "low"
+    }
+  );
+
+  console.error(
+    "[Veyra V4 STAGE] PLAN: Composition + assets"
+  );
+
+  const [composition, assets] = await Promise.all([
+    runModel(
+      "design",
+      COMPOSITION_SYSTEM,
+      `${ctx}\n\nDESIGN DNA:\n${designDNA}`,
+      {
+        maxOutputTokens: 3500,
+        reasoningEffort: "low"
+      }
+    ),
+
+    runModel(
+      "design",
+      ASSET_SYSTEM,
+      `${ctx}\n\nDESIGN DNA:\n${designDNA}`,
+      {
+        maxOutputTokens: 3000,
+        reasoningEffort: "low"
+      }
+    )
+  ]);
+
+  console.error("[Veyra V4 STAGE] PLAN complete");
+
+  return {
+    ok: true,
+    stage: "plan",
+    plan: {
+      designDNA,
+      composition,
+      assets
+    },
+    complete: false
+  };
+}
+
+export async function orchestrateStudioBuildStage(
+  req: StudioBuildRequest,
+  plan: V4PlanState
+): Promise<V4StageResult> {
+  if (!plan?.designDNA || !plan?.composition || !plan?.assets) {
+    throw new Error("V4 build stage requires completed planning state.");
+  }
+
+  const ctx = projectContext(req);
+
+  console.error("[Veyra V4 STAGE] BUILD: Generating website");
+
+  const raw = await runModel(
+    "code",
+    BUILDER_SYSTEM,
+    [
+      ctx,
+      `DESIGN DNA:\n${plan.designDNA}`,
+      `COMPOSITION BLUEPRINT:\n${plan.composition}`,
+      `ASSET STRATEGY:\n${plan.assets}`
+    ].join("\n\n"),
+    {
+      maxOutputTokens: 24000,
+      reasoningEffort: "low"
+    }
+  );
+
+  const site = parseSite(raw);
+
+  console.error(
+    "[Veyra V4 STAGE] BUILD: Rendering + screenshot critic"
+  );
+
+  const candidate = await evaluateCandidate(site, req);
+
+  console.error(
+    `[Veyra V4 STAGE] BUILD complete | score=${candidate.review.score}`
+  );
+
+  if (candidatePasses(candidate)) {
+    return {
+      ok: true,
+      stage: "complete",
+      plan,
+      candidate,
+      best: candidate,
+      attempt: 0,
+      complete: true,
+      result: candidateToResult(candidate)
+    };
+  }
+
+  return {
+    ok: true,
+    stage: "build",
+    plan,
+    candidate,
+    best: candidate,
+    attempt: 0,
+    complete: false
+  };
+}
+
+export async function orchestrateStudioRecomposeStage(
+  req: StudioBuildRequest,
+  plan: V4PlanState,
+  currentState: V4CandidateState,
+  bestState: V4CandidateState,
+  attempt: number
+): Promise<V4StageResult> {
+  if (attempt < 1 || attempt > 2) {
+    throw new Error("V4 recomposition attempt must be 1 or 2.");
+  }
+
+  const ctx = projectContext(req);
+
+  const current: Candidate = currentState;
+  const previousBest: Candidate = bestState;
+
+  console.error(
+    `[Veyra V4 STAGE] RECOMPOSE ${attempt}/2`
+  );
+
+  const repairRaw = await runModel(
+    "repair",
+    RECOMPOSE_SYSTEM,
+    [
+      `ORIGINAL PROJECT:\n${ctx}`,
+
+      `DESIGN DNA:\n${plan.designDNA}`,
+
+      `COMPOSITION BLUEPRINT:\n${plan.composition}`,
+
+      `ASSET STRATEGY:\n${plan.assets}`,
+
+      `CURRENT HTML:\n${current.site.html}`,
+
+      `CURRENT CSS:\n${current.site.css}`,
+
+      `CURRENT JS:\n${current.site.js}`,
+
+      `SCREENSHOT REVIEW:\n${JSON.stringify(
+        current.review,
+        null,
+        2
+      )}`,
+
+      `BROWSER DIAGNOSTICS:\n${JSON.stringify(
+        current.diagnostics,
+        null,
+        2
+      )}`,
+
+      `RECOMPOSITION ATTEMPT: ${attempt} of 2`,
+
+      "Fix the visual cause, not merely the symptom."
+    ].join("\n\n"),
+    {
+      maxOutputTokens: 26000,
+      reasoningEffort: "low"
+    }
+  );
+
+  const repairedSite = parseSite(repairRaw);
+  const repaired = await evaluateCandidate(repairedSite, req);
+
+  const best = better(previousBest, repaired);
+
+  console.error(
+    `[Veyra V4 STAGE] RECOMPOSE ${attempt} complete | score=${repaired.review.score} | best=${best.review.score}`
+  );
+
+  const finished =
+    candidatePasses(repaired) ||
+    attempt >= 2;
+
+  if (finished) {
+    return {
+      ok: true,
+      stage: "complete",
+      plan,
+      candidate: repaired,
+      best,
+      attempt,
+      complete: true,
+      result: candidateToResult(best)
+    };
+  }
+
+  return {
+    ok: true,
+    stage: "recompose",
+    plan,
+    candidate: repaired,
+    best,
+    attempt,
+    complete: false
   };
 }

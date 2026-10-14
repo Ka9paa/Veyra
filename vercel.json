@@ -6,7 +6,8 @@
       "maxDuration": 300
     },
     "api/omni-v4.mjs": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "includeFiles": "node_modules/playwright-core/.local-browsers/**"
     }
   }
 }

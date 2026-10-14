@@ -2379,7 +2379,16 @@ VEYRA_V4_ENGINE_DIR = (
 VEYRA_V4_CLI = VEYRA_V4_ENGINE_DIR / "dist" / "v4-cli.js"
 
 
-def run_veyra_v4(prompt, current=None, user_id=None):
+def run_veyra_v4(
+    prompt,
+    current=None,
+    user_id=None,
+    stage="legacy",
+    plan=None,
+    candidate=None,
+    best=None,
+    attempt=None,
+):
     """
     Execute Veyra Omni V4.
 
@@ -2400,7 +2409,22 @@ def run_veyra_v4(prompt, current=None, user_id=None):
             "width": 1440,
             "height": 900,
         },
+        "stage": str(stage or "legacy"),
     }
+
+    # Staged V4 checkpoints are JSON-serializable and travel only through
+    # the authenticated Flask -> internal Node bridge.
+    if plan is not None:
+        payload["plan"] = plan
+
+    if candidate is not None:
+        payload["candidate"] = candidate
+
+    if best is not None:
+        payload["best"] = best
+
+    if attempt is not None:
+        payload["attempt"] = int(attempt)
 
     # Vercel Python functions do not expose the Node runtime to subprocesses.
     # Delegate V4 to the native Node serverless function on the same deployment.
@@ -2422,7 +2446,8 @@ def run_veyra_v4(prompt, current=None, user_id=None):
         endpoint = f"https://{host}/api/omni-v4"
 
         app.logger.warning(
-            "[V4 BRIDGE] delegating to Node | prompt_chars=%s | user=%s | host=%s",
+            "[V4 BRIDGE] delegating to Node | stage=%s | prompt_chars=%s | user=%s | host=%s",
+            payload.get("stage"),
             len(payload.get("prompt", "")),
             bool(payload.get("userId")),
             host,
@@ -2623,6 +2648,30 @@ def api_build():
     #
     # Authentication, credit validation, attachments, and billing remain
     # controlled by Flask. Omni V4 owns the visual generation pipeline.
+    #
+    # Staged V4 gives every expensive generation/render/review phase a fresh
+    # Vercel runtime. Intermediate stages NEVER reach the credit debit block.
+    requested_v4_stage = str(p.get("v4_stage") or "plan").strip().lower()
+    v4_state = p.get("v4_state") or {}
+
+    if not isinstance(v4_state, dict):
+        return jsonify({
+            "ok": False,
+            "error": "Invalid V4 build checkpoint.",
+            "code": "INVALID_V4_STATE",
+            "credits_used": 0,
+            "credits_remaining": credits_before,
+        }), 400
+
+    if requested_v4_stage not in ("plan", "build", "recompose"):
+        return jsonify({
+            "ok": False,
+            "error": "Invalid V4 build stage.",
+            "code": "INVALID_V4_STAGE",
+            "credits_used": 0,
+            "credits_remaining": credits_before,
+        }), 400
+
     try:
         v4_prompt = prompt
 
@@ -2652,11 +2701,74 @@ def api_build():
                 + "\n".join(attachment_context)
             )
 
-        data = run_veyra_v4(
-            prompt=v4_prompt,
-            current=cur,
-            user_id=uid,
-        )
+        # PLAN establishes the canonical prompt for the entire staged build.
+        # Later stages reuse it so attachment context and generation context
+        # cannot silently change between serverless executions.
+        if requested_v4_stage != "plan":
+            checkpoint_prompt = v4_state.get("prompt")
+
+            if not isinstance(checkpoint_prompt, str) or not checkpoint_prompt.strip():
+                return jsonify({
+                    "ok": False,
+                    "error": "V4 build checkpoint is missing its canonical prompt.",
+                    "code": "V4_CHECKPOINT_PROMPT_REQUIRED",
+                    "credits_used": 0,
+                    "credits_remaining": credits_before,
+                }), 400
+
+            v4_prompt = checkpoint_prompt
+
+        stage_kwargs = {
+            "prompt": v4_prompt,
+            "current": cur,
+            "user_id": uid,
+            "stage": requested_v4_stage,
+        }
+
+        if requested_v4_stage == "build":
+            stage_kwargs["plan"] = v4_state.get("plan")
+
+        elif requested_v4_stage == "recompose":
+            stage_kwargs["plan"] = v4_state.get("plan")
+            stage_kwargs["candidate"] = v4_state.get("candidate")
+            stage_kwargs["best"] = v4_state.get("best")
+            stage_kwargs["attempt"] = int(v4_state.get("attempt") or 1)
+
+        data = run_veyra_v4(**stage_kwargs)
+
+        # Intermediate V4 stages are successful work, but NOT completed builds.
+        # Return their checkpoint to Studio before any credit debit can occur.
+        if data.get("complete") is not True:
+            next_stage = "build"
+
+            if data.get("stage") in ("build", "recompose"):
+                next_stage = "recompose"
+
+            checkpoint = {
+                "prompt": v4_prompt,
+                "plan": data.get("plan"),
+                "candidate": data.get("candidate"),
+                "best": data.get("best"),
+                "attempt": data.get("attempt", 0),
+            }
+
+            return jsonify({
+                "ok": True,
+                "v4_staged": True,
+                "v4_complete": False,
+                "v4_stage": data.get("stage"),
+                "v4_next_stage": next_stage,
+                "v4_state": checkpoint,
+                "engine": "Veyra AI",
+                "credits_used": 0,
+                "credits_remaining": credits_before,
+                "credit_cost": credit_cost,
+                "is_followup": is_followup,
+            })
+
+        # A completed staged response wraps the actual website under result.
+        if isinstance(data.get("result"), dict):
+            data = data["result"]
 
         # Normalize V4's file map to the frontend's expected filename list.
         v4_files = data.get('files') or {}

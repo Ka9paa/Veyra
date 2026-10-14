@@ -3585,6 +3585,137 @@ function setDirty(dirty=true){
   $("savedState").textContent=dirty?"Unsaved":state.project_id?"Saved":"Not saved";
 }
 
+
+const veyraWorkTraceStyle=document.createElement("style");
+veyraWorkTraceStyle.textContent=`
+.work-trace{
+  margin:8px 0 16px;
+  width:100%;
+}
+
+.work-duration{
+  appearance:none;
+  border:0;
+  background:transparent;
+  color:#d9e2ef;
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  padding:4px 0;
+  font:inherit;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+  transition:color .18s ease;
+}
+
+.work-duration:hover{
+  color:#fff;
+}
+
+.work-spark{
+  width:5px;
+  height:5px;
+  border-radius:999px;
+  background:#8b5cf6;
+  box-shadow:0 0 9px rgba(139,92,246,.75);
+  flex:0 0 auto;
+}
+
+.work-chevron{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:17px;
+  line-height:1;
+  color:#8995a8;
+  transform:rotate(0deg);
+  transition:transform .2s ease,color .2s ease;
+}
+
+.work-trace.expanded .work-chevron{
+  transform:rotate(90deg);
+  color:#c4b5fd;
+}
+
+.work-trace-panel{
+  display:grid;
+  grid-template-rows:0fr;
+  opacity:0;
+  margin-top:0;
+  transition:
+    grid-template-rows .24s ease,
+    opacity .2s ease,
+    margin-top .24s ease;
+}
+
+.work-trace-panel > *{
+  min-height:0;
+}
+
+.work-trace.expanded .work-trace-panel{
+  grid-template-rows:1fr;
+  opacity:1;
+  margin-top:10px;
+}
+
+.work-trace-panel{
+  overflow:hidden;
+}
+
+.work-trace-group{
+  position:relative;
+  padding:0 0 13px 18px;
+}
+
+.work-trace-group:not(:last-child)::before{
+  content:"";
+  position:absolute;
+  left:4px;
+  top:23px;
+  bottom:1px;
+  width:1px;
+  background:rgba(148,163,184,.18);
+}
+
+.work-trace-label{
+  color:#a8b3c5;
+  font-size:11px;
+  font-weight:600;
+  margin-bottom:6px;
+}
+
+.work-trace-row{
+  position:relative;
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+  color:#e5eaf1;
+  font-size:12px;
+  line-height:1.5;
+}
+
+.work-trace-check{
+  position:absolute;
+  left:-18px;
+  top:2px;
+  width:10px;
+  height:10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+  color:#63e6be;
+  font-size:9px;
+  font-weight:800;
+}
+
+.work-trace.expanded + .agent-section{
+  margin-top:2px;
+}
+`;
+document.head.appendChild(veyraWorkTraceStyle);
+
 function syncUI(){
   $("topProjectName").textContent=state.title;
   $("projectTitle").textContent=state.title==="Untitled Project"?"Build, iterate, and launch with AI.":state.title;
@@ -3642,11 +3773,47 @@ function addMessage(role,text,card=null,steps=null,details=null){
 
   if(card){
     const duration=details?.duration
-      ? `<button class="work-duration" type="button">
-           <span class="work-spark"></span>
-           Worked for ${esc(formatWorkDuration(details.duration))}
-           <span class="work-chevron">›</span>
-         </button>`
+      ? `<div class="work-trace">
+           <button class="work-duration" type="button" aria-expanded="false">
+             <span class="work-spark"></span>
+             <span>Worked for ${esc(formatWorkDuration(details.duration))}</span>
+             <span class="work-chevron">›</span>
+           </button>
+
+           <div class="work-trace-panel">
+             <div class="work-trace-group">
+               <div class="work-trace-label">Reasoning</div>
+               <div class="work-trace-row">
+                 <span class="work-trace-check">✓</span>
+                 <span>Analyzed your request and planned the visual direction</span>
+               </div>
+             </div>
+
+             <div class="work-trace-group">
+               <div class="work-trace-label">Build</div>
+               <div class="work-trace-row">
+                 <span class="work-trace-check">✓</span>
+                 <span>Generated and updated the project files</span>
+               </div>
+             </div>
+
+             <div class="work-trace-group">
+               <div class="work-trace-label">Visual review</div>
+               <div class="work-trace-row">
+                 <span class="work-trace-check">✓</span>
+                 <span>Rendered the website and inspected the result</span>
+               </div>
+             </div>
+
+             <div class="work-trace-group">
+               <div class="work-trace-label">Refinement</div>
+               <div class="work-trace-row">
+                 <span class="work-trace-check">✓</span>
+                 <span>Reviewed visual quality and selected the best result</span>
+               </div>
+             </div>
+           </div>
+         </div>`
       : "";
 
     const changed=(details?.changedFiles||[])
@@ -3744,6 +3911,17 @@ function addMessage(role,text,card=null,steps=null,details=null){
   `;
 
   messages.insertBefore(wrap,typingRow);
+
+  const workDuration=wrap.querySelector(".work-duration");
+  const workTrace=wrap.querySelector(".work-trace");
+
+  if(workDuration && workTrace){
+    workDuration.addEventListener("click",()=>{
+      const expanded=workTrace.classList.toggle("expanded");
+      workDuration.setAttribute("aria-expanded",expanded?"true":"false");
+      scrollChat();
+    });
+  }
 
   wrap.querySelectorAll("[data-agent-prompt]").forEach(btn=>{
     btn.addEventListener("click",()=>{
@@ -3923,17 +4101,74 @@ async function build(prompt){
   setTyping(true,"Designing your update…");
 
   try{
-    const res=await fetch("/api/build",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        prompt,
-        current:{html:state.html,css:state.css,js:state.js},
-        attachments:attachmentsForBuild
-      })
-    });
-    const data=await readJsonResponse(res);
-    if(!res.ok||data.ok===false)throw new Error(data.error||data.code||"Build failed");
+    const originalCurrent={
+      html:state.html,
+      css:state.css,
+      js:state.js
+    };
+
+    let v4Stage="plan";
+    let v4State={};
+    let data=null;
+
+    while(true){
+      if(v4Stage==="plan"){
+        $("engineStatus").textContent="Planning visual direction…";
+        setTyping(true,"Planning the design system…");
+      }else if(v4Stage==="build"){
+        $("engineStatus").textContent="Building and reviewing…";
+        setTyping(true,"Building, rendering, and inspecting the website…");
+      }else{
+        const nextAttempt=Math.min(
+          Number(v4State?.attempt||0)+1,
+          2
+        );
+        $("engineStatus").textContent=`Refining visual quality ${nextAttempt}/2…`;
+        setTyping(true,"Reviewing the screenshot and improving the design…");
+      }
+
+      const requestState={...v4State};
+
+      if(v4Stage==="recompose"){
+        requestState.attempt=Math.min(
+          Number(v4State?.attempt||0)+1,
+          2
+        );
+      }
+
+      const res=await fetch("/api/build",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          prompt,
+          current:originalCurrent,
+          attachments:v4Stage==="plan" ? attachmentsForBuild : [],
+          v4_stage:v4Stage,
+          v4_state:requestState
+        })
+      });
+
+      data=await readJsonResponse(res);
+
+      if(!res.ok||data.ok===false){
+        throw new Error(
+          data.error||data.code||"Build failed"
+        );
+      }
+
+      if(!data.v4_staged||data.v4_complete!==false){
+        break;
+      }
+
+      if(!data.v4_next_stage||!data.v4_state){
+        throw new Error(
+          "Veyra returned an incomplete build checkpoint."
+        );
+      }
+
+      v4Stage=data.v4_next_stage;
+      v4State=data.v4_state;
+    }
 
     state.title=data.title||state.title;
     state.html=data.html||"";
@@ -4193,5 +4428,250 @@ const chatObserver=new MutationObserver(()=>scrollChat());
 chatObserver.observe(messages,{childList:true,subtree:true});
 
 </script>
+
+
+<style id="veyra-composer-polish">
+/* =========================================================
+   VEYRA STUDIO — AGENT COMPOSER POLISH
+   Presentation only. Does not alter V4 generation behavior.
+   ========================================================= */
+
+.composer-wrap{
+  padding:10px 16px 16px !important;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(7,16,28,0) 0%,
+      rgba(7,16,28,.90) 22%,
+      #07101c 48%
+    ) !important;
+}
+
+.composer{
+  position:relative !important;
+
+  min-height:142px !important;
+  padding:15px 14px 12px !important;
+
+  border:1px solid rgba(111,82,225,.78) !important;
+  border-radius:17px !important;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(10,24,41,.98),
+      rgba(8,20,35,.98)
+    ) !important;
+
+  box-shadow:
+    0 16px 42px rgba(0,0,0,.28),
+    inset 0 1px 0 rgba(255,255,255,.025),
+    0 0 0 1px rgba(108,74,220,.05) !important;
+
+  transition:
+    border-color .18s ease,
+    box-shadow .18s ease,
+    transform .18s ease !important;
+}
+
+.composer:focus-within{
+  border-color:#8b68ff !important;
+
+  box-shadow:
+    0 18px 48px rgba(0,0,0,.32),
+    0 0 0 3px rgba(124,82,237,.08),
+    0 0 30px rgba(112,76,225,.075) !important;
+}
+
+.composer textarea{
+  width:100% !important;
+  height:84px !important;
+  min-height:84px !important;
+
+  padding:0 2px 14px !important;
+
+  color:#edf3fb !important;
+  caret-color:#a98cff !important;
+
+  font-size:12px !important;
+  line-height:1.55 !important;
+  font-weight:400 !important;
+
+  background:transparent !important;
+  border:0 !important;
+  outline:0 !important;
+  resize:none !important;
+}
+
+.composer textarea::placeholder{
+  color:#70819a !important;
+  opacity:.88 !important;
+}
+
+.compose-actions{
+  min-height:34px !important;
+  height:34px !important;
+
+  display:flex !important;
+  align-items:center !important;
+  gap:8px !important;
+
+  padding:0 !important;
+}
+
+/* + attachment button */
+#attachBtn{
+  width:34px !important;
+  height:34px !important;
+  min-width:34px !important;
+
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+
+  padding:0 !important;
+
+  border:1px solid #33465f !important;
+  border-radius:10px !important;
+
+  background:#0b1929 !important;
+  color:#b7c4d6 !important;
+
+  font-size:19px !important;
+  font-weight:300 !important;
+  line-height:1 !important;
+
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.025) !important;
+
+  transition:
+    border-color .16s ease,
+    background .16s ease,
+    color .16s ease,
+    transform .16s ease !important;
+}
+
+#attachBtn:hover{
+  border-color:#7257d6 !important;
+  background:#101d30 !important;
+  color:#fff !important;
+  transform:translateY(-1px);
+}
+
+/* Veyra AI indicator */
+.engine-label{
+  display:inline-flex !important;
+  align-items:center !important;
+  gap:6px !important;
+
+  margin-right:auto !important;
+  padding:0 !important;
+
+  border:0 !important;
+  background:transparent !important;
+
+  color:#8493aa !important;
+
+  font-size:10px !important;
+  font-weight:600 !important;
+  letter-spacing:.01em !important;
+}
+
+.engine-label::before{
+  content:"" !important;
+
+  width:5px !important;
+  height:5px !important;
+
+  border-radius:999px !important;
+
+  background:#8b5cf6 !important;
+
+  box-shadow:
+    0 0 8px rgba(139,92,246,.9) !important;
+}
+
+/* Purple send arrow */
+.send{
+  width:36px !important;
+  height:36px !important;
+  min-width:36px !important;
+
+  margin-left:auto !important;
+  padding:0 !important;
+
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+
+  border:0 !important;
+  border-radius:10px !important;
+
+  background:
+    linear-gradient(
+      135deg,
+      #8c67ff,
+      #7049ee
+    ) !important;
+
+  color:#fff !important;
+
+  font-size:18px !important;
+  font-weight:700 !important;
+  line-height:1 !important;
+
+  box-shadow:
+    0 8px 22px rgba(112,73,238,.26),
+    inset 0 1px 0 rgba(255,255,255,.18) !important;
+
+  transition:
+    transform .16s ease,
+    box-shadow .16s ease,
+    opacity .16s ease !important;
+}
+
+.send:hover:not(:disabled){
+  transform:translateY(-1px) scale(1.025);
+
+  box-shadow:
+    0 11px 28px rgba(112,73,238,.34),
+    inset 0 1px 0 rgba(255,255,255,.2) !important;
+}
+
+.send:active:not(:disabled){
+  transform:scale(.96);
+}
+
+.send:disabled{
+  opacity:.48 !important;
+  cursor:not-allowed !important;
+}
+
+/* Keep attachment tray integrated with new composer */
+.attachment-tray.show{
+  margin-bottom:9px !important;
+}
+
+.attachment-chip{
+  border-radius:9px !important;
+}
+
+/* Keep + menu above the composer */
+.attach-menu-wrap{
+  z-index:2147483000 !important;
+}
+
+.attach-menu{
+  z-index:2147483001 !important;
+}
+</style>
+
+<script id="veyra-composer-label">
+(() => {
+  const engine = document.getElementById("engineStatus");
+  if(engine) engine.textContent = "Veyra AI";
+})();
+</script>
+
 </body>
 </html>
