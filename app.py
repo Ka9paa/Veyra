@@ -2032,19 +2032,47 @@ def _project_access(project_id, uid):
 
 def _visible_projects(uid):
     with db() as c:
-        rows=c.execute(
-            '''SELECT p.*, 'owner' AS access_role
-               FROM projects p
-               WHERE p.user_id=?
-               UNION ALL
-               SELECT p.*, pm.role AS access_role
+        owned_rows=c.execute(
+            '''SELECT *
+               FROM projects
+               WHERE user_id=?
+               ORDER BY updated_at DESC''',
+            (uid,)
+        ).fetchall()
+
+        shared_rows=c.execute(
+            '''SELECT p.*,pm.role AS access_role
                FROM projects p
                JOIN project_members pm ON pm.project_id=p.id
                WHERE pm.user_id=?
-               ORDER BY updated_at DESC''',
-            (uid,uid)
+               ORDER BY p.updated_at DESC''',
+            (uid,)
         ).fetchall()
-    return [dict(r) for r in rows]
+
+    projects=[]
+
+    for row in owned_rows:
+        project=dict(row)
+        project['access_role']='owner'
+        projects.append(project)
+
+    owned_ids={int(project['id']) for project in projects}
+
+    for row in shared_rows:
+        project=dict(row)
+
+        if int(project['id']) in owned_ids:
+            continue
+
+        project['access_role']=str(project.get('access_role') or 'viewer')
+        projects.append(project)
+
+    projects.sort(
+        key=lambda project:str(project.get('updated_at') or ''),
+        reverse=True
+    )
+
+    return projects
 
 
 @app.route('/dashboard')
