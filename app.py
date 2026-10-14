@@ -2166,16 +2166,48 @@ def dashboard():
 @app.route('/app/projects')
 @login_required
 def projects_page():
-    try:
-        u=current_user()
+    u=current_user()
+    return render_template(
+        'projects.html',
+        user=u,
         projects=_visible_projects(u['id'])
-        return render_template('projects.html',user=u,projects=projects)
-    except Exception:
-        import traceback
-        print("=== PROJECTS PAGE ERROR ===", flush=True)
-        traceback.print_exc()
-        print("=== END PROJECTS PAGE ERROR ===", flush=True)
-        raise
+    )
+
+
+@app.post('/app/projects/<int:project_id>/delete')
+@login_required
+def project_delete(project_id):
+    u=current_user()
+
+    project=_project_for_owner(project_id,u['id'])
+    if not project:
+        return ('Project not found or access denied',404)
+
+    with db() as c:
+        c.execute(
+            'DELETE FROM project_members WHERE project_id=?',
+            (project_id,)
+        )
+        c.execute(
+            'DELETE FROM project_databases WHERE project_id=?',
+            (project_id,)
+        )
+        c.execute(
+            'DELETE FROM deployments WHERE project_id=?',
+            (project_id,)
+        )
+        c.execute(
+            'DELETE FROM analytics_events WHERE project_id=?',
+            (project_id,)
+        )
+        c.execute(
+            'DELETE FROM projects WHERE id=? AND user_id=?',
+            (project_id,u['id'])
+        )
+        c.commit()
+
+    flash('Project deleted successfully.','success')
+    return redirect(url_for('projects_page'))
 
 
 @app.route('/app/templates')
