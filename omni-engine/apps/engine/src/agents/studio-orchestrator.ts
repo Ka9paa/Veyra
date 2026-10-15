@@ -4,6 +4,11 @@ import {
   critiqueScreenshot,
   type VisualReview
 } from "../visual/visual-critic.js";
+import {
+  analyzeWebsiteReference,
+  findWebsiteReferenceUrl
+} from "../visual/website-analyzer.js";
+import { callOpenAIVisual } from "../providers/openai.js";
 
 export interface StudioBuildRequest {
   projectId?: string;
@@ -955,7 +960,132 @@ export async function orchestrateStudioPlan(
     throw new Error("A build prompt is required.");
   }
 
-  const ctx = projectContext(req);
+  const baseCtx = projectContext(req);
+  let ctx = baseCtx;
+
+  const referenceUrl = findWebsiteReferenceUrl(req.prompt);
+
+  if (referenceUrl) {
+    console.error(
+      `[Veyra V4 STAGE] PLAN: Website reference detected | url=${referenceUrl}`
+    );
+
+    try {
+      const reference = await analyzeWebsiteReference(
+        req.prompt,
+        req.viewport?.width ?? 1440,
+        req.viewport?.height ?? 900
+      );
+
+      if (reference) {
+        let visualAnalysis = "";
+
+        try {
+          console.error(
+            "[Veyra V4 STAGE] PLAN: Analyzing reference screenshot"
+          );
+
+          visualAnalysis = await callOpenAIVisual(
+            [
+              "You are Veyra's Website Reference Visual Analyst.",
+              "Analyze the supplied screenshot as professional web design reference material.",
+              "Focus only on useful visual evidence visible in the screenshot.",
+              "Do not generate website code.",
+              "Do not blindly praise or clone the reference.",
+              "Identify what should be preserved, improved, simplified, or recomposed."
+            ].join(" "),
+            [
+              `Reference URL: ${reference.finalUrl}`,
+              `Page title: ${reference.title}`,
+              "",
+              "Return a compact professional visual analysis covering:",
+              "- overall visual direction and brand personality",
+              "- layout and composition",
+              "- hero structure and hierarchy",
+              "- navigation treatment",
+              "- typography",
+              "- color usage and contrast",
+              "- cards, borders, radii, shadows and surfaces",
+              "- spacing and density",
+              "- imagery and decorative treatments",
+              "- strongest design decisions",
+              "- weakest design decisions",
+              "- specific recommendations for an improved original redesign",
+              "",
+              "Keep the response under roughly 1200 words."
+            ].join("\n"),
+            reference.screenshotBase64,
+            {
+              maxOutputTokens: 3500,
+              reasoningEffort: "medium"
+            }
+          );
+
+          console.error(
+            `[Veyra V4 STAGE] PLAN: Reference screenshot analyzed | chars=${visualAnalysis.length}`
+          );
+        } catch (visualError) {
+          const visualDetail =
+            visualError instanceof Error
+              ? visualError.message
+              : String(visualError);
+
+          console.error(
+            `[Veyra V4 STAGE] PLAN: Screenshot analysis unavailable | error=${visualDetail}`
+          );
+
+          visualAnalysis = "";
+        }
+
+        const referenceContext = {
+          sourceUrl: reference.url,
+          finalUrl: reference.finalUrl,
+          title: reference.title,
+          description: reference.description,
+          headings: reference.headings,
+          navigation: reference.navigation,
+          buttons: reference.buttons,
+          links: reference.links.slice(0, 30),
+          images: reference.images.slice(0, 20),
+          colors: reference.colors,
+          fonts: reference.fonts,
+          bodyHeight: reference.bodyHeight,
+          visibleText: reference.visibleText.slice(0, 8000),
+          visualAnalysis: visualAnalysis.slice(0, 12000)
+        };
+
+        ctx = [
+          baseCtx,
+          "WEBSITE REFERENCE ANALYSIS:",
+          "The user supplied this live website as reference material.",
+          "The reference was inspected in a real browser. Structured page evidence and, when available, AI screenshot analysis are provided below.",
+          "Study its real content, information architecture, navigation, calls to action, branding clues, layout, hierarchy, typography, spacing, surfaces, and visual characteristics.",
+          "Preserve useful business/content meaning and recognizable brand cues when appropriate, but do not blindly clone weak design decisions.",
+          "Create an improved, original Veyra interpretation that follows the user's request.",
+          JSON.stringify(referenceContext, null, 2)
+        ].join("\n\n");
+
+        console.error(
+          `[Veyra V4 STAGE] PLAN: Website analysis attached | title=${JSON.stringify(reference.title)}`
+        );
+      } else {
+        console.error(
+          "[Veyra V4 STAGE] PLAN: Website analysis unavailable | continuing normal V4"
+        );
+      }
+    } catch (error) {
+      const detail =
+        error instanceof Error
+          ? error.message
+          : String(error);
+
+      console.error(
+        `[Veyra V4 STAGE] PLAN: Website analysis failed open | error=${detail}`
+      );
+
+      ctx = baseCtx;
+    }
+  }
 
   console.error("[Veyra V4 STAGE] PLAN: Design DNA");
 
