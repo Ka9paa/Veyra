@@ -235,11 +235,32 @@ export async function analyzeWebsiteReference(
       deviceScaleFactor: 1
     });
 
-    page.setDefaultNavigationTimeout(15000);
-    page.setDefaultTimeout(10000);
+    page.setDefaultNavigationTimeout(30000);
+    page.setDefaultTimeout(12000);
+
+    const approvedHosts = new Map<string, Promise<void>>();
+
+    const approveDestination = async (target: URL): Promise<void> => {
+      const hostname = target.hostname.toLowerCase().replace(/\.$/, "");
+
+      let approval = approvedHosts.get(hostname);
+
+      if (!approval) {
+        approval = assertPublicDestination(target);
+        approvedHosts.set(hostname, approval);
+      }
+
+      try {
+        await approval;
+      } catch (error) {
+        approvedHosts.delete(hostname);
+        throw error;
+      }
+    };
 
     await page.route("**/*", async (route: Route) => {
-      const requestUrl = route.request().url();
+      const request = route.request();
+      const requestUrl = request.url();
 
       if (
         requestUrl.startsWith("data:") ||
@@ -254,7 +275,7 @@ export async function analyzeWebsiteReference(
 
       try {
         target = validatePublicUrl(requestUrl);
-        await assertPublicDestination(target);
+        await approveDestination(target);
       } catch {
         console.error(
           `[V4 WEBSITE ANALYZER] blocked request | url=${requestUrl}`
@@ -269,7 +290,7 @@ export async function analyzeWebsiteReference(
 
     const response = await page.goto(requestedUrl.toString(), {
       waitUntil: "domcontentloaded",
-      timeout: 15000
+      timeout: 30000
     });
 
     if (response && response.status() >= 400) {
