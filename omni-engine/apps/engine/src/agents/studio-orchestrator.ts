@@ -945,10 +945,21 @@ function candidateToResult(
   };
 }
 
+const V4_EXCELLENT_SCORE = 88;
+const V4_FAST_ACCEPT_SCORE = 75;
+
 function candidatePasses(candidate: Candidate): boolean {
   return (
     candidate.review.pass &&
-    candidate.review.score >= 88 &&
+    candidate.review.score >= V4_EXCELLENT_SCORE &&
+    candidate.diagnostics.hardFailures.length === 0
+  );
+}
+
+function candidateCanFastAccept(candidate: Candidate): boolean {
+  return (
+    candidate.review.pass &&
+    candidate.review.score >= V4_FAST_ACCEPT_SCORE &&
     candidate.diagnostics.hardFailures.length === 0
   );
 }
@@ -1178,7 +1189,14 @@ export async function orchestrateStudioBuildStage(
     `[Veyra V4 STAGE] BUILD complete | score=${candidate.review.score}`
   );
 
-  if (candidatePasses(candidate)) {
+  if (candidateCanFastAccept(candidate)) {
+    const acceptance =
+      candidatePasses(candidate) ? "excellent" : "fast";
+
+    console.error(
+      `[Veyra V4 STAGE] BUILD accepted without repair | score=${candidate.review.score} | gate=${acceptance}`
+    );
+
     return {
       ok: true,
       stage: "complete",
@@ -1254,9 +1272,12 @@ export async function orchestrateStudioRecomposeStage(
       `[Veyra V4 STAGE] RECOMPOSE ${attempt} complete | score=${repaired.review.score} | best=${best.review.score}`
     );
 
+    // Studio fast path: one screenshot-guided repair is the automatic limit.
+    // 88+ remains the excellence target, while a healthy 75+ candidate can ship
+    // without paying for another full 26k-token recomposition.
     const finished =
-      candidatePasses(repaired) ||
-      attempt >= 2;
+      candidateCanFastAccept(repaired) ||
+      attempt >= 1;
 
     if (finished) {
       return {
