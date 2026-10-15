@@ -1092,79 +1092,83 @@ export async function orchestrateStudioRecomposeStage(
     `[Veyra V4 STAGE] RECOMPOSE ${attempt}/2`
   );
 
-  const repairRaw = await runModel(
-    "repair",
-    RECOMPOSE_SYSTEM,
-    [
-      `ORIGINAL PROJECT:\n${ctx}`,
+  try {
+    const repairRaw = await runModel(
+      "repair",
+      RECOMPOSE_SYSTEM,
+      [
+        `ORIGINAL PROJECT:\n${ctx}`,
+        `DESIGN DNA:\n${plan.designDNA}`,
+        `COMPOSITION BLUEPRINT:\n${plan.composition}`,
+        `ASSET STRATEGY:\n${plan.assets}`,
+        `CURRENT HTML:\n${current.site.html}`,
+        `CURRENT CSS:\n${current.site.css}`,
+        `CURRENT JS:\n${current.site.js}`,
+        `SCREENSHOT REVIEW:\n${JSON.stringify(current.review, null, 2)}`,
+        `BROWSER DIAGNOSTICS:\n${JSON.stringify(current.diagnostics, null, 2)}`,
+        `RECOMPOSITION ATTEMPT: ${attempt} of 2`,
+        "Fix the visual cause, not merely the symptom."
+      ].join("\n\n"),
+      {
+        maxOutputTokens: 26000,
+        reasoningEffort: "low"
+      }
+    );
 
-      `DESIGN DNA:\n${plan.designDNA}`,
+    const repairedSite = parseSite(repairRaw);
+    const repaired = await evaluateCandidate(repairedSite, req);
 
-      `COMPOSITION BLUEPRINT:\n${plan.composition}`,
+    const best = better(previousBest, repaired);
 
-      `ASSET STRATEGY:\n${plan.assets}`,
+    console.error(
+      `[Veyra V4 STAGE] RECOMPOSE ${attempt} complete | score=${repaired.review.score} | best=${best.review.score}`
+    );
 
-      `CURRENT HTML:\n${current.site.html}`,
+    const finished =
+      candidatePasses(repaired) ||
+      attempt >= 2;
 
-      `CURRENT CSS:\n${current.site.css}`,
-
-      `CURRENT JS:\n${current.site.js}`,
-
-      `SCREENSHOT REVIEW:\n${JSON.stringify(
-        current.review,
-        null,
-        2
-      )}`,
-
-      `BROWSER DIAGNOSTICS:\n${JSON.stringify(
-        current.diagnostics,
-        null,
-        2
-      )}`,
-
-      `RECOMPOSITION ATTEMPT: ${attempt} of 2`,
-
-      "Fix the visual cause, not merely the symptom."
-    ].join("\n\n"),
-    {
-      maxOutputTokens: 26000,
-      reasoningEffort: "low"
+    if (finished) {
+      return {
+        ok: true,
+        stage: "complete",
+        plan,
+        candidate: repaired,
+        best,
+        attempt,
+        complete: true,
+        result: candidateToResult(best)
+      };
     }
-  );
 
-  const repairedSite = parseSite(repairRaw);
-  const repaired = await evaluateCandidate(repairedSite, req);
-
-  const best = better(previousBest, repaired);
-
-  console.error(
-    `[Veyra V4 STAGE] RECOMPOSE ${attempt} complete | score=${repaired.review.score} | best=${best.review.score}`
-  );
-
-  const finished =
-    candidatePasses(repaired) ||
-    attempt >= 2;
-
-  if (finished) {
     return {
       ok: true,
-      stage: "complete",
+      stage: "recompose",
       plan,
       candidate: repaired,
       best,
       attempt,
+      complete: false
+    };
+  } catch (error) {
+    const detail =
+      error instanceof Error
+        ? error.message
+        : String(error);
+
+    console.error(
+      `[Veyra V4 STAGE] RECOMPOSE ${attempt} failed | falling back to previous best | error=${detail}`
+    );
+
+    return {
+      ok: true,
+      stage: "complete",
+      plan,
+      candidate: current,
+      best: previousBest,
+      attempt,
       complete: true,
-      result: candidateToResult(best)
+      result: candidateToResult(previousBest)
     };
   }
-
-  return {
-    ok: true,
-    stage: "recompose",
-    plan,
-    candidate: repaired,
-    best,
-    attempt,
-    complete: false
-  };
 }
