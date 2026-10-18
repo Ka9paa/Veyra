@@ -1342,7 +1342,7 @@ def support_api():
 @app.route('/staff/apply')
 @login_required
 def staff_apply():
-    return render_template('staff_apply.html')
+    return render_template('staff_apply.html', user=current_user())
 
 @app.route('/login')
 def login():
