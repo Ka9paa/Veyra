@@ -1974,6 +1974,24 @@ def admin_dashboard():
             ).fetchall()
         ]
 
+        staff_applications=[
+            dict(r) for r in c.execute(
+                """SELECT
+                       sa.*,
+                       u.name AS applicant_name,
+                       u.email AS applicant_email,
+                       u.avatar_url AS applicant_avatar
+                   FROM staff_applications sa
+                   LEFT JOIN users u ON u.id=sa.user_id
+                   ORDER BY
+                     CASE lower(COALESCE(sa.status,'pending'))
+                       WHEN 'pending' THEN 0
+                       ELSE 1
+                     END,
+                     sa.created_at DESC"""
+            ).fetchall()
+        ]
+
         audit_raw=[
             dict(r) for r in c.execute(
                 'SELECT * FROM admin_audit ORDER BY created_at DESC LIMIT 20'
@@ -2019,6 +2037,10 @@ def admin_dashboard():
         'projects':int(project_count or 0),
         'restricted':int(restricted or 0),
         'open_support':len(support_threads),
+        'pending_staff':sum(
+            1 for application in staff_applications
+            if str(application.get('status') or 'pending').lower() == 'pending'
+        ),
         'total_credits':int(total_credits or 0),
         'total_logins':int(total_logins or 0),
         'admin_count':int(admin_count or 0),
@@ -2036,8 +2058,70 @@ def admin_dashboard():
         users=users,
         stats=stats,
         support_threads=support_threads,
+        staff_applications=staff_applications,
         audit_rows=audit_rows
     )
+
+@app.post('/admin/staff/<int:application_id>/review')
+@login_required
+def admin_review_staff_application(application_id):
+    if not is_admin():
+        return ('Forbidden',403)
+
+    decision=(request.form.get('decision') or '').strip().lower()
+    note=(request.form.get('reviewer_note') or '').strip()[:2000]
+
+    if decision not in {'accepted','declined'}:
+        return ('Invalid staff application decision',400)
+
+    actor=current_user()
+
+    with db() as c:
+        application=c.execute(
+            'SELECT id,user_id,status FROM staff_applications WHERE id=?',
+            (application_id,)
+        ).fetchone()
+
+        if not application:
+            return ('Staff application not found',404)
+
+        previous_status=application['status'] or 'pending'
+
+        c.execute(
+            """UPDATE staff_applications
+               SET status=?,
+                   reviewer_id=?,
+                   reviewer_note=?,
+                   reviewed_at=?
+               WHERE id=?""",
+            (
+                decision,
+                actor['id'],
+                note,
+                now(),
+                application_id
+            )
+        )
+        c.commit()
+
+    admin_audit(
+        'review_staff_application',
+        application['user_id'],
+        {
+            'application_id':application_id,
+            'before':previous_status,
+            'after':decision
+        }
+    )
+
+    flash(
+        'Staff application accepted.'
+        if decision == 'accepted'
+        else 'Staff application declined.',
+        'success'
+    )
+    return redirect(url_for('admin_dashboard') + '#staff')
+
 
 @app.post('/admin/support/<int:thread_id>/reply')
 @login_required

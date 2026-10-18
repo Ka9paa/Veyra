@@ -91,6 +91,29 @@
     .support-reply:focus{border-color:#705cff;box-shadow:0 0 0 3px rgba(112,92,255,.1)}
     .support-send{border:1px solid #705cff;background:#705cff;color:#fff;border-radius:10px;padding:11px 15px;font-size:10px;font-weight:900;cursor:pointer;white-space:nowrap}
     .support-send:hover{filter:brightness(1.08)}
+
+    .staff-list{display:grid;gap:14px;padding:18px}
+    .staff-card{border:1px solid #1c2c42;background:#07111e;border-radius:14px;padding:16px}
+    .staff-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+    .staff-person{display:flex;align-items:center;gap:11px}
+    .staff-person .avatar,.staff-person .avatar-fallback{width:38px;height:38px}
+    .staff-person b{display:block;color:#fff;font-size:12px}
+    .staff-person span{display:block;color:#7186a3;font-size:10px;margin-top:3px}
+    .staff-status{display:inline-flex;align-items:center;border:1px solid #31445f;border-radius:999px;padding:5px 9px;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;color:#9fb0c6}
+    .staff-status.accepted{border-color:#2e6b5b;background:#0d211c;color:#71e7c4}
+    .staff-status.declined{border-color:#6d2c3a;background:#241018;color:#ff8097}
+    .staff-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+    .staff-answer{border:1px solid #182a42;background:#0b1726;border-radius:11px;padding:12px}
+    .staff-answer.full{grid-column:1/-1}
+    .staff-answer small{display:block;color:#6f83a0;font-size:9px;font-weight:900;letter-spacing:.07em;margin-bottom:6px}
+    .staff-answer p{margin:0;color:#c2cede;font-size:11px;line-height:1.6;white-space:pre-wrap}
+    .staff-review{margin-top:14px;padding-top:14px;border-top:1px solid #182a42}
+    .staff-review textarea{width:100%;min-height:64px;resize:vertical;border:1px solid #283b56;background:#050d18;color:#fff;border-radius:10px;padding:10px 11px;font:inherit;font-size:11px;outline:none}
+    .staff-review-actions{display:flex;gap:8px;margin-top:9px}
+    .staff-accept,.staff-decline{border-radius:9px;padding:9px 13px;font-size:10px;font-weight:900;cursor:pointer}
+    .staff-accept{border:1px solid #28745d;background:#103629;color:#77ebc4}
+    .staff-decline{border:1px solid #783044;background:#35131d;color:#ff8ca1}
+
     .empty{padding:40px;text-align:center;color:var(--muted)}
     @media(max-width:1100px){.stats{grid-template-columns:repeat(3,1fr)}}
     @media(max-width:700px){.admin-shell{padding:14px}.topbar{align-items:flex-start}.stats{grid-template-columns:1fr 1fr}.panel-head{align-items:flex-start;flex-direction:column}.search{width:100%;max-width:none}}
@@ -110,6 +133,7 @@
     <button class="tab active" data-tab="users">Users</button>
     <button class="tab" data-tab="projects">Projects <span style="color:#a996ff">{{stats.projects or 0}}</span></button>
     <button class="tab" data-tab="support">Support <span style="color:#a996ff">{{stats.open_support or 0}}</span></button>
+    <button class="tab" data-tab="staff">Staff Applications{% if stats.pending_staff %} <span style="color:#a996ff">{{stats.pending_staff}}</span>{% endif %}</button>
     <button class="tab" data-tab="audit">Audit log</button>
   </nav>
 
@@ -321,6 +345,105 @@
     </div>
     {% else %}
     <div class="empty">No support threads right now.</div>
+    {% endif %}
+  </section>
+
+  <section id="pane-staff" class="tab-pane panel">
+    <div class="panel-head">
+      <div>
+        <h2>Staff Applications</h2>
+        <p>Review applications submitted through Veyra and accept or decline applicants.</p>
+      </div>
+    </div>
+
+    {% if staff_applications %}
+    <div class="staff-list">
+      {% for a in staff_applications %}
+      <div class="staff-card">
+        <div class="staff-top">
+          <div class="staff-person">
+            {% if a.applicant_avatar %}
+              <img class="avatar" src="{{a.applicant_avatar}}" alt="">
+            {% else %}
+              <div class="avatar-fallback">{{(a.applicant_name or a.applicant_email or 'V')[:1]|upper}}</div>
+            {% endif %}
+            <div>
+              <b>{{a.applicant_name or 'Unnamed applicant'}}</b>
+              <span>{{a.applicant_email or 'No email'}} · User #{{a.user_id}} · Application #{{a.id}}</span>
+              <span>{{a.discord_name or 'No Discord provided'}}{% if a.age %} · Age {{a.age}}{% endif %}{% if a.timezone %} · {{a.timezone}}{% endif %}</span>
+            </div>
+          </div>
+
+          <div style="text-align:right">
+            <span class="staff-status {{(a.status or 'pending')|lower}}">{{a.status or 'pending'}}</span>
+            <div style="color:#657a97;font-size:9px;margin-top:7px">{{a.created_at}}</div>
+          </div>
+        </div>
+
+        <div class="staff-grid">
+          <div class="staff-answer">
+            <small>AVAILABILITY</small>
+            <p>{{a.availability}}</p>
+          </div>
+
+          <div class="staff-answer">
+            <small>ABOUT</small>
+            <p>{{a.about}}</p>
+          </div>
+
+          <div class="staff-answer">
+            <small>EXPERIENCE</small>
+            <p>{{a.experience}}</p>
+          </div>
+
+          <div class="staff-answer">
+            <small>WHY VEYRA</small>
+            <p>{{a.why_veyra}}</p>
+          </div>
+
+          <div class="staff-answer full">
+            <small>SUPPORT JUDGMENT</small>
+            <p>{{a.support_judgment}}</p>
+          </div>
+
+          {% if a.extra %}
+          <div class="staff-answer full">
+            <small>ADDITIONAL INFORMATION</small>
+            <p>{{a.extra}}</p>
+          </div>
+          {% endif %}
+        </div>
+
+        <form class="staff-review"
+              method="post"
+              action="{{url_for('admin_review_staff_application', application_id=a.id)}}">
+          <textarea name="reviewer_note"
+                    maxlength="2000"
+                    placeholder="Optional review note...">{{a.reviewer_note or ''}}</textarea>
+
+          <div class="staff-review-actions">
+            <button class="staff-accept"
+                    type="submit"
+                    name="decision"
+                    value="accepted">Accept Application</button>
+
+            <button class="staff-decline"
+                    type="submit"
+                    name="decision"
+                    value="declined">Decline Application</button>
+          </div>
+        </form>
+
+        {% if a.reviewed_at %}
+        <div style="color:#657a97;font-size:9px;margin-top:9px">
+          Reviewed {{a.reviewed_at}}{% if a.reviewer_id %} · Admin #{{a.reviewer_id}}{% endif %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+      <div class="empty">No staff applications have been submitted yet.</div>
     {% endif %}
   </section>
 

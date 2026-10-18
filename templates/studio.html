@@ -4204,6 +4204,13 @@ async function build(prompt){
   if(!prompt && !pendingAttachments.length)return;
 
   const attachmentsForBuild=pendingAttachments.map(a=>({...a}));
+
+  // The sent message owns its attachment copy now. Clear the composer
+  // immediately while V4 continues using attachmentsForBuild.
+  pendingAttachments=[];
+  renderAttachments();
+  closeAttachMenu();
+
   addMessage(
     "user",
     prompt,
