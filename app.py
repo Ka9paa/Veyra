@@ -375,6 +375,25 @@ def init_db():
                 created_at TEXT NOT NULL,
                 reviewed_at TEXT
             )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS staff_applications(
+                id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                discord_name TEXT DEFAULT '',
+                age TEXT DEFAULT '',
+                timezone TEXT DEFAULT '',
+                availability TEXT NOT NULL,
+                about TEXT NOT NULL,
+                experience TEXT NOT NULL,
+                why_veyra TEXT NOT NULL,
+                support_judgment TEXT NOT NULL,
+                extra TEXT DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                reviewer_note TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                reviewed_at TEXT
+            )''')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_applications_user ON staff_applications(user_id)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_applications_status ON staff_applications(status)')
             c.execute('''CREATE TABLE IF NOT EXISTS support_threads(
                 id BIGSERIAL PRIMARY KEY,
                 user_id BIGINT,
@@ -469,6 +488,25 @@ def init_db():
             c.execute('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,provider TEXT NOT NULL,provider_user_id TEXT NOT NULL,email TEXT,name TEXT,avatar_url TEXT,password_hash TEXT,credits INTEGER NOT NULL DEFAULT 50,created_at TEXT NOT NULL,UNIQUE(provider,provider_user_id))''')
             c.execute('''CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',html TEXT DEFAULT '',css TEXT DEFAULT '',js TEXT DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)''')
             c.execute('''CREATE TABLE IF NOT EXISTS vouches(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,role TEXT DEFAULT '',rating INTEGER NOT NULL DEFAULT 5,message TEXT NOT NULL,project_name TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL,reviewed_at TEXT)''')
+            c.execute('''CREATE TABLE IF NOT EXISTS staff_applications(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                discord_name TEXT DEFAULT '',
+                age TEXT DEFAULT '',
+                timezone TEXT DEFAULT '',
+                availability TEXT NOT NULL,
+                about TEXT NOT NULL,
+                experience TEXT NOT NULL,
+                why_veyra TEXT NOT NULL,
+                support_judgment TEXT NOT NULL,
+                extra TEXT DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                reviewer_note TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                reviewed_at TEXT
+            )''')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_applications_user ON staff_applications(user_id)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_staff_applications_status ON staff_applications(status)')
             c.execute('''CREATE TABLE IF NOT EXISTS support_threads(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,question TEXT NOT NULL,answer TEXT NOT NULL,created_at TEXT NOT NULL)''')
             cols={r['name'] for r in c.execute('PRAGMA table_info(users)').fetchall()}
             if 'password_hash' not in cols: c.execute('ALTER TABLE users ADD COLUMN password_hash TEXT')
@@ -1339,10 +1377,86 @@ def support_api():
     return jsonify({'ok':True,'answer':answer})
 
 
-@app.route('/staff/apply')
+@app.route('/staff/apply', methods=['GET', 'POST'])
 @login_required
 def staff_apply():
-    return render_template('staff_apply.html', user=current_user())
+    u = current_user()
+
+    with db() as c:
+        application = c.execute(
+            "SELECT * FROM staff_applications WHERE user_id=? ORDER BY id DESC LIMIT 1",
+            (u['id'],)
+        ).fetchone()
+
+    application = dict(application) if application else None
+
+    if request.method == 'POST':
+        form_data = {
+            'discord_name': (request.form.get('discord_name') or '').strip()[:100],
+            'age': (request.form.get('age') or '').strip()[:20],
+            'timezone': (request.form.get('timezone') or '').strip()[:100],
+            'availability': (request.form.get('availability') or '').strip()[:3000],
+            'about': (request.form.get('about') or '').strip()[:5000],
+            'experience': (request.form.get('experience') or '').strip()[:5000],
+            'why_veyra': (request.form.get('why_veyra') or '').strip()[:5000],
+            'support_judgment': (request.form.get('support_judgment') or '').strip()[:5000],
+            'extra': (request.form.get('extra') or '').strip()[:5000],
+        }
+
+        if application and application.get('status') == 'pending':
+            flash('You already have a staff application pending review.', 'error')
+            return redirect(url_for('staff_apply'))
+
+        required = {
+            'availability': 'Availability',
+            'about': 'About you',
+            'experience': 'Experience',
+            'why_veyra': 'Why Veyra',
+            'support_judgment': 'Support judgment',
+        }
+
+        for field, label in required.items():
+            if len(form_data[field].split()) < 5:
+                flash(f'{label} must contain at least 5 words.', 'error')
+                return render_template(
+                    'staff_apply.html',
+                    user=u,
+                    application=application,
+                    form_data=form_data
+                ), 400
+
+        with db() as c:
+            c.execute(
+                '''INSERT INTO staff_applications(
+                    user_id,discord_name,age,timezone,availability,about,
+                    experience,why_veyra,support_judgment,extra,status,
+                    reviewer_note,created_at,reviewed_at
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,'pending','',?,NULL)''',
+                (
+                    u['id'],
+                    form_data['discord_name'],
+                    form_data['age'],
+                    form_data['timezone'],
+                    form_data['availability'],
+                    form_data['about'],
+                    form_data['experience'],
+                    form_data['why_veyra'],
+                    form_data['support_judgment'],
+                    form_data['extra'],
+                    now(),
+                )
+            )
+            c.commit()
+
+        flash('Your staff application has been submitted successfully.', 'success')
+        return redirect(url_for('staff_apply'))
+
+    return render_template(
+        'staff_apply.html',
+        user=u,
+        application=application,
+        form_data={}
+    )
 
 @app.route('/login')
 def login():
