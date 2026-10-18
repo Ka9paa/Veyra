@@ -510,6 +510,47 @@ Do not animate every object.
 Respect prefers-reduced-motion.
 `;
 
+const STRUCTURE_RECOVERY_SYSTEM = `
+You are Veyra's frontend output recovery engineer.
+
+A previous frontend generation failed Veyra's required output contract.
+
+Recover the website without simplifying, redesigning, summarizing,
+or lowering its visual quality.
+
+Return ONLY valid JSON using EXACTLY this structure:
+
+{
+  "title": "",
+  "assistant_message": "",
+  "html": "",
+  "css": "",
+  "js": "",
+  "next_steps": [],
+  "quality_notes": []
+}
+
+MANDATORY:
+
+- html must contain BODY CONTENT ONLY
+- html must be non-empty
+- css must be non-empty
+- js must be a string and may be empty only when JavaScript is unnecessary
+- keep HTML, CSS, and JavaScript in their separate JSON fields
+- do not wrap the response in markdown
+- do not use code fences
+- do not return commentary outside the JSON
+- do not omit CSS
+- preserve the original design intent and implementation detail
+- preserve all useful content from the failed generation
+- if CSS was accidentally embedded inside HTML, move it into the css field
+- if JavaScript was accidentally embedded inside HTML, move it into the js field
+- never replace a detailed implementation with a simplified one
+
+The recovered result will still be rendered in Chromium and judged by
+Veyra's normal screenshot quality system.
+`;
+
 const RECOMPOSE_SYSTEM = `
 You are Veyra's emergency Principal Art Director.
 
@@ -708,7 +749,58 @@ export async function orchestrateStudio(
     }
   );
 
-  const firstSite = parseSite(firstRaw);
+  let firstSite: SiteCode;
+
+  try {
+    firstSite = parseSite(firstRaw);
+  } catch (initialParseError) {
+    const parseMessage =
+      initialParseError instanceof Error
+        ? initialParseError.message
+        : String(initialParseError);
+
+    console.error(
+      `[Veyra V4] Initial builder output invalid (${parseMessage}). ` +
+      "Attempting one structural recovery..."
+    );
+
+    const recoveryRaw = await runModel(
+      "code",
+      STRUCTURE_RECOVERY_SYSTEM,
+      [
+        `ORIGINAL PROJECT:\n${ctx}`,
+        `DESIGN DNA:\n${designDNA}`,
+        `COMPOSITION BLUEPRINT:\n${composition}`,
+        `ASSET STRATEGY:\n${assets}`,
+        `FAILED BUILDER OUTPUT:\n${firstRaw}`,
+        `VALIDATION ERROR:\n${parseMessage}`,
+        "Recover the failed output into Veyra's exact required JSON structure.",
+        "Do not simplify or redesign the site."
+      ].join("\n\n"),
+      {
+        maxOutputTokens: 24000,
+        reasoningEffort: "low"
+      }
+    );
+
+    try {
+      firstSite = parseSite(recoveryRaw);
+
+      console.error(
+        "[Veyra V4] Structural recovery succeeded."
+      );
+    } catch (recoveryError) {
+      const recoveryMessage =
+        recoveryError instanceof Error
+          ? recoveryError.message
+          : String(recoveryError);
+
+      throw new Error(
+        `Initial builder output was invalid (${parseMessage}); ` +
+        `structural recovery also failed (${recoveryMessage}).`
+      );
+    }
+  }
 
   console.error("[Veyra V4] Rendering first composition...");
 

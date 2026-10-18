@@ -451,6 +451,36 @@ def init_db():
                 granted_by TEXT NOT NULL,
                 granted_at TEXT NOT NULL
             )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS project_messages(
+                id BIGSERIAL PRIMARY KEY,
+                project_id BIGINT NOT NULL,
+                user_id BIGINT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT DEFAULT '',
+                attachments_json TEXT DEFAULT '[]',
+                metadata_json TEXT DEFAULT '{}',
+                created_at TEXT NOT NULL
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS project_versions(
+                id BIGSERIAL PRIMARY KEY,
+                project_id BIGINT NOT NULL,
+                user_id BIGINT NOT NULL,
+                version_number INTEGER NOT NULL,
+                title TEXT DEFAULT '',
+                prompt TEXT DEFAULT '',
+                html TEXT DEFAULT '',
+                css TEXT DEFAULT '',
+                js TEXT DEFAULT '',
+                source TEXT NOT NULL DEFAULT 'build',
+                restored_from BIGINT,
+                created_at TEXT NOT NULL,
+                UNIQUE(project_id,version_number)
+            )''')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_project_messages_project ON project_messages(project_id,id)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_project_messages_user ON project_messages(user_id)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_project_versions_project ON project_versions(project_id,version_number)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_project_versions_user ON project_versions(user_id)')
+
             c.execute('''CREATE TABLE IF NOT EXISTS project_members(
                 id BIGSERIAL PRIMARY KEY,
                 project_id BIGINT NOT NULL,
@@ -575,6 +605,36 @@ def init_db():
                 granted_by TEXT NOT NULL,
                 granted_at TEXT NOT NULL
             )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS project_messages(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT DEFAULT '',
+                attachments_json TEXT DEFAULT '[]',
+                metadata_json TEXT DEFAULT '{}',
+                created_at TEXT NOT NULL
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS project_versions(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                version_number INTEGER NOT NULL,
+                title TEXT DEFAULT '',
+                prompt TEXT DEFAULT '',
+                html TEXT DEFAULT '',
+                css TEXT DEFAULT '',
+                js TEXT DEFAULT '',
+                source TEXT NOT NULL DEFAULT 'build',
+                restored_from INTEGER,
+                created_at TEXT NOT NULL,
+                UNIQUE(project_id,version_number)
+            )''')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_project_messages_project ON project_messages(project_id,id)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_project_messages_user ON project_messages(user_id)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_project_versions_project ON project_versions(project_id,version_number)')
+            c.execute('CREATE INDEX IF NOT EXISTS idx_project_versions_user ON project_versions(user_id)')
+
             c.execute('''CREATE TABLE IF NOT EXISTS project_members(id INTEGER PRIMARY KEY AUTOINCREMENT,project_id INTEGER NOT NULL,user_id INTEGER NOT NULL,role TEXT NOT NULL DEFAULT 'editor',added_by INTEGER NOT NULL,created_at TEXT NOT NULL,UNIQUE(project_id,user_id))''')
             c.execute('''CREATE TABLE IF NOT EXISTS agents(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,name TEXT NOT NULL,description TEXT DEFAULT '',status TEXT NOT NULL DEFAULT 'idle',created_at TEXT NOT NULL)''')
             c.execute('''CREATE TABLE IF NOT EXISTS project_databases(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,project_id INTEGER,name TEXT NOT NULL,provider TEXT NOT NULL DEFAULT 'Postgres',status TEXT NOT NULL DEFAULT 'connected',created_at TEXT NOT NULL)''')
@@ -3537,6 +3597,308 @@ def api_build():
         'ai_model':used_model,
     })
     return jsonify(data)
+
+
+
+@app.get('/api/projects/<int:project_id>/history')
+@login_required
+def project_history(project_id):
+    u=current_user()
+    project,role=_project_access(project_id,u['id'])
+
+    if not project or not role:
+        return jsonify({'ok':False,'error':'Project not found'}),404
+
+    with db() as c:
+        messages=c.execute(
+            """SELECT id,project_id,user_id,role,content,
+                      attachments_json,metadata_json,created_at
+               FROM project_messages
+               WHERE project_id=?
+               ORDER BY id ASC""",
+            (project_id,)
+        ).fetchall()
+
+        versions=c.execute(
+            """SELECT id,project_id,user_id,version_number,title,prompt,
+                      source,restored_from,created_at
+               FROM project_versions
+               WHERE project_id=?
+               ORDER BY version_number DESC""",
+            (project_id,)
+        ).fetchall()
+
+    def decode_json(value,fallback):
+        try:
+            return json.loads(value or '')
+        except Exception:
+            return fallback
+
+    return jsonify({
+        'ok':True,
+        'access_role':role,
+        'messages':[
+            {
+                **dict(row),
+                'attachments':decode_json(row['attachments_json'],[]),
+                'metadata':decode_json(row['metadata_json'],{})
+            }
+            for row in messages
+        ],
+        'versions':[dict(row) for row in versions]
+    })
+
+
+@app.post('/api/projects/<int:project_id>/messages')
+@login_required
+def save_project_message(project_id):
+    u=current_user()
+    project,access_role=_project_access(project_id,u['id'])
+
+    if not project or not access_role:
+        return jsonify({'ok':False,'error':'Project not found'}),404
+
+    if access_role not in {'owner','editor'}:
+        return jsonify({'ok':False,'error':'You do not have edit access to this project.'}),403
+
+    payload=request.get_json(silent=True) or {}
+
+    message_role=str(payload.get('role') or '').strip().lower()
+    content=str(payload.get('content') or '')
+    attachments=payload.get('attachments') or []
+    metadata=payload.get('metadata') or {}
+
+    if message_role not in {'user','assistant'}:
+        return jsonify({'ok':False,'error':'Invalid message role'}),400
+
+    if not isinstance(attachments,list):
+        attachments=[]
+
+    if not isinstance(metadata,dict):
+        metadata={}
+
+    # Keep persisted history lightweight. Image/file binary data belongs to
+    # the live build request, not permanently inside the database.
+    safe_attachments=[]
+
+    for attachment in attachments[:4]:
+        if not isinstance(attachment,dict):
+            continue
+
+        safe_attachments.append({
+            'name':str(attachment.get('name') or '')[:255],
+            'type':str(attachment.get('type') or '')[:120],
+            'size':attachment.get('size') or 0,
+            'kind':str(attachment.get('kind') or '')[:40]
+        })
+
+    created=now()
+
+    with db() as c:
+        cur=c.execute(
+            """INSERT INTO project_messages(
+                   project_id,user_id,role,content,
+                   attachments_json,metadata_json,created_at
+               )
+               VALUES(?,?,?,?,?,?,?)""",
+            (
+                project_id,
+                u['id'],
+                message_role,
+                content[:50000],
+                json.dumps(safe_attachments,separators=(',',':')),
+                json.dumps(metadata,separators=(',',':')),
+                created
+            )
+        )
+
+        message_id=cur.lastrowid
+        c.commit()
+
+    return jsonify({
+        'ok':True,
+        'message_id':message_id,
+        'created_at':created
+    })
+
+
+@app.post('/api/projects/<int:project_id>/versions')
+@login_required
+def create_project_version(project_id):
+    u=current_user()
+    project,access_role=_project_access(project_id,u['id'])
+
+    if not project or not access_role:
+        return jsonify({'ok':False,'error':'Project not found'}),404
+
+    if access_role not in {'owner','editor'}:
+        return jsonify({'ok':False,'error':'You do not have edit access to this project.'}),403
+
+    payload=request.get_json(silent=True) or {}
+
+    prompt=str(payload.get('prompt') or '')[:10000]
+    source=str(payload.get('source') or 'build').strip().lower()
+
+    if source not in {'build','edit','manual','restore'}:
+        source='build'
+
+    created=now()
+
+    with db() as c:
+        latest=c.execute(
+            """SELECT COALESCE(MAX(version_number),0) AS n
+               FROM project_versions
+               WHERE project_id=?""",
+            (project_id,)
+        ).fetchone()
+
+        version_number=int(latest['n'] or 0)+1
+
+        cur=c.execute(
+            """INSERT INTO project_versions(
+                   project_id,user_id,version_number,title,prompt,
+                   html,css,js,source,restored_from,created_at
+               )
+               VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                project_id,
+                u['id'],
+                version_number,
+                project.get('name') or '',
+                prompt,
+                project.get('html') or '',
+                project.get('css') or '',
+                project.get('js') or '',
+                source,
+                None,
+                created
+            )
+        )
+
+        version_id=cur.lastrowid
+        c.commit()
+
+    return jsonify({
+        'ok':True,
+        'version_id':version_id,
+        'version_number':version_number,
+        'created_at':created
+    })
+
+
+@app.get('/api/projects/<int:project_id>/versions/<int:version_id>')
+@login_required
+def get_project_version(project_id,version_id):
+    u=current_user()
+    project,role=_project_access(project_id,u['id'])
+
+    if not project or not role:
+        return jsonify({'ok':False,'error':'Project not found'}),404
+
+    with db() as c:
+        version=c.execute(
+            """SELECT *
+               FROM project_versions
+               WHERE id=? AND project_id=?""",
+            (version_id,project_id)
+        ).fetchone()
+
+    if not version:
+        return jsonify({'ok':False,'error':'Version not found'}),404
+
+    return jsonify({
+        'ok':True,
+        'version':dict(version)
+    })
+
+
+@app.post('/api/projects/<int:project_id>/versions/<int:version_id>/restore')
+@login_required
+def restore_project_version(project_id,version_id):
+    u=current_user()
+    project,access_role=_project_access(project_id,u['id'])
+
+    if not project or not access_role:
+        return jsonify({'ok':False,'error':'Project not found'}),404
+
+    if access_role not in {'owner','editor'}:
+        return jsonify({'ok':False,'error':'You do not have edit access to this project.'}),403
+
+    created=now()
+
+    with db() as c:
+        version=c.execute(
+            """SELECT *
+               FROM project_versions
+               WHERE id=? AND project_id=?""",
+            (version_id,project_id)
+        ).fetchone()
+
+        if not version:
+            return jsonify({'ok':False,'error':'Version not found'}),404
+
+        latest=c.execute(
+            """SELECT COALESCE(MAX(version_number),0) AS n
+               FROM project_versions
+               WHERE project_id=?""",
+            (project_id,)
+        ).fetchone()
+
+        new_number=int(latest['n'] or 0)+1
+
+        # Restore the selected snapshot into the live project.
+        c.execute(
+            """UPDATE projects
+               SET name=?,html=?,css=?,js=?,updated_at=?
+               WHERE id=?""",
+            (
+                version['title'] or project.get('name') or 'Untitled Project',
+                version['html'] or '',
+                version['css'] or '',
+                version['js'] or '',
+                created,
+                project_id
+            )
+        )
+
+        # Restoring is itself a new snapshot. This makes the restore
+        # reversible instead of destroying history.
+        cur=c.execute(
+            """INSERT INTO project_versions(
+                   project_id,user_id,version_number,title,prompt,
+                   html,css,js,source,restored_from,created_at
+               )
+               VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                project_id,
+                u['id'],
+                new_number,
+                version['title'] or project.get('name') or '',
+                'Restored version '+str(version['version_number']),
+                version['html'] or '',
+                version['css'] or '',
+                version['js'] or '',
+                'restore',
+                version['id'],
+                created
+            )
+        )
+
+        restored_id=cur.lastrowid
+        c.commit()
+
+    return jsonify({
+        'ok':True,
+        'version_id':restored_id,
+        'version_number':new_number,
+        'restored_from':version['id'],
+        'title':version['title'] or project.get('name') or '',
+        'html':version['html'] or '',
+        'css':version['css'] or '',
+        'js':version['js'] or '',
+        'created_at':created
+    })
+
 
 
 @app.post('/api/projects/save')

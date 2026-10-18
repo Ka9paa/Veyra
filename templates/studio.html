@@ -1393,12 +1393,115 @@ body{
 
   <div class="studio-credit-pill"><span></span><b id="studioCreditCount">{{user.credits or 0}}</b> credits</div>
   <div class="top-actions">
-    <button class="top-btn" id="saveBtn">Save</button><button class="top-btn" id="inspectBtn">Inspect</button>
+    <button class="top-btn" id="saveBtn">Save</button>
+    <button class="top-btn history-top-btn" id="historyBtn" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 12a9 9 0 1 0 3-6.7"/>
+        <path d="M3 4v6h6"/>
+        <path d="M12 7v5l3 2"/>
+      </svg>
+      History
+    </button>
+    <button class="top-btn" id="inspectBtn">Inspect</button>
     <button class="top-btn share" id="shareBtn">Share</button>
     <button class="top-btn export" id="exportBtn">Export</button>
     <button class="top-btn primary" id="publishBtn">Publish</button>
   </div>
 </header>
+
+<div class="history-overlay" id="historyOverlay"></div>
+
+<aside class="history-drawer" id="historyDrawer" aria-hidden="true">
+  <div class="history-drawer-head">
+    <div>
+      <div class="history-kicker">PROJECT HISTORY</div>
+      <h3>Version History</h3>
+      <p>Preview or restore an earlier build.</p>
+    </div>
+
+    <button
+      class="history-close"
+      id="historyClose"
+      type="button"
+      aria-label="Close version history"
+    >×</button>
+  </div>
+
+  <div class="history-current">
+    <div class="history-current-icon">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 5h16v14H4z"/>
+        <path d="M4 9h16"/>
+      </svg>
+    </div>
+
+    <div>
+      <span>Current project</span>
+      <strong id="historyProjectName">Untitled Project</strong>
+    </div>
+
+    <span class="history-live-pill">LIVE</span>
+  </div>
+
+  <div class="history-toolbar">
+    <div>
+      <strong>Saved versions</strong>
+      <span id="historyVersionCount">0 versions</span>
+    </div>
+
+    <button
+      class="history-refresh"
+      id="historyRefresh"
+      type="button"
+      title="Refresh versions"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M20 11a8 8 0 1 0-2.3 5.7"/>
+        <path d="M20 5v6h-6"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="history-list" id="historyList">
+    <div class="history-empty">
+      <div class="history-empty-icon">↶</div>
+      <strong>No versions yet</strong>
+      <span>Your successful AI builds will appear here automatically.</span>
+    </div>
+  </div>
+
+  <div class="history-preview-bar" id="historyPreviewBar">
+    <div>
+      <span>Previewing</span>
+      <strong id="historyPreviewLabel">Version</strong>
+    </div>
+
+    <button type="button" id="historyReturnCurrent">
+      Return to current
+    </button>
+  </div>
+</aside>
+
+<div class="history-confirm-overlay" id="historyConfirmOverlay">
+  <div class="history-confirm">
+    <div class="history-confirm-icon">↶</div>
+    <h3>Restore this version?</h3>
+    <p id="historyConfirmText">
+      Your current project will switch to this saved version.
+    </p>
+
+    <div class="history-confirm-actions">
+      <button type="button" id="historyCancelRestore">Cancel</button>
+      <button
+        type="button"
+        class="history-confirm-primary"
+        id="historyConfirmRestore"
+      >
+        Restore version
+      </button>
+    </div>
+  </div>
+</div>
 
 <aside class="rail">
   <a class="nav-item active" href="#">
@@ -4138,6 +4241,164 @@ async function readJsonResponse(res){
   }
 }
 
+
+let historyHydrating=false;
+
+function historyAttachmentPayload(attachments=[]){
+  return (Array.isArray(attachments)?attachments:[])
+    .filter(Boolean)
+    .slice(0,4)
+    .map(a=>({
+      name:String(a?.name||"").slice(0,255),
+      type:String(a?.type||"").slice(0,120),
+      size:Number(a?.size||0),
+      kind:String(
+        a?.kind||
+        (String(a?.type||"").startsWith("image/")?"image":"file")
+      ).slice(0,40)
+    }));
+}
+
+async function persistProjectMessage(role,text,attachments=[],metadata={}){
+  if(historyHydrating || !state.project_id || state.access_role==="viewer"){
+    return null;
+  }
+
+  try{
+    const res=await fetch(`/api/projects/${state.project_id}/messages`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        role,
+        content:text||"",
+        attachments:historyAttachmentPayload(attachments),
+        metadata:metadata||{}
+      })
+    });
+
+    const data=await readJsonResponse(res);
+
+    if(!res.ok||data.ok===false){
+      throw new Error(data.error||data.code||"History save failed");
+    }
+
+    return data;
+  }catch(e){
+    console.error("Veyra history save failed",e);
+    return null;
+  }
+}
+
+async function createProjectVersion(prompt="",source="build"){
+  if(!state.project_id || state.access_role==="viewer"){
+    return null;
+  }
+
+  try{
+    const res=await fetch(`/api/projects/${state.project_id}/versions`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        prompt:prompt||"",
+        source:source||"build"
+      })
+    });
+
+    const data=await readJsonResponse(res);
+
+    if(!res.ok||data.ok===false){
+      throw new Error(data.error||data.code||"Version save failed");
+    }
+
+    return data;
+  }catch(e){
+    console.error("Veyra version snapshot failed",e);
+    return null;
+  }
+}
+
+function clearRenderedConversation(){
+  const root=$("messages");
+  if(!root)return;
+
+  Array.from(root.children).forEach(node=>{
+    if(node.id!=="veyraWelcome" && node.id!=="typingRow"){
+      node.remove();
+    }
+  });
+
+  const welcome=$("veyraWelcome");
+  if(welcome)welcome.style.display="";
+}
+
+async function loadProjectHistory(projectId){
+  if(!projectId)return null;
+
+  const res=await fetch(`/api/projects/${projectId}/history`);
+  const data=await readJsonResponse(res);
+
+  if(!res.ok||data.ok===false){
+    throw new Error(
+      data.error||
+      data.code||
+      "Conversation history could not be loaded."
+    );
+  }
+
+  clearRenderedConversation();
+
+  const historyMessages=Array.isArray(data.messages)
+    ? data.messages
+    : [];
+
+  historyHydrating=true;
+
+  try{
+    for(const message of historyMessages){
+      const metadata=message.metadata||{};
+
+      if(message.role==="assistant" && metadata.kind==="build"){
+        addMessage(
+          "assistant",
+          message.content||"",
+          metadata.title||null,
+          Array.isArray(metadata.steps)?metadata.steps:null,
+          {
+            duration:metadata.duration??null,
+            changedFiles:Array.isArray(metadata.changedFiles)
+              ? metadata.changedFiles
+              : [],
+            nextSteps:Array.isArray(metadata.nextSteps)
+              ? metadata.nextSteps
+              : [],
+            creditsUsed:metadata.creditsUsed??null
+          },
+          message.attachments||[]
+        );
+      }else{
+        addMessage(
+          message.role==="assistant"?"assistant":"user",
+          message.content||"",
+          null,
+          null,
+          null,
+          message.attachments||[]
+        );
+      }
+    }
+  }finally{
+    historyHydrating=false;
+  }
+
+  if(historyMessages.length){
+    const welcome=$("veyraWelcome");
+    if(welcome)welcome.style.display="none";
+  }
+
+  return data;
+}
+
+
 let autosaveTimer=null;
 let saveInFlight=null;
 
@@ -4219,6 +4480,23 @@ async function build(prompt){
     null,
     attachmentsForBuild
   );
+  const historyUserMessage={
+    role:"user",
+    text:prompt,
+    attachments:attachmentsForBuild
+  };
+
+  const historyProjectIdAtSend=state.project_id;
+
+  if(historyProjectIdAtSend){
+    await persistProjectMessage(
+      "user",
+      historyUserMessage.text,
+      historyUserMessage.attachments,
+      {kind:"user"}
+    );
+  }
+
   promptEl.value="";
   sendBtn.disabled=true;
   $("engineStatus").textContent="Veyra is thinking…";
@@ -4253,13 +4531,25 @@ async function build(prompt){
 
       setTyping(false);
 
+      const assistantChatText=
+        chatData.assistant_message || "How can I help?";
+
       addMessage(
         "assistant",
-        chatData.assistant_message || "How can I help?",
+        assistantChatText,
         null,
         null,
         null
       );
+
+      if(state.project_id){
+        await persistProjectMessage(
+          "assistant",
+          assistantChatText,
+          [],
+          {kind:"chat"}
+        );
+      }
 
       $("engineStatus").textContent=
         chatData.engine || "Veyra Assistant";
@@ -4356,16 +4646,40 @@ async function build(prompt){
     syncUI();
 
     setTyping(false);
+
+    const completedAssistantText=
+      data.assistant_message||"Done — I updated the project.";
+
+    const completedMetadata={
+      kind:"build",
+      title:state.title,
+      steps:[
+        "Analyzed your request",
+        "Updated project files",
+        "Rendered live preview"
+      ],
+      duration:Date.now()-veyraBuildStartedAt,
+      changedFiles:Array.isArray(data.changed_files)
+        ? data.changed_files
+        : [],
+      nextSteps:Array.isArray(data.next_steps)
+        ? data.next_steps
+        : [],
+      creditsUsed:Number.isFinite(Number(data.credits_used))
+        ? Number(data.credits_used)
+        : null
+    };
+
     addMessage(
       "assistant",
-      data.assistant_message||"Done — I updated the project.",
+      completedAssistantText,
       state.title,
-      ["Analyzed your request","Updated project files","Rendered live preview"],
+      completedMetadata.steps,
       {
-        duration: Date.now()-veyraBuildStartedAt,
-        changedFiles: Array.isArray(data.changed_files) ? data.changed_files : [],
-        nextSteps: Array.isArray(data.next_steps) ? data.next_steps : [],
-        creditsUsed: Number.isFinite(Number(data.credits_used)) ? Number(data.credits_used) : null
+        duration:completedMetadata.duration,
+        changedFiles:completedMetadata.changedFiles,
+        nextSteps:completedMetadata.nextSteps,
+        creditsUsed:completedMetadata.creditsUsed
       }
     );
     $("engineStatus").textContent=data.engine||"Veyra AI";
@@ -4379,7 +4693,44 @@ async function build(prompt){
         diagnostic.classList.remove("show");
       }
     }
-    await autosave(data.diagnostic_code ? "Fallback preview saved" : "AI build autosaved");
+    const buildSave=await autosave(
+      data.diagnostic_code
+        ? "Fallback preview saved"
+        : "AI build autosaved"
+    );
+
+    if(buildSave && state.project_id){
+      /*
+        A brand-new project had no id when the first user message was
+        sent. Once autosave creates the project, persist that message.
+      */
+      if(!historyProjectIdAtSend){
+        await persistProjectMessage(
+          "user",
+          historyUserMessage.text,
+          historyUserMessage.attachments,
+          {kind:"user"}
+        );
+      }
+
+      await persistProjectMessage(
+        "assistant",
+        completedAssistantText,
+        [],
+        completedMetadata
+      );
+
+      await createProjectVersion(
+        prompt,
+        (originalCurrent.html||originalCurrent.css||originalCurrent.js)
+          ? "edit"
+          : "build"
+      );
+
+      if($("historyDrawer")?.classList.contains("open")){
+        await refreshVersionHistory();
+      }
+    }
   }catch(e){
     setTyping(false);
     addMessage("assistant","I couldn’t finish that build: "+e.message);
@@ -4466,7 +4817,36 @@ async function loadProject(id){
   state.dirty=false;
   renderPreview();
   syncUI();
-  addMessage("assistant","Loaded "+state.title+". You can keep working from where you left off.");
+
+  if($("historyProjectName")){
+    $("historyProjectName").textContent=
+      state.title||"Untitled Project";
+  }
+
+  projectVersions=[];
+  historyPreviewOriginal=null;
+  historyPreviewVersion=null;
+
+  if($("historyPreviewBar")){
+    $("historyPreviewBar").classList.remove("show");
+  }
+
+  try{
+    const historyData=await loadProjectHistory(state.project_id);
+
+    if(!historyData?.messages?.length){
+      addMessage(
+        "assistant",
+        "Loaded "+state.title+". You can keep working from where you left off."
+      );
+    }
+  }catch(e){
+    console.error("Veyra history load failed",e);
+    addMessage(
+      "assistant",
+      "Loaded "+state.title+". Your project is ready, but conversation history could not be loaded."
+    );
+  }
 }
 
 async function doExport(){
@@ -4483,6 +4863,412 @@ async function doExport(){
   a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
+
+
+let projectVersions=[];
+let historyPreviewVersion=null;
+let historyPreviewOriginal=null;
+let pendingRestoreVersion=null;
+
+function historyDate(value){
+  if(!value)return "Saved version";
+
+  const d=new Date(value);
+
+  if(Number.isNaN(d.getTime())){
+    return String(value);
+  }
+
+  return d.toLocaleString([],{
+    month:"short",
+    day:"numeric",
+    year:"numeric",
+    hour:"numeric",
+    minute:"2-digit"
+  });
+}
+
+function historySourceLabel(source){
+  const value=String(source||"build").toLowerCase();
+
+  if(value==="restore")return "Restored";
+  if(value==="edit")return "AI Edit";
+  if(value==="manual")return "Manual";
+  return "AI Build";
+}
+
+function openHistoryDrawer(){
+  if(!state.project_id){
+    addMessage(
+      "assistant",
+      "Build or save this project first, then version history will be available."
+    );
+    return;
+  }
+
+  $("historyProjectName").textContent=
+    state.title||"Untitled Project";
+
+  $("historyDrawer").classList.add("open");
+  $("historyOverlay").classList.add("open");
+  $("historyDrawer").setAttribute("aria-hidden","false");
+  document.body.classList.add("history-open");
+
+  refreshVersionHistory();
+}
+
+function closeHistoryDrawer(){
+  $("historyDrawer").classList.remove("open");
+  $("historyOverlay").classList.remove("open");
+  $("historyDrawer").setAttribute("aria-hidden","true");
+  document.body.classList.remove("history-open");
+}
+
+function renderVersionHistory(){
+  const list=$("historyList");
+  if(!list)return;
+
+  $("historyVersionCount").textContent=
+    `${projectVersions.length} ${
+      projectVersions.length===1?"version":"versions"
+    }`;
+
+  if(!projectVersions.length){
+    list.innerHTML=`
+      <div class="history-empty">
+        <div class="history-empty-icon">↶</div>
+        <strong>No versions yet</strong>
+        <span>Your successful AI builds will appear here automatically.</span>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML=projectVersions.map(version=>{
+    const previewing=
+      Number(historyPreviewVersion?.id)===Number(version.id);
+
+    const prompt=
+      version.prompt||
+      (
+        version.source==="restore"
+          ? "Restored an earlier saved version."
+          : "Saved project build."
+      );
+
+    return `
+      <article
+        class="history-version ${previewing?"previewing":""}"
+        data-history-version="${Number(version.id)}"
+      >
+        <div class="history-version-top">
+          <div class="history-version-number">
+            Version ${Number(version.version_number)||1}
+          </div>
+
+          <span class="history-version-source">
+            ${esc(historySourceLabel(version.source))}
+          </span>
+        </div>
+
+        <div class="history-version-time">
+          ${esc(historyDate(version.created_at))}
+        </div>
+
+        <div class="history-version-prompt">
+          ${esc(prompt)}
+        </div>
+
+        <div class="history-version-actions">
+          <button
+            type="button"
+            data-history-preview="${Number(version.id)}"
+          >
+            ${previewing?"Previewing":"Preview"}
+          </button>
+
+          <button
+            type="button"
+            class="restore"
+            data-history-restore="${Number(version.id)}"
+            ${state.access_role==="viewer"?"disabled":""}
+          >
+            Restore
+          </button>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  list.querySelectorAll("[data-history-preview]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      previewHistoryVersion(Number(btn.dataset.historyPreview));
+    });
+  });
+
+  list.querySelectorAll("[data-history-restore]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      askRestoreHistoryVersion(Number(btn.dataset.historyRestore));
+    });
+  });
+}
+
+async function refreshVersionHistory(){
+  if(!state.project_id)return;
+
+  const list=$("historyList");
+
+  if(list){
+    list.innerHTML=`
+      <div class="history-empty">
+        <div class="history-empty-icon">•••</div>
+        <strong>Loading history</strong>
+        <span>Fetching saved project versions.</span>
+      </div>
+    `;
+  }
+
+  try{
+    const res=await fetch(
+      `/api/projects/${state.project_id}/history`
+    );
+
+    const data=await readJsonResponse(res);
+
+    if(!res.ok||data.ok===false){
+      throw new Error(
+        data.error||
+        data.code||
+        "Could not load version history."
+      );
+    }
+
+    projectVersions=Array.isArray(data.versions)
+      ? data.versions
+      : [];
+
+    renderVersionHistory();
+  }catch(e){
+    console.error("Veyra version history load failed",e);
+
+    if(list){
+      list.innerHTML=`
+        <div class="history-empty">
+          <div class="history-empty-icon">!</div>
+          <strong>History unavailable</strong>
+          <span>${esc(e.message||"Could not load saved versions.")}</span>
+        </div>
+      `;
+    }
+  }
+}
+
+async function previewHistoryVersion(versionId){
+  if(!state.project_id)return;
+
+  try{
+    const res=await fetch(
+      `/api/projects/${state.project_id}/versions/${versionId}`
+    );
+
+    const data=await readJsonResponse(res);
+
+    if(!res.ok||data.ok===false||!data.version){
+      throw new Error(
+        data.error||
+        data.code||
+        "Could not preview this version."
+      );
+    }
+
+    if(!historyPreviewOriginal){
+      historyPreviewOriginal={
+        title:state.title,
+        html:state.html,
+        css:state.css,
+        js:state.js,
+        quality:state.quality
+      };
+    }
+
+    historyPreviewVersion=data.version;
+
+    state.html=data.version.html||"";
+    state.css=data.version.css||"";
+    state.js=data.version.js||"";
+
+    renderPreview();
+
+    $("historyPreviewLabel").textContent=
+      `Version ${data.version.version_number}`;
+
+    $("historyPreviewBar").classList.add("show");
+
+    renderVersionHistory();
+  }catch(e){
+    console.error("Veyra version preview failed",e);
+    addMessage(
+      "assistant",
+      "I couldn’t preview that saved version: "+e.message
+    );
+  }
+}
+
+function returnToCurrentVersion(){
+  if(!historyPreviewOriginal)return;
+
+  state.title=historyPreviewOriginal.title;
+  state.html=historyPreviewOriginal.html;
+  state.css=historyPreviewOriginal.css;
+  state.js=historyPreviewOriginal.js;
+  state.quality=historyPreviewOriginal.quality;
+
+  historyPreviewOriginal=null;
+  historyPreviewVersion=null;
+
+  $("historyPreviewBar").classList.remove("show");
+
+  renderPreview();
+  syncUI();
+  renderVersionHistory();
+}
+
+function askRestoreHistoryVersion(versionId){
+  if(state.access_role==="viewer")return;
+
+  const version=projectVersions.find(
+    v=>Number(v.id)===Number(versionId)
+  );
+
+  if(!version)return;
+
+  pendingRestoreVersion=version;
+
+  $("historyConfirmText").textContent=
+    `Restore Version ${version.version_number}? `+
+    `Your current project will switch to this saved build. `+
+    `The restore will also be saved as a new version.`;
+
+  $("historyConfirmOverlay").classList.add("open");
+}
+
+function closeRestoreConfirmation(){
+  pendingRestoreVersion=null;
+  $("historyConfirmOverlay").classList.remove("open");
+}
+
+async function restoreHistoryVersion(){
+  if(!pendingRestoreVersion || !state.project_id)return;
+
+  const version=pendingRestoreVersion;
+  const button=$("historyConfirmRestore");
+
+  button.disabled=true;
+  button.textContent="Restoring…";
+
+  try{
+    const res=await fetch(
+      `/api/projects/${state.project_id}/versions/${version.id}/restore`,
+      {
+        method:"POST",
+        headers:{"Content-Type":"application/json"}
+      }
+    );
+
+    const data=await readJsonResponse(res);
+
+    if(!res.ok||data.ok===false){
+      throw new Error(
+        data.error||
+        data.code||
+        "Version restore failed."
+      );
+    }
+
+    state.title=data.title||state.title;
+    state.html=data.html||"";
+    state.css=data.css||"";
+    state.js=data.js||"";
+    state.dirty=false;
+
+    historyPreviewOriginal=null;
+    historyPreviewVersion=null;
+
+    $("historyPreviewBar").classList.remove("show");
+
+    renderPreview();
+    syncUI();
+
+    $("historyProjectName").textContent=
+      state.title||"Untitled Project";
+
+    closeRestoreConfirmation();
+
+    await refreshVersionHistory();
+
+    setSaveState(
+      "saved",
+      `Restored ${messageTimestamp()}`
+    );
+
+    showAutosaveToast(
+      `Version ${version.version_number} restored`
+    );
+
+    addMessage(
+      "assistant",
+      `Restored Version ${version.version_number}. `+
+      `I kept your newer history, so you can switch back later.`
+    );
+
+    await persistProjectMessage(
+      "assistant",
+      `Restored Version ${version.version_number}.`,
+      [],
+      {
+        kind:"restore",
+        restoredVersion:Number(version.version_number)
+      }
+    );
+  }catch(e){
+    console.error("Veyra version restore failed",e);
+    addMessage(
+      "assistant",
+      "I couldn’t restore that version: "+e.message
+    );
+  }finally{
+    button.disabled=false;
+    button.textContent="Restore version";
+  }
+}
+
+$("historyBtn").onclick=openHistoryDrawer;
+$("historyClose").onclick=closeHistoryDrawer;
+$("historyOverlay").onclick=closeHistoryDrawer;
+$("historyRefresh").onclick=refreshVersionHistory;
+$("historyReturnCurrent").onclick=returnToCurrentVersion;
+$("historyCancelRestore").onclick=closeRestoreConfirmation;
+$("historyConfirmRestore").onclick=restoreHistoryVersion;
+
+$("historyConfirmOverlay").addEventListener("click",e=>{
+  if(e.target===$("historyConfirmOverlay")){
+    closeRestoreConfirmation();
+  }
+});
+
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Escape")return;
+
+  if($("historyConfirmOverlay").classList.contains("open")){
+    closeRestoreConfirmation();
+    return;
+  }
+
+  if($("historyDrawer").classList.contains("open")){
+    closeHistoryDrawer();
+  }
+});
+
 
 sendBtn.onclick=()=>build(promptEl.value);
 promptEl.addEventListener("keydown",e=>{
@@ -5137,6 +5923,498 @@ chatObserver.observe(messages,{childList:true,subtree:true});
   width:7px;
   height:7px;
 }
+
+
+/* ---------- VERSION HISTORY ---------- */
+
+.history-top-btn svg,
+.history-refresh svg,
+.history-current-icon svg{
+  width:15px;
+  height:15px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
+.history-overlay{
+  position:fixed;
+  inset:0;
+  z-index:89;
+  background:rgba(2,6,13,.54);
+  backdrop-filter:blur(3px);
+  opacity:0;
+  visibility:hidden;
+  transition:opacity .2s ease,visibility .2s ease;
+}
+
+.history-overlay.open{
+  opacity:1;
+  visibility:visible;
+}
+
+.history-drawer{
+  position:fixed;
+  z-index:90;
+  top:0;
+  right:0;
+  width:min(420px,94vw);
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  background:
+    radial-gradient(circle at 100% 0,rgba(119,76,255,.12),transparent 28%),
+    linear-gradient(180deg,#09111f,#070e19);
+  border-left:1px solid #202d45;
+  box-shadow:-30px 0 80px rgba(0,0,0,.34);
+  transform:translateX(102%);
+  transition:transform .25s cubic-bezier(.22,.8,.24,1);
+}
+
+.history-drawer.open{
+  transform:translateX(0);
+}
+
+.history-drawer-head{
+  display:flex;
+  align-items:flex-start;
+  gap:14px;
+  padding:22px 20px 18px;
+  border-bottom:1px solid var(--line);
+}
+
+.history-drawer-head > div:first-child{
+  min-width:0;
+  flex:1;
+}
+
+.history-kicker{
+  margin-bottom:5px;
+  color:#8e6cff;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.14em;
+}
+
+.history-drawer-head h3{
+  margin:0;
+  color:#f4f7fc;
+  font-size:18px;
+  letter-spacing:-.02em;
+}
+
+.history-drawer-head p{
+  margin:5px 0 0;
+  color:#71819a;
+  font-size:11px;
+}
+
+.history-close{
+  width:34px;
+  height:34px;
+  flex:0 0 auto;
+  display:grid;
+  place-items:center;
+  border:1px solid #25344d;
+  border-radius:10px;
+  background:#0c1626;
+  color:#8998ae;
+  font-size:21px;
+  line-height:1;
+}
+
+.history-close:hover{
+  color:#fff;
+  border-color:#4b3a80;
+  background:#121a2e;
+}
+
+.history-current{
+  margin:15px 16px 8px;
+  padding:12px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  border:1px solid #263651;
+  border-radius:13px;
+  background:linear-gradient(180deg,#0e1829,#0a1423);
+}
+
+.history-current-icon{
+  width:34px;
+  height:34px;
+  flex:0 0 auto;
+  display:grid;
+  place-items:center;
+  border-radius:10px;
+  color:#a98cff;
+  background:#17183a;
+  border:1px solid #37306d;
+}
+
+.history-current > div:nth-child(2){
+  min-width:0;
+  flex:1;
+}
+
+.history-current span{
+  display:block;
+  color:#667893;
+  font-size:9px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+
+.history-current strong{
+  display:block;
+  margin-top:2px;
+  overflow:hidden;
+  color:#e9eef7;
+  font-size:12px;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.history-current .history-live-pill{
+  width:auto;
+  padding:4px 6px;
+  border:1px solid rgba(69,223,174,.2);
+  border-radius:999px;
+  color:#6ce8b9;
+  background:rgba(69,223,174,.07);
+  font-size:8px;
+  letter-spacing:.09em;
+}
+
+.history-toolbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px 17px 10px;
+}
+
+.history-toolbar > div{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+
+.history-toolbar strong{
+  color:#dce4f0;
+  font-size:11px;
+}
+
+.history-toolbar span{
+  color:#657590;
+  font-size:9px;
+}
+
+.history-refresh{
+  width:30px;
+  height:30px;
+  display:grid;
+  place-items:center;
+  border:1px solid #25344c;
+  border-radius:9px;
+  background:#0b1524;
+  color:#8090a9;
+}
+
+.history-refresh:hover{
+  color:#fff;
+  border-color:#554285;
+}
+
+.history-list{
+  min-height:0;
+  flex:1;
+  overflow:auto;
+  padding:0 14px 18px;
+}
+
+.history-empty{
+  min-height:220px;
+  padding:30px 24px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  color:#6e7e97;
+}
+
+.history-empty-icon{
+  width:43px;
+  height:43px;
+  margin-bottom:12px;
+  display:grid;
+  place-items:center;
+  border:1px solid #2b3851;
+  border-radius:13px;
+  color:#9875ff;
+  background:#10182a;
+  font-size:19px;
+}
+
+.history-empty strong{
+  color:#cbd5e4;
+  font-size:12px;
+}
+
+.history-empty span{
+  max-width:240px;
+  margin-top:5px;
+  font-size:10px;
+  line-height:1.5;
+}
+
+.history-version{
+  position:relative;
+  margin-bottom:8px;
+  padding:13px;
+  border:1px solid #1e2d45;
+  border-radius:13px;
+  background:linear-gradient(180deg,#0d1727,#091321);
+  transition:border-color .16s ease,transform .16s ease,background .16s ease;
+}
+
+.history-version:hover{
+  transform:translateY(-1px);
+  border-color:#3c3c70;
+  background:linear-gradient(180deg,#101a2d,#0b1525);
+}
+
+.history-version.previewing{
+  border-color:#7554e8;
+  box-shadow:
+    inset 0 0 0 1px rgba(132,91,255,.16),
+    0 0 25px rgba(104,74,220,.08);
+}
+
+.history-version-top{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.history-version-number{
+  min-width:0;
+  flex:1;
+  color:#edf2fa;
+  font-size:12px;
+  font-weight:850;
+}
+
+.history-version-source{
+  padding:3px 6px;
+  border:1px solid #2d3a54;
+  border-radius:999px;
+  color:#8292aa;
+  background:#0a1220;
+  font-size:8px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+}
+
+.history-version-time{
+  margin-top:4px;
+  color:#5e708b;
+  font-size:9px;
+}
+
+.history-version-prompt{
+  margin-top:9px;
+  display:-webkit-box;
+  overflow:hidden;
+  color:#aeb9cb;
+  font-size:10px;
+  line-height:1.45;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+}
+
+.history-version-actions{
+  display:flex;
+  gap:6px;
+  margin-top:11px;
+}
+
+.history-version-actions button{
+  height:29px;
+  padding:0 9px;
+  border:1px solid #293a57;
+  border-radius:8px;
+  background:#0c1626;
+  color:#94a4bc;
+  font-size:9px;
+  font-weight:800;
+}
+
+.history-version-actions button:hover{
+  color:#fff;
+  border-color:#51417e;
+  background:#12192d;
+}
+
+.history-version-actions .restore{
+  margin-left:auto;
+  color:#b7a5ff;
+  border-color:#443574;
+  background:#15132c;
+}
+
+.history-version-actions .restore:hover{
+  color:#fff;
+  border-color:#7b59f4;
+  background:#211a43;
+}
+
+.history-version-actions .restore:disabled{
+  opacity:.4;
+  cursor:not-allowed;
+}
+
+.history-preview-bar{
+  display:none;
+  align-items:center;
+  gap:12px;
+  padding:12px 15px;
+  border-top:1px solid #2d2857;
+  background:
+    linear-gradient(180deg,rgba(40,29,78,.96),rgba(20,19,47,.98));
+}
+
+.history-preview-bar.show{
+  display:flex;
+}
+
+.history-preview-bar > div{
+  min-width:0;
+  flex:1;
+}
+
+.history-preview-bar span{
+  display:block;
+  color:#8f7fc5;
+  font-size:8px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+
+.history-preview-bar strong{
+  display:block;
+  margin-top:2px;
+  color:#eeeaff;
+  font-size:11px;
+}
+
+.history-preview-bar button{
+  height:31px;
+  padding:0 10px;
+  border:1px solid #5b468e;
+  border-radius:8px;
+  background:#181532;
+  color:#c7b8ff;
+  font-size:9px;
+  font-weight:800;
+}
+
+.history-confirm-overlay{
+  position:fixed;
+  inset:0;
+  z-index:110;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  background:rgba(2,5,11,.72);
+  backdrop-filter:blur(6px);
+  opacity:0;
+  visibility:hidden;
+  transition:.18s ease;
+}
+
+.history-confirm-overlay.open{
+  opacity:1;
+  visibility:visible;
+}
+
+.history-confirm{
+  width:min(390px,100%);
+  padding:23px;
+  border:1px solid #2c3b57;
+  border-radius:17px;
+  background:
+    radial-gradient(circle at 80% 0,rgba(119,76,255,.12),transparent 32%),
+    #0b1423;
+  box-shadow:0 30px 100px rgba(0,0,0,.5);
+}
+
+.history-confirm-icon{
+  width:42px;
+  height:42px;
+  margin-bottom:15px;
+  display:grid;
+  place-items:center;
+  border:1px solid #483876;
+  border-radius:12px;
+  color:#a98dff;
+  background:#17142f;
+  font-size:19px;
+}
+
+.history-confirm h3{
+  margin:0;
+  color:#f1f4fa;
+  font-size:17px;
+}
+
+.history-confirm p{
+  margin:7px 0 19px;
+  color:#7f8ea5;
+  font-size:11px;
+  line-height:1.55;
+}
+
+.history-confirm-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:7px;
+}
+
+.history-confirm-actions button{
+  height:35px;
+  padding:0 12px;
+  border:1px solid #2b3b57;
+  border-radius:9px;
+  background:#0d1727;
+  color:#9dacbf;
+  font-size:10px;
+  font-weight:800;
+}
+
+.history-confirm-actions .history-confirm-primary{
+  color:#fff;
+  border-color:#7652ed;
+  background:linear-gradient(135deg,#8055f8,#625ce9);
+  box-shadow:0 8px 24px rgba(104,76,231,.18);
+}
+
+body.history-open{
+  overflow:hidden;
+}
+
+@media(max-width:980px){
+  .history-top-btn{
+    padding:0 10px;
+  }
+}
+
 
 /* Topbar home spacing */
 .topbar .veyra-studio-home{
