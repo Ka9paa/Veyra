@@ -392,6 +392,36 @@ def init_db():
                 created_at TEXT NOT NULL,
                 reviewed_at TEXT
             )''')
+            # Migrate legacy staff application schemas.
+            current_staff_columns = {
+                'id', 'user_id', 'discord_name', 'age', 'timezone',
+                'availability', 'about', 'experience', 'why_veyra',
+                'support_judgment', 'extra', 'status', 'reviewer_id',
+                'reviewer_note', 'created_at', 'reviewed_at'
+            }
+
+            legacy_required_columns = c.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'staff_applications'
+                  AND is_nullable = 'NO'
+                  AND column_default IS NULL
+            """).fetchall()
+
+            for row in legacy_required_columns:
+                column_name = row['column_name']
+                if column_name not in current_staff_columns:
+                    c.execute(
+                        f'ALTER TABLE staff_applications '
+                        f'ALTER COLUMN "{column_name}" DROP NOT NULL'
+                    )
+
+            c.execute(
+                'ALTER TABLE staff_applications '
+                'ADD COLUMN IF NOT EXISTS reviewer_id BIGINT'
+            )
+
             c.execute('CREATE INDEX IF NOT EXISTS idx_staff_applications_user ON staff_applications(user_id)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_staff_applications_status ON staff_applications(status)')
             c.execute('''CREATE TABLE IF NOT EXISTS support_threads(
