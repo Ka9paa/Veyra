@@ -207,6 +207,65 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #8
 .message-meta b{font-size:12px}
 .message-meta time{font-size:10px;color:#5e708c}
 .message-body p{margin:0;color:#d2dbea}
+
+.message-attachments{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  margin:0 0 9px;
+}
+
+.message-attachments.single{
+  grid-template-columns:minmax(0,360px);
+}
+
+.message-image{
+  display:block;
+  width:100%;
+  max-height:280px;
+  object-fit:cover;
+  border-radius:11px;
+  border:1px solid #263753;
+  background:#070d17;
+  cursor:pointer;
+}
+
+.message-file{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-width:0;
+  padding:9px 10px;
+  border:1px solid #263753;
+  border-radius:10px;
+  background:#091321;
+  color:#aebbd0;
+  font-size:11px;
+}
+
+.message-file-icon{
+  width:28px;
+  height:28px;
+  flex:0 0 auto;
+  display:grid;
+  place-items:center;
+  border-radius:8px;
+  background:#15223a;
+  color:#a88cff;
+  font-weight:800;
+}
+
+.message-file-name{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.message-body.has-attachments > p:empty{
+  display:none;
+}
+
 .build-card{
   margin-top:10px;
   border:1px solid #253553;border-radius:11px;
@@ -3773,9 +3832,33 @@ function fileLabel(file){
   return "Updated file";
 }
 
-function addMessage(role,text,card=null,steps=null,details=null){
+function addMessage(role,text,card=null,steps=null,details=null,attachments=null){
   const wrap=document.createElement("div");
   wrap.className="message "+(role==="assistant"?"assistant":"user");
+
+  const messageAttachments=Array.isArray(attachments)
+    ? attachments.filter(Boolean).slice(0,4)
+    : [];
+
+  const attachmentHtml=messageAttachments.length
+    ? `<div class="message-attachments ${messageAttachments.length===1?"single":""}">
+        ${messageAttachments.map(a=>{
+          if(a.kind==="image" && typeof a.data==="string" && a.data.startsWith("data:image/")){
+            return `<img
+              class="message-image"
+              src="${esc(a.data)}"
+              alt="${esc(a.name||"Uploaded image")}"
+              title="${esc(a.name||"Uploaded image")}"
+            >`;
+          }
+
+          return `<div class="message-file">
+            <span class="message-file-icon">${a.kind==="text"?"</>":"▤"}</span>
+            <span class="message-file-name">${esc(a.name||"Attachment")}</span>
+          </div>`;
+        }).join("")}
+      </div>`
+    : "";
 
   const avatar=role==="assistant"
     ? `<div class="avatar-ai"><img class="real-logo small" src="{{ url_for('static', filename='veyra-mark.png') }}" alt="Veyra"></div>`
@@ -3910,12 +3993,13 @@ function addMessage(role,text,card=null,steps=null,details=null){
 
   wrap.innerHTML=`
     ${avatar}
-    <div class="message-body">
+    <div class="message-body ${messageAttachments.length?"has-attachments":""}">
       <div class="message-meta">
         <b>${role==="assistant"?"Veyra Assistant":"You"}</b>
         <time title="${esc(messageTimestampTitle())}">${esc(messageTimestamp())}</time>
       </div>
 
+      ${attachmentHtml}
       <p>${esc(text)}</p>
 
       ${agentResult}
@@ -3939,6 +4023,21 @@ function addMessage(role,text,card=null,steps=null,details=null){
     btn.addEventListener("click",()=>{
       promptEl.value=btn.dataset.agentPrompt||"";
       promptEl.focus();
+    });
+  });
+
+  wrap.querySelectorAll(".message-image").forEach(img=>{
+    img.addEventListener("click",()=>{
+      const src=img.getAttribute("src");
+      if(src){
+        const preview=window.open();
+        if(preview){
+          preview.document.write(
+            `<title>Veyra Image Preview</title><style>html,body{margin:0;min-height:100%;background:#050914;display:grid;place-items:center}img{display:block;max-width:100%;max-height:100vh;object-fit:contain}</style><img src="${src}">`
+          );
+          preview.document.close();
+        }
+      }
     });
   });
 
@@ -4105,8 +4204,14 @@ async function build(prompt){
   if(!prompt && !pendingAttachments.length)return;
 
   const attachmentsForBuild=pendingAttachments.map(a=>({...a}));
-  const attachmentNames=attachmentsForBuild.map(a=>a.name);
-  addMessage("user",prompt || `Attached ${attachmentNames.length} file${attachmentNames.length===1?"":"s"}: ${attachmentNames.join(", ")}`);
+  addMessage(
+    "user",
+    prompt,
+    null,
+    null,
+    null,
+    attachmentsForBuild
+  );
   promptEl.value="";
   sendBtn.disabled=true;
   $("engineStatus").textContent="Veyra is thinking…";

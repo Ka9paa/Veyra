@@ -74,7 +74,9 @@ export async function callOpenAIVisual(
           },
           {
             type: "input_image",
-            image_url: `data:image/png;base64,${screenshotBase64}`,
+            image_url: screenshotBase64.startsWith("data:image/")
+              ? screenshotBase64
+              : `data:image/png;base64,${screenshotBase64}`,
             detail: "high"
           }
         ]

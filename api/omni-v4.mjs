@@ -151,7 +151,24 @@ export default async function handler(req, res) {
       viewport: {
         width: Number(body.viewport?.width || 1440),
         height: Number(body.viewport?.height || 900)
-      }
+      },
+
+      uploadedImages: Array.isArray(body.images)
+        ? body.images
+            .slice(0, 4)
+            .filter(
+              image =>
+                image &&
+                typeof image === "object" &&
+                typeof image.data === "string" &&
+                image.data.startsWith("data:image/")
+            )
+            .map(image => ({
+              name: String(image.name || "image").slice(0, 160),
+              type: String(image.type || "image/png").slice(0, 120),
+              data: String(image.data || "")
+            }))
+        : []
     };
 
     const stage = String(body.stage || "legacy").toLowerCase();

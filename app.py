@@ -2852,6 +2852,7 @@ def run_veyra_v4(
     candidate=None,
     best=None,
     attempt=None,
+    images=None,
 ):
     """
     Execute Veyra Omni V4.
@@ -2875,6 +2876,20 @@ def run_veyra_v4(
         },
         "stage": str(stage or "legacy"),
     }
+
+    # Uploaded user images are only needed during PLAN, where V4 analyzes
+    # them visually and converts them into compact design context.
+    if images:
+        payload["images"] = [
+            {
+                "name": str(image.get("name") or "image")[:160],
+                "type": str(image.get("type") or "image/png")[:120],
+                "data": str(image.get("data") or ""),
+            }
+            for image in images[:4]
+            if isinstance(image, dict)
+            and str(image.get("data") or "").startswith("data:image/")
+        ]
 
     # Staged V4 checkpoints are JSON-serializable and travel only through
     # the authenticated Flask -> internal Node bridge.
@@ -3267,6 +3282,10 @@ def api_build():
             "current": cur,
             "user_id": uid,
             "stage": requested_v4_stage,
+            "images": [
+                a for a in attachments
+                if a.get("kind") == "image"
+            ] if requested_v4_stage == "plan" else [],
         }
 
         if requested_v4_stage == "build":

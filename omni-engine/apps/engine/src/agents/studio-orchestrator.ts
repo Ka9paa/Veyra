@@ -25,6 +25,12 @@ export interface StudioBuildRequest {
     width?: number;
     height?: number;
   };
+
+  uploadedImages?: {
+    name: string;
+    type: string;
+    data: string;
+  }[];
 }
 
 export interface StudioBuildResult {
@@ -973,6 +979,83 @@ export async function orchestrateStudioPlan(
 
   const baseCtx = projectContext(req);
   let ctx = baseCtx;
+
+  const uploadedImages = Array.isArray(req.uploadedImages)
+    ? req.uploadedImages.slice(0, 4)
+    : [];
+
+  if (uploadedImages.length) {
+    console.error(
+      `[Veyra V4 STAGE] PLAN: Analyzing ${uploadedImages.length} uploaded image(s)`
+    );
+
+    const uploadedVisualAnalyses: string[] = [];
+
+    for (let index = 0; index < uploadedImages.length; index += 1) {
+      const image = uploadedImages[index];
+
+      if (!image?.data?.startsWith("data:image/")) {
+        continue;
+      }
+
+      try {
+        const analysis = await callOpenAIVisual(
+          [
+            "You are Veyra's Uploaded Image Visual Analyst.",
+            "The user intentionally attached this image as context for a website or web application build.",
+            "Inspect the actual pixels carefully.",
+            "Determine how the image relates to the user's request.",
+            "If it is a logo or brand asset, describe its visible identity, shape, typography, colors, transparency/background, and how it should be used.",
+            "If it is a website or UI screenshot, analyze layout, hierarchy, typography, colors, spacing, components, imagery, surfaces, borders, radii, and overall design language.",
+            "If it is another type of reference image, identify the visually useful details and explain how they should influence the build.",
+            "Do not claim to see details that are not visible.",
+            "Do not generate code.",
+            "Return compact, concrete visual build guidance."
+          ].join(" "),
+          [
+            `User request: ${req.prompt}`,
+            `Uploaded image ${index + 1} of ${uploadedImages.length}`,
+            `Filename: ${image.name || "image"}`,
+            `MIME type: ${image.type || "image"}`,
+            "",
+            "Analyze this uploaded image as direct visual context for the user's build."
+          ].join("\n"),
+          image.data,
+          {
+            maxOutputTokens: 2500,
+            reasoningEffort: "medium"
+          }
+        );
+
+        if (analysis.trim()) {
+          uploadedVisualAnalyses.push(
+            [
+              `UPLOADED IMAGE ${index + 1}: ${image.name || "image"}`,
+              analysis.trim()
+            ].join("\n")
+          );
+        }
+      } catch (error) {
+        console.error(
+          `[Veyra V4 STAGE] PLAN: Uploaded image analysis failed | image=${index + 1}`,
+          error
+        );
+      }
+    }
+
+    if (uploadedVisualAnalyses.length) {
+      ctx += [
+        "",
+        "",
+        "=== USER UPLOADED VISUAL CONTEXT ===",
+        "The following analysis came from images the user directly attached.",
+        "Treat this as visual evidence when planning the build.",
+        "Follow the user's prompt when deciding whether to preserve, adapt, or improve these references.",
+        "",
+        uploadedVisualAnalyses.join("\n\n")
+      ].join("\n");
+    }
+  }
 
   const referenceUrl = findWebsiteReferenceUrl(req.prompt);
 
