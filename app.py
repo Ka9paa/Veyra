@@ -431,6 +431,11 @@ def init_db():
                 answer TEXT NOT NULL,
                 created_at TEXT NOT NULL
             )''')
+            # Support inbox/admin reply fields.
+            c.execute("ALTER TABLE support_threads ADD COLUMN IF NOT EXISTS admin_reply TEXT DEFAULT ''")
+            c.execute("ALTER TABLE support_threads ADD COLUMN IF NOT EXISTS replied_by BIGINT")
+            c.execute("ALTER TABLE support_threads ADD COLUMN IF NOT EXISTS replied_at TEXT")
+            c.execute("ALTER TABLE support_threads ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'open'")
             c.execute('''CREATE TABLE IF NOT EXISTS admin_audit(
                 id BIGSERIAL PRIMARY KEY,
                 admin_user_id BIGINT,
@@ -538,6 +543,16 @@ def init_db():
             c.execute('CREATE INDEX IF NOT EXISTS idx_staff_applications_user ON staff_applications(user_id)')
             c.execute('CREATE INDEX IF NOT EXISTS idx_staff_applications_status ON staff_applications(status)')
             c.execute('''CREATE TABLE IF NOT EXISTS support_threads(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,question TEXT NOT NULL,answer TEXT NOT NULL,created_at TEXT NOT NULL)''')
+            support_cols={r['name'] for r in c.execute('PRAGMA table_info(support_threads)').fetchall()}
+            support_missing={
+                'admin_reply':"TEXT DEFAULT ''",
+                'replied_by':"INTEGER",
+                'replied_at':"TEXT",
+                'status':"TEXT NOT NULL DEFAULT 'open'",
+            }
+            for col,definition in support_missing.items():
+                if col not in support_cols:
+                    c.execute(f'ALTER TABLE support_threads ADD COLUMN {col} {definition}')
             cols={r['name'] for r in c.execute('PRAGMA table_info(users)').fetchall()}
             if 'password_hash' not in cols: c.execute('ALTER TABLE users ADD COLUMN password_hash TEXT')
             if 'plan' not in cols: c.execute("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'")
@@ -2023,6 +2038,47 @@ def admin_dashboard():
         support_threads=support_threads,
         audit_rows=audit_rows
     )
+
+@app.post('/admin/support/<int:thread_id>/reply')
+@login_required
+def admin_support_reply(thread_id):
+    if not is_admin():
+        return ('Forbidden',403)
+
+    reply=(request.form.get('reply') or '').strip()
+    if not reply:
+        flash('Enter a reply before sending.','error')
+        return redirect(url_for('admin_dashboard') + '#support')
+
+    reply=reply[:5000]
+    actor=current_user()
+
+    with db() as c:
+        thread=c.execute(
+            'SELECT id,user_id FROM support_threads WHERE id=?',
+            (thread_id,)
+        ).fetchone()
+
+        if not thread:
+            return ('Support thread not found',404)
+
+        c.execute(
+            '''UPDATE support_threads
+               SET admin_reply=?,replied_by=?,replied_at=?,status='replied'
+               WHERE id=?''',
+            (reply,actor['id'],now(),thread_id)
+        )
+        c.commit()
+
+    admin_audit(
+        'reply_support',
+        thread['user_id'],
+        {'thread_id':thread_id}
+    )
+
+    flash('Support reply sent.','success')
+    return redirect(url_for('admin_dashboard') + '#support')
+
 
 @app.post('/admin/users/<int:user_id>/plan')
 @login_required
