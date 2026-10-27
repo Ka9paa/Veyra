@@ -1,9 +1,13 @@
-import { orchestrateStudio } from "./agents/studio-orchestrator.js";
+import {
+  orchestrateStudio,
+  orchestrateStudioPlan,
+  orchestrateStudioBuildStage,
+  orchestrateStudioRecomposeStage
+} from "./agents/studio-orchestrator.js";
 
 async function main() {
-  // The Flask bridge expects stdout to contain ONLY the final JSON result.
-  // V4 internally uses console.log() for progress, so redirect those logs
-  // to stderr while this CLI is running.
+  // Flask expects stdout to contain ONLY the final JSON result.
+  // Send V4 progress/logging to stderr.
   console.log = (...args: unknown[]) => {
     console.error(...args);
   };
@@ -24,7 +28,7 @@ async function main() {
 
   const request = JSON.parse(input);
 
-  const result = await orchestrateStudio({
+  const buildRequest = {
     projectId:
       typeof request.projectId === "string"
         ? request.projectId
@@ -46,8 +50,59 @@ async function main() {
     viewport: {
       width: Number(request.viewport?.width || 1440),
       height: Number(request.viewport?.height || 900)
+    },
+
+    uploadedImages: Array.isArray(request.images)
+      ? request.images
+      : []
+  };
+
+  const stage = String(request.stage || "legacy").toLowerCase();
+
+  console.error(`[Veyra V4 CLI] stage=${stage}`);
+
+  let result;
+
+  if (stage === "plan") {
+    result = await orchestrateStudioPlan(buildRequest);
+
+  } else if (stage === "build") {
+    if (!request.plan) {
+      throw new Error("V4 CLI build stage received no plan.");
     }
-  });
+
+    result = await orchestrateStudioBuildStage(
+      buildRequest,
+      request.plan
+    );
+
+  } else if (stage === "recompose") {
+    if (!request.plan) {
+      throw new Error("V4 CLI recompose stage received no plan.");
+    }
+
+    if (!request.candidate) {
+      throw new Error("V4 CLI recompose stage received no candidate.");
+    }
+
+    if (!request.best) {
+      throw new Error("V4 CLI recompose stage received no best candidate.");
+    }
+
+    result = await orchestrateStudioRecomposeStage(
+      buildRequest,
+      request.plan,
+      request.candidate,
+      request.best,
+      Number(request.attempt || 1)
+    );
+
+  } else if (stage === "legacy") {
+    result = await orchestrateStudio(buildRequest);
+
+  } else {
+    throw new Error(`Unknown V4 CLI stage: ${stage}`);
+  }
 
   process.stdout.write(JSON.stringify(result));
 }

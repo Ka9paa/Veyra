@@ -63,6 +63,7 @@ a{color:inherit}.app-shell{min-height:100vh;display:grid;grid-template-columns:2
     <div class="nav-section">Workspace</div>
     <a class="{{'active' if n=='dashboard' else ''}}" href="{{url_for('dashboard')}}"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5v9A1.5 1.5 0 0 1 19.5 21h-15A1.5 1.5 0 0 1 3 19.5z"/><path d="M9 21v-6h6v6"/></svg><span>Dashboard</span></a>
     <a class="{{'active' if n=='projects_page' else ''}}" href="{{url_for('projects_page')}}"><svg viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v10A1.5 1.5 0 0 1 19.5 20h-15A1.5 1.5 0 0 1 3 18.5z"/></svg><span>Projects</span></a>
+    <a class="{{'active' if n=='discover_page' else ''}}" href="{{url_for('discover_page')}}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="m15.5 8.5-2.1 4.9-4.9 2.1 2.1-4.9z"/></svg><span>Discover</span></a>
     <a class="{{'active' if n=='templates_page' else ''}}" href="{{url_for('templates_page')}}"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>Templates</span></a>
     <a class="{{'active' if n=='agents_page' else ''}}" href="{{url_for('agents_page')}}"><svg viewBox="0 0 24 24"><path d="m12 3 1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/></svg><span>Agents</span></a>
     <div class="nav-section">Ship</div>

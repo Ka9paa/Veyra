@@ -1,0 +1,5 @@
+Ensure your root requirements.txt contains this line:
+
+openai>=1.68.0
+
+Do not remove your existing Flask/Authlib/psycopg/etc. dependencies.

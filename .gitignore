@@ -33,3 +33,4 @@ omni-engine/apps/engine/chromium-runtime/
 
 omni-engine/apps/engine/.playwright-browsers/
 api/_chromium-runtime/
+.env*
