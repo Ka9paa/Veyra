@@ -1,3 +1,6 @@
+import {
+  guardPhotoSearch
+} from "../runtime/cost-guard.js";
 export type RealPhotoOrientation =
   | "landscape"
   | "portrait"
@@ -735,6 +738,8 @@ export async function searchRealPhotos(
   let response: Response;
 
   try {
+    guardPhotoSearch();
+
     response = await fetch(endpoint, {
       method: "GET",
 

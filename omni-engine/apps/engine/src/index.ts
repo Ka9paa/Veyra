@@ -1,11 +1,52 @@
 import {
+  runtimeCostSnapshot
+} from "./runtime/cost-guard.js";
+import {
   findSectionById,
   sectionRegenerationContext,
   assetRegenerationContext
 } from "./studio/section-regeneration.js";
 import Fastify from "fastify";import cors from "@fastify/cors";import {env} from "./config.js";import {ensureSchema} from "./state/project-store.js";import {routeCanvas} from "./router/canvas-router.js";import {amplifyFeature} from "./router/feature-router.js";import {selfHeal} from "./repair/self-heal.js";import {deployProject} from "./deploy/deployer.js";
 import {orchestrateStudio} from "./agents/studio-orchestrator.js";
-const app=Fastify({logger:true});await app.register(cors,{origin:true,credentials:true});if (env.DATABASE_URL) await ensureSchema();app.get("/health",async()=>({ok:true,service:"veyra-omni-engine"}));
+const app=Fastify({logger:true});
+
+await app.register(cors,{
+  origin:true,
+  credentials:true
+});
+
+let databaseStartupError: string | null = null;
+
+if(env.DATABASE_URL){
+  try{
+    await ensureSchema();
+  }catch(error:any){
+    databaseStartupError =
+      error?.message ||
+      "Database initialization failed.";
+
+    app.log.error(
+      {err:error},
+      "Veyra database unavailable during startup; engine continuing in degraded mode."
+    );
+  }
+}
+
+app.get("/health",async()=>({
+  ok:true,
+  service:"veyra-omni-engine",
+  status:databaseStartupError
+    ? "degraded"
+    : "healthy",
+  dependencies:{
+    database:{
+      configured:Boolean(env.DATABASE_URL),
+      available:!databaseStartupError,
+      error:databaseStartupError
+    }
+  },
+  cost:runtimeCostSnapshot()
+}));
 
 app.post("/v1/studio/regenerate", async (req, reply) => {
   try {

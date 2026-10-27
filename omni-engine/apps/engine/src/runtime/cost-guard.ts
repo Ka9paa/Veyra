@@ -161,3 +161,44 @@ export function createVeyraCostGuard(
 ): VeyraCostGuard {
   return new VeyraCostGuard(budget);
 }
+
+
+/* VEYRA_RUNTIME_COST_GUARD_V1
+ *
+ * Shared runtime guard for actual provider calls.
+ *
+ * Every external model/photo/image call must reserve budget
+ * BEFORE contacting its provider.
+ */
+
+const runtimeCostGuard = createVeyraCostGuard();
+
+export function getVeyraRuntimeCostGuard(): VeyraCostGuard {
+  return runtimeCostGuard;
+}
+
+export function guardModelCall(
+  stage: VeyraCostStage
+): void {
+  runtimeCostGuard.model(stage);
+}
+
+export function guardGeneratedVisual(): void {
+  runtimeCostGuard.generatedVisual();
+}
+
+export function guardPhotoSearch(): void {
+  runtimeCostGuard.photoSearch();
+}
+
+export function runtimeCostSnapshot() {
+  return {
+    usage: runtimeCostGuard.snapshot(),
+    remaining: runtimeCostGuard.remaining(),
+    budget: {
+      ...runtimeCostGuard.budget
+    }
+  };
+}
+
+/* END VEYRA_RUNTIME_COST_GUARD_V1 */

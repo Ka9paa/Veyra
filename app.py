@@ -10,7 +10,7 @@ import base64
 import hashlib
 import hmac
 import time
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote
 from urllib.request import Request as UrlRequest, urlopen
 from urllib.error import HTTPError, URLError
 from pathlib import Path
@@ -2554,6 +2554,260 @@ def project_delete(project_id):
     return redirect(url_for('projects_page'))
 
 
+
+@app.route('/app/discover')
+@login_required
+def discover_page():
+    return render_template('discover.html', user=current_user(), google_maps_browser_key=(os.getenv('GOOGLE_MAPS_BROWSER_KEY') or '').strip())
+
+
+def _google_places_request(url, payload=None, field_mask=None):
+    """Server-side Google Places API (New) request. Never exposes the API key."""
+    api_key = (os.getenv('GOOGLE_PLACES_API_KEY') or '').strip()
+    if not api_key:
+        raise RuntimeError('GOOGLE_PLACES_API_KEY is not configured')
+
+    headers = {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': api_key,
+    }
+    if field_mask:
+        headers['X-Goog-FieldMask'] = field_mask
+
+    data = None
+    if payload is not None:
+        data = json.dumps(payload).encode('utf-8')
+
+    req = UrlRequest(url, data=data, headers=headers, method='POST' if data is not None else 'GET')
+
+    try:
+        with urlopen(req, timeout=12) as response:
+            return json.loads(response.read().decode('utf-8'))
+    except HTTPError as exc:
+        try:
+            body = json.loads(exc.read().decode('utf-8'))
+            message = body.get('error', {}).get('message') or 'Google Places request failed'
+        except Exception:
+            message = 'Google Places request failed'
+        raise RuntimeError(message) from exc
+    except URLError as exc:
+        raise RuntimeError('Could not connect to Google Places') from exc
+
+
+@app.route('/api/discover/search', methods=['POST'])
+@login_required
+def discover_search():
+    body = request.get_json(silent=True) or {}
+
+    query = str(body.get('query') or '').strip()
+    if not query:
+        return jsonify({'ok': False, 'error': 'Enter a business or category to search.'}), 400
+
+    if len(query) > 120:
+        return jsonify({'ok': False, 'error': 'Search is too long.'}), 400
+
+    try:
+        page_size = int(body.get('limit') or 20)
+    except (TypeError, ValueError):
+        page_size = 20
+    page_size = max(1, min(page_size, 20))
+
+    payload = {
+        'textQuery': query,
+        'pageSize': page_size,
+    }
+
+    # Restrict categorical searches to the visible map area when supplied.
+    bounds = body.get('bounds')
+    if isinstance(bounds, dict):
+        try:
+            south = float(bounds['south'])
+            west = float(bounds['west'])
+            north = float(bounds['north'])
+            east = float(bounds['east'])
+
+            if not (-90 <= south < north <= 90):
+                raise ValueError
+            if not (-180 <= west <= 180 and -180 <= east <= 180):
+                raise ValueError
+
+            # Google Places rectangle viewports cannot cross the
+            # antimeridian or span more than 180 degrees of longitude.
+            # At world/continent zoom levels, skip the restriction and let
+            # the text query run globally instead of sending invalid bounds.
+            longitude_width = east - west
+
+            if west < east and 0 < longitude_width <= 180:
+                payload['locationRestriction'] = {
+                    'rectangle': {
+                        'low': {'latitude': south, 'longitude': west},
+                        'high': {'latitude': north, 'longitude': east},
+                    }
+                }
+        except (KeyError, TypeError, ValueError):
+            return jsonify({'ok': False, 'error': 'Invalid map bounds.'}), 400
+
+    # Search-stage fields only. Rich details/reviews come later when selected.
+    field_mask = ','.join([
+        'places.id',
+        'places.displayName',
+        'places.formattedAddress',
+        'places.location',
+        'places.primaryType',
+        'places.primaryTypeDisplayName',
+    ])
+
+    try:
+        result = _google_places_request(
+            'https://places.googleapis.com/v1/places:searchText',
+            payload=payload,
+            field_mask=field_mask,
+        )
+    except RuntimeError as exc:
+        # Keep API keys/request internals out of the browser response.
+        message = str(exc)
+        if 'GOOGLE_PLACES_API_KEY' in message:
+            safe_error = 'Veyra Discover is not configured yet.'
+        else:
+            safe_error = message[:240] or 'Business search failed.'
+        return jsonify({'ok': False, 'error': safe_error}), 502
+
+    businesses = []
+    for place in result.get('places') or []:
+        location = place.get('location') or {}
+        display_name = place.get('displayName') or {}
+        type_name = place.get('primaryTypeDisplayName') or {}
+
+        lat = location.get('latitude')
+        lng = location.get('longitude')
+        place_id = place.get('id')
+
+        if not place_id or lat is None or lng is None:
+            continue
+
+        businesses.append({
+            'id': place_id,
+            'name': display_name.get('text') or 'Unknown business',
+            'address': place.get('formattedAddress') or '',
+            'lat': lat,
+            'lng': lng,
+            'type': place.get('primaryType') or '',
+            'category': type_name.get('text') or place.get('primaryType') or 'Business',
+        })
+
+    return jsonify({
+        'ok': True,
+        'query': query,
+        'count': len(businesses),
+        'businesses': businesses,
+    })
+
+
+@app.route('/api/discover/details', methods=['POST'])
+@login_required
+def discover_details():
+    body = request.get_json(silent=True) or {}
+    place_id = str(body.get('place_id') or '').strip()
+
+    if not place_id or len(place_id) > 300:
+        return jsonify({
+            'ok': False,
+            'error': 'A valid business is required.'
+        }), 400
+
+    field_mask = ','.join([
+        'id',
+        'displayName',
+        'formattedAddress',
+        'location',
+        'primaryType',
+        'primaryTypeDisplayName',
+        'nationalPhoneNumber',
+        'internationalPhoneNumber',
+        'websiteUri',
+        'googleMapsUri',
+        'rating',
+        'userRatingCount',
+        'businessStatus',
+        'currentOpeningHours',
+        'regularOpeningHours',
+        'reviews',
+    ])
+
+    try:
+        place = _google_places_request(
+            'https://places.googleapis.com/v1/places/' + quote(place_id, safe=''),
+            field_mask=field_mask,
+        )
+    except RuntimeError as exc:
+        print('Veyra Discover details error:', exc)
+        return jsonify({
+            'ok': False,
+            'error': 'Veyra could not load this business right now.'
+        }), 502
+
+    display_name = place.get('displayName') or {}
+    type_name = place.get('primaryTypeDisplayName') or {}
+    location = place.get('location') or {}
+    current_hours = place.get('currentOpeningHours') or {}
+    regular_hours = place.get('regularOpeningHours') or {}
+
+    reviews = []
+    for review in (place.get('reviews') or [])[:5]:
+        text_obj = review.get('text') or review.get('originalText') or {}
+        author = review.get('authorAttribution') or {}
+
+        text = text_obj.get('text') if isinstance(text_obj, dict) else str(text_obj or '')
+        text = str(text or '').strip()
+
+        if not text:
+            continue
+
+        reviews.append({
+            'text': text[:1600],
+            'rating': review.get('rating'),
+            'relative_time': review.get('relativePublishTimeDescription') or '',
+            'publish_time': review.get('publishTime') or '',
+            'author': author.get('displayName') or '',
+            'author_uri': author.get('uri') or '',
+            'author_photo_uri': author.get('photoUri') or '',
+        })
+
+    website = str(place.get('websiteUri') or '').strip()
+
+    business = {
+        'id': place.get('id') or place_id,
+        'name': display_name.get('text') or 'Unknown business',
+        'address': place.get('formattedAddress') or '',
+        'lat': location.get('latitude'),
+        'lng': location.get('longitude'),
+        'type': place.get('primaryType') or '',
+        'category': type_name.get('text') or place.get('primaryType') or 'Business',
+        'phone': (
+            place.get('nationalPhoneNumber')
+            or place.get('internationalPhoneNumber')
+            or ''
+        ),
+        'website': website or None,
+        'google_maps_url': place.get('googleMapsUri') or '',
+        'rating': place.get('rating'),
+        'reviews': place.get('userRatingCount'),
+        'business_status': place.get('businessStatus') or '',
+        'open_now': current_hours.get('openNow'),
+        'weekday_hours': (
+            current_hours.get('weekdayDescriptions')
+            or regular_hours.get('weekdayDescriptions')
+            or []
+        ),
+        'review_samples': reviews,
+    }
+
+    return jsonify({
+        'ok': True,
+        'business': business,
+    })
+
+
 @app.route('/app/templates')
 @login_required
 def templates_page():
@@ -3983,7 +4237,19 @@ def veyra_features(): return jsonify({'ok':True,'count':1000,'version':'V16','fe
 def feature_lab(): return render_template('feature_lab.html',user=current_user(),active='feature-lab',features=VEYRA_V10_FEATURES)
 
 
-init_db()
+DATABASE_STARTUP_ERROR=None
+
+try:
+    init_db()
+except Exception as exc:
+    DATABASE_STARTUP_ERROR=str(exc)
+    print(
+        "[VEYRA] Database initialization failed; "
+        "web application will continue in degraded mode: "
+        + DATABASE_STARTUP_ERROR,
+        flush=True
+    )
+
 if __name__=='__main__':
     from waitress import serve
     host=os.getenv('HOST','127.0.0.1');port=int(os.getenv('PORT','8765'));print(f'VEYRA ready at http://{host}:{port}');serve(app,host=host,port=port)
