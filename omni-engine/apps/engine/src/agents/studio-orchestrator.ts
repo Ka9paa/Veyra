@@ -34,6 +34,10 @@ import {
 import {
   studioEditingContext
 } from "../studio/edit-contracts.js";
+import {
+  deriveResponsiveDirectorPlan,
+  responsiveDirectorContext
+} from "../intelligence/responsive-director.js";
 
 export interface StudioBuildRequest {
   projectId?: string;
@@ -3400,6 +3404,17 @@ export async function orchestrateStudioBuildStage(
   const editabilityContext =
     studioEditingContext();
 
+  const responsivePlan =
+    deriveResponsiveDirectorPlan({
+      prompt: req.prompt,
+      designDNA: plan.designDNA,
+      composition: plan.composition,
+      assets: plan.assets
+    });
+
+  const responsiveContext =
+    responsiveDirectorContext(responsivePlan);
+
   console.error(
     `[Veyra V4 STAGE] BUILD: ${resolvedVisuals.length} generated visual asset(s) ready`
   );
@@ -3419,6 +3434,7 @@ export async function orchestrateStudioBuildStage(
       `COMPOSITION BLUEPRINT:\n${plan.composition}`,
       `VISUAL EXPERIENCE PLAN:\n${plan.assets}`,
       creativeContext,
+      responsiveContext,
       editabilityContext,
       resolvedRealPhotoContext,
       resolvedVisualContext,
@@ -3508,6 +3524,17 @@ export async function orchestrateStudioRecomposeStage(
   const editabilityContext =
     studioEditingContext();
 
+  const responsivePlan =
+    deriveResponsiveDirectorPlan({
+      prompt: req.prompt,
+      designDNA: plan.designDNA,
+      composition: plan.composition,
+      assets: plan.assets
+    });
+
+  const responsiveContext =
+    responsiveDirectorContext(responsivePlan);
+
   const current: Candidate = currentState;
   const previousBest: Candidate = bestState;
 
@@ -3563,6 +3590,7 @@ export async function orchestrateStudioRecomposeStage(
             `COMPOSITION BLUEPRINT:\n${plan.composition}`,
             `VISUAL EXPERIENCE PLAN:\n${plan.assets}`,
             creativeContext,
+            responsiveContext,
             editabilityContext,
             realPhotoContext(plan.resolvedRealPhotos ?? []),
             generatedVisualContext(plan.resolvedVisuals ?? []),
@@ -3593,6 +3621,7 @@ export async function orchestrateStudioRecomposeStage(
             `COMPOSITION BLUEPRINT:\n${plan.composition}`,
             `VISUAL EXPERIENCE PLAN:\n${plan.assets}`,
             creativeContext,
+            responsiveContext,
             editabilityContext,
             realPhotoContext(plan.resolvedRealPhotos ?? []),
             generatedVisualContext(plan.resolvedVisuals ?? []),
