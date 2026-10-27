@@ -1,3 +1,4 @@
+import {buildAssetLibrary,findAsset,assetsForSection} from "./studio/asset-library.js";
 import {
   runtimeCostSnapshot
 } from "./runtime/cost-guard.js";
@@ -47,6 +48,31 @@ app.get("/health",async()=>({
   },
   cost:runtimeCostSnapshot()
 }));
+
+app.post("/v1/studio/assets",async(req,reply)=>{
+  try{
+    const body=(req.body||{}) as any;
+    const html=String(body.html||body.current?.html||"");
+
+    if(!html.trim())
+      return reply.code(400).send({ok:false,error:"Project HTML is required."});
+
+    const library=buildAssetLibrary(html);
+
+    return {
+      ok:true,
+      library,
+      asset:body.asset_id?findAsset(library,String(body.asset_id)):null,
+      sectionAssets:body.section_id?assetsForSection(library,String(body.section_id)):null
+    };
+  }catch(error:any){
+    req.log.error(error);
+    return reply.code(400).send({
+      ok:false,
+      error:error?.message||"Unable to build asset library."
+    });
+  }
+});
 
 app.post("/v1/studio/regenerate", async (req, reply) => {
   try {
