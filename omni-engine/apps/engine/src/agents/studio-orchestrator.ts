@@ -38,6 +38,14 @@ import {
   deriveResponsiveDirectorPlan,
   responsiveDirectorContext
 } from "../intelligence/responsive-director.js";
+import {
+  deriveMotionDirectorPlan,
+  motionDirectorContext
+} from "../intelligence/motion-director.js";
+import {
+  deriveBrandSystemPlan,
+  brandSystemContext
+} from "../intelligence/brand-system.js";
 
 export interface StudioBuildRequest {
   projectId?: string;
@@ -3415,6 +3423,29 @@ export async function orchestrateStudioBuildStage(
   const responsiveContext =
     responsiveDirectorContext(responsivePlan);
 
+
+  const motionPlan =
+    deriveMotionDirectorPlan({
+      prompt: req.prompt,
+      designDNA: plan.designDNA,
+      composition: plan.composition,
+      assets: plan.assets
+    });
+
+  const motionContext =
+    motionDirectorContext(motionPlan);
+
+  const brandPlan =
+    deriveBrandSystemPlan({
+      prompt: req.prompt,
+      designDNA: plan.designDNA,
+      composition: plan.composition,
+      assets: plan.assets
+    });
+
+  const brandContext =
+    brandSystemContext(brandPlan);
+
   console.error(
     `[Veyra V4 STAGE] BUILD: ${resolvedVisuals.length} generated visual asset(s) ready`
   );
@@ -3435,6 +3466,8 @@ export async function orchestrateStudioBuildStage(
       `VISUAL EXPERIENCE PLAN:\n${plan.assets}`,
       creativeContext,
       responsiveContext,
+      motionContext,
+      brandContext,
       editabilityContext,
       resolvedRealPhotoContext,
       resolvedVisualContext,
@@ -3535,6 +3568,29 @@ export async function orchestrateStudioRecomposeStage(
   const responsiveContext =
     responsiveDirectorContext(responsivePlan);
 
+
+  const motionPlan =
+    deriveMotionDirectorPlan({
+      prompt: req.prompt,
+      designDNA: plan.designDNA,
+      composition: plan.composition,
+      assets: plan.assets
+    });
+
+  const motionContext =
+    motionDirectorContext(motionPlan);
+
+  const brandPlan =
+    deriveBrandSystemPlan({
+      prompt: req.prompt,
+      designDNA: plan.designDNA,
+      composition: plan.composition,
+      assets: plan.assets
+    });
+
+  const brandContext =
+    brandSystemContext(brandPlan);
+
   const current: Candidate = currentState;
   const previousBest: Candidate = bestState;
 
@@ -3591,6 +3647,8 @@ export async function orchestrateStudioRecomposeStage(
             `VISUAL EXPERIENCE PLAN:\n${plan.assets}`,
             creativeContext,
             responsiveContext,
+            motionContext,
+            brandContext,
             editabilityContext,
             realPhotoContext(plan.resolvedRealPhotos ?? []),
             generatedVisualContext(plan.resolvedVisuals ?? []),
@@ -3622,6 +3680,8 @@ export async function orchestrateStudioRecomposeStage(
             `VISUAL EXPERIENCE PLAN:\n${plan.assets}`,
             creativeContext,
             responsiveContext,
+            motionContext,
+            brandContext,
             editabilityContext,
             realPhotoContext(plan.resolvedRealPhotos ?? []),
             generatedVisualContext(plan.resolvedVisuals ?? []),
