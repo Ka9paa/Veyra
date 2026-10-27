@@ -1,0 +1,2323 @@
+{% extends 'app_base.html' %}
+{% block title %}Discover — Veyra
+
+
+{% endblock %}
+{% block top_title %}Discover{% endblock %}
+
+{% block content %}
+
+
+<style>
+.content{
+  padding:0!important;
+  max-width:none!important;
+  height:calc(100vh - 64px);
+  overflow:hidden;
+}
+
+.discover{
+  height:100%;
+  display:grid;
+  grid-template-columns:390px minmax(0,1fr);
+  background:#050914;
+  overflow:hidden;
+}
+
+/* LEFT PANEL */
+.discover-side{
+  position:relative;
+  z-index:1000;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  background:
+    radial-gradient(circle at 15% 0%,rgba(119,75,255,.09),transparent 25%),
+    #070d17;
+  border-right:1px solid #1b2940;
+  box-shadow:18px 0 50px rgba(0,0,0,.16);
+}
+
+.discover-header{
+  padding:19px 17px 15px;
+  border-bottom:1px solid #17243a;
+}
+
+.discover-title-row{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.discover-kicker{
+  font-size:9px;
+  letter-spacing:.18em;
+  color:#9f82ff;
+  font-weight:900;
+}
+
+.discover-header h1{
+  margin:4px 0 2px;
+  font-size:23px;
+  line-height:1.1;
+  letter-spacing:-.045em;
+}
+
+.discover-header p{
+  margin:0;
+  color:#6d7e97;
+  font-size:11px;
+}
+
+.live-pill{
+  height:24px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:0 8px;
+  border:1px solid #2a3a55;
+  border-radius:999px;
+  background:#0b1524;
+  color:#8091aa;
+  font-size:8px;
+  white-space:nowrap;
+}
+
+.live-pill i{
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:#54e1ae;
+  box-shadow:0 0 10px rgba(84,225,174,.6);
+}
+
+/* SEARCH */
+.search-block{
+  display:grid;
+  gap:8px;
+  margin-top:15px;
+}
+
+.search-box{
+  height:43px;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  border:1px solid #263753;
+  border-radius:12px;
+  background:#091321;
+  padding:0 11px;
+  transition:.15s ease;
+}
+
+.search-box:focus-within{
+  border-color:#6f50e8;
+  box-shadow:0 0 0 3px rgba(111,80,232,.08);
+}
+
+.search-box svg{
+  width:17px;
+  height:17px;
+  stroke:#8b9ab1;
+  fill:none;
+  stroke-width:1.8;
+  flex:0 0 auto;
+}
+
+.search-box.area svg{stroke:#a783ff}
+
+.search-box input{
+  flex:1;
+  min-width:0;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#f5f7fb;
+  font:inherit;
+  font-size:12px;
+}
+
+.search-box input::placeholder{color:#52627a}
+
+.search-go{
+  height:27px;
+  padding:0 9px;
+  border:1px solid #3b4b69;
+  border-radius:8px;
+  background:#111d2e;
+  color:#b9c4d4;
+  font-size:9px;
+  font-weight:800;
+  cursor:pointer;
+}
+
+.search-go:hover{
+  color:#fff;
+  border-color:#6550bb;
+}
+
+/* FILTERS */
+.filters{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+  margin-top:8px;
+}
+
+.filters select{
+  width:100%;
+  height:35px;
+  border:1px solid #243550;
+  border-radius:9px;
+  background:#08111e;
+  color:#8d9db4;
+  padding:0 9px;
+  outline:0;
+  font-size:10px;
+}
+
+/* STATS */
+.stats{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  border-bottom:1px solid #17243a;
+  background:#101a29;
+  gap:1px;
+}
+
+.stat{
+  background:#08111d;
+  padding:11px 12px;
+}
+
+.stat b{
+  display:block;
+  font-size:17px;
+  letter-spacing:-.04em;
+}
+
+.stat span{
+  display:block;
+  margin-top:1px;
+  color:#53657e;
+  font-size:7px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+}
+
+/* RESULTS */
+.result-head{
+  height:42px;
+  padding:0 14px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  color:#64758e;
+  font-size:9px;
+  letter-spacing:.06em;
+}
+
+.result-head b{
+  color:#8494aa;
+  font-size:9px;
+}
+
+.results{
+  flex:1;
+  overflow:auto;
+  padding:0 9px 18px;
+}
+
+.business{
+  position:relative;
+  padding:12px;
+  margin-bottom:7px;
+  border:1px solid #1a2940;
+  border-radius:13px;
+  background:linear-gradient(180deg,#0a1422,#08111e);
+  cursor:pointer;
+  transition:.16s ease;
+}
+
+.business:hover{
+  border-color:#344a6c;
+  transform:translateY(-1px);
+}
+
+.business.active{
+  border-color:#7053dd;
+  background:
+    radial-gradient(circle at 100% 0,rgba(126,83,255,.12),transparent 36%),
+    #0b1525;
+  box-shadow:0 8px 28px rgba(0,0,0,.18);
+}
+
+.business-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:8px;
+}
+
+.business h3{
+  margin:0;
+  color:#f0f4fa;
+  font-size:12px;
+}
+
+.business-type{
+  margin-top:2px;
+  color:#657791;
+  font-size:9px;
+}
+
+.web-status{
+  flex:0 0 auto;
+  min-height:20px;
+  padding:0 7px;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  font-size:7px;
+  letter-spacing:.04em;
+  font-weight:900;
+}
+
+.web-status.no{
+  color:#ff8296;
+  background:#291119;
+  border:1px solid #5e2938;
+}
+
+.web-status.yes{
+  color:#66dfb1;
+  background:#0d231b;
+  border:1px solid #24513e;
+}
+
+.business-info{
+  margin-top:9px;
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:5px 9px;
+  color:#71829a;
+  font-size:9px;
+}
+
+.business-info strong{color:#e7edf7}
+
+.opportunity-mini{
+  margin-top:9px;
+  padding-top:8px;
+  border-top:1px solid #17243a;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  color:#63758e;
+  font-size:8px;
+}
+
+.opportunity-mini b{color:#a98aff}
+
+/* MAP */
+.map-stage{
+  position:relative;
+  min-width:0;
+  min-height:0;
+  height:calc(100vh - 64px);
+  overflow:hidden;
+  background:#07101b;
+}
+
+#veyraMap{
+  position:absolute;
+  inset:0;
+  z-index:1;
+  background:#07101b;
+}
+
+.leaflet-container{
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background:#07101b;
+}
+
+.leaflet-control-attribution{
+  background:rgba(5,10,18,.78)!important;
+  color:#5d6d83!important;
+  font-size:8px!important;
+}
+
+.leaflet-control-attribution a{color:#8293ac!important}
+
+.leaflet-control-zoom{
+  border:1px solid #2b3d59!important;
+  border-radius:11px!important;
+  overflow:hidden;
+  box-shadow:0 12px 35px rgba(0,0,0,.3)!important;
+}
+
+.leaflet-control-zoom a{
+  width:34px!important;
+  height:34px!important;
+  line-height:34px!important;
+  background:#091321!important;
+  color:#dfe7f3!important;
+  border-color:#20314b!important;
+}
+
+.leaflet-control-zoom a:hover{
+  background:#101c2e!important;
+}
+
+/* darken OSM tiles for Veyra look */
+.leaflet-tile-pane{
+  filter:brightness(.48) saturate(.45) contrast(1.25) hue-rotate(175deg);
+}
+
+.leaflet-marker-pane,
+.leaflet-shadow-pane{
+  filter:none;
+}
+
+/* Discover performance */
+#veyraMap,
+.leaflet-map-pane,
+.leaflet-tile-pane,
+.leaflet-marker-pane{
+  will-change:transform;
+}
+
+.leaflet-zoom-animated{
+  will-change:transform;
+}
+
+.veyra-marker-wrap{
+  background:transparent!important;
+  border:0!important;
+  will-change:transform;
+}
+
+.veyra-marker{
+  transform:translateZ(0);
+  backface-visibility:hidden;
+  contain:layout paint;
+  transition:
+    transform .16s cubic-bezier(.2,.8,.2,1),
+    box-shadow .16s ease,
+    border-color .16s ease,
+    opacity .16s ease;
+}
+
+.veyra-marker:hover{
+  transform:translateZ(0) scale(1.08);
+}
+
+.veyra-marker.selected{
+  transform:translateZ(0) scale(1.12);
+}
+
+.map-stage{
+  isolation:isolate;
+}
+
+.discover{
+  height:calc(100vh - 64px);
+  min-height:0;
+  overflow:hidden;
+}
+
+.discover-side{
+  min-height:0;
+  height:100%;
+  overflow-y:auto;
+}
+
+.map-searchbar,
+.area-chip,
+.map-badge,
+.legend,
+.business-card,
+.map-ai{
+  transform:translateZ(0);
+  backface-visibility:hidden;
+}
+
+.map-searchbar{
+  background:rgba(7,14,25,.88);
+  border-color:rgba(102,119,151,.42);
+  box-shadow:
+    0 18px 50px rgba(0,0,0,.32),
+    inset 0 1px 0 rgba(255,255,255,.025);
+}
+
+.area-chip{
+  background:rgba(8,16,29,.90);
+}
+
+@media (prefers-reduced-motion:reduce){
+  .veyra-marker,
+  .area-chip{
+    transition:none!important;
+  }
+}
+
+/* MAP TOP */
+.map-searchbar{
+  position:absolute;
+  z-index:800;
+  top:17px;
+  left:50%;
+  transform:translateX(-50%);
+  width:min(570px,calc(100% - 190px));
+  height:48px;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:0 8px 0 14px;
+  border:1px solid #31435f;
+  border-radius:15px;
+  background:rgba(7,14,25,.94);
+  backdrop-filter:blur(20px);
+  box-shadow:0 18px 50px rgba(0,0,0,.4);
+}
+
+.map-searchbar svg{
+  width:18px;
+  height:18px;
+  stroke:#a785ff;
+  fill:none;
+  stroke-width:1.8;
+}
+
+.map-searchbar input{
+  flex:1;
+  min-width:0;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#fff;
+  font-size:12px;
+}
+
+.map-searchbar input::placeholder{color:#64758e}
+
+
+#useMyLocation{
+  width:34px;
+  min-width:34px;
+  padding:0;
+  border:1px solid #354967;
+  background:#0d1929;
+  color:#b89cff;
+  font-size:16px;
+  box-shadow:none;
+}
+
+#useMyLocation:hover{
+  background:#152239;
+  border-color:#7359d7;
+}
+
+.map-searchbar button{
+  height:34px;
+  padding:0 13px;
+  border:0;
+  border-radius:10px;
+  background:linear-gradient(135deg,#8757ff,#5f70f5);
+  color:#fff;
+  font-size:10px;
+  font-weight:850;
+  cursor:pointer;
+}
+
+.area-chip{
+  position:absolute;
+  z-index:800;
+  top:78px;
+  left:50%;
+  transform:translateX(-50%);
+  height:34px;
+  padding:0 13px;
+  border:1px solid #344864;
+  border-radius:999px;
+  background:rgba(8,16,29,.95);
+  backdrop-filter:blur(18px);
+  color:#dbe4ef;
+  box-shadow:0 12px 30px rgba(0,0,0,.3);
+  font-size:9px;
+  font-weight:850;
+  cursor:pointer;
+  opacity:0;
+  pointer-events:none;
+  transition:.18s ease;
+}
+
+.area-chip.show{
+  opacity:1;
+  pointer-events:auto;
+}
+
+.map-badge{
+  position:absolute;
+  z-index:800;
+  left:18px;
+  top:17px;
+  padding:9px 11px;
+  border:1px solid #293b56;
+  border-radius:11px;
+  background:rgba(7,14,25,.92);
+  backdrop-filter:blur(18px);
+  box-shadow:0 12px 35px rgba(0,0,0,.26);
+}
+
+.map-badge b{
+  display:block;
+  font-size:10px;
+}
+
+.map-badge span{
+  display:block;
+  margin-top:1px;
+  color:#61728c;
+  font-size:8px;
+}
+
+.legend{
+  position:absolute;
+  z-index:800;
+  right:18px;
+  top:17px;
+  display:flex;
+  gap:10px;
+  padding:8px 10px;
+  border:1px solid #293b56;
+  border-radius:10px;
+  background:rgba(7,14,25,.92);
+  backdrop-filter:blur(18px);
+  color:#7d8da4;
+  font-size:8px;
+}
+
+.legend i{
+  display:inline-block;
+  width:7px;
+  height:7px;
+  margin-right:4px;
+  border-radius:50%;
+}
+
+.legend .red{background:#ff5875}
+.legend .green{background:#4bdda9}
+
+/* CUSTOM MARKERS */
+.veyra-marker-wrap{
+  background:none!important;
+  border:0!important;
+}
+
+.veyra-marker{
+  position:relative;
+  width:34px;
+  height:34px;
+  border-radius:11px 11px 11px 3px;
+  transform:rotate(-45deg);
+  display:grid;
+  place-items:center;
+  border:2px solid #09111d;
+  box-shadow:0 8px 20px rgba(0,0,0,.55);
+  transition:.15s ease;
+}
+
+.veyra-marker.no{background:#ff5572}
+.veyra-marker.yes{background:#43d6a2}
+
+.veyra-marker span{
+  transform:rotate(45deg);
+  color:#fff;
+  font-size:10px;
+  font-weight:950;
+}
+
+.veyra-marker.selected{
+  width:40px;
+  height:40px;
+  box-shadow:0 0 0 6px rgba(132,86,255,.17),0 12px 28px rgba(0,0,0,.6);
+  background:#895cff;
+}
+
+/* BUSINESS CARD */
+.business-card{
+  position:absolute;
+  z-index:850;
+  right:20px;
+  bottom:20px;
+  width:360px;
+  border:1px solid #30435f;
+  border-radius:18px;
+  background:
+    radial-gradient(circle at 100% 0,rgba(128,83,255,.13),transparent 34%),
+    rgba(7,14,26,.97);
+  backdrop-filter:blur(22px);
+  box-shadow:0 28px 85px rgba(0,0,0,.55);
+  padding:16px;
+  display:none;
+}
+
+.business-card.show{
+  display:block;
+  animation:cardIn .18s ease;
+}
+
+@keyframes cardIn{
+  from{opacity:0;transform:translateY(8px) scale(.985)}
+}
+
+.card-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.card-top h2{
+  margin:0;
+  font-size:18px;
+  letter-spacing:-.035em;
+}
+
+.card-type{
+  margin-top:3px;
+  color:#72839c;
+  font-size:9px;
+}
+
+.close-card{
+  width:29px;
+  height:29px;
+  flex:0 0 auto;
+  border:1px solid #283a56;
+  border-radius:9px;
+  background:#0b1524;
+  color:#8191a8;
+  cursor:pointer;
+}
+
+.card-meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px 10px;
+  margin-top:12px;
+  color:#7b8ca4;
+  font-size:9px;
+}
+
+.card-meta strong{color:#f1f4fa}
+
+.website-row{
+  margin-top:12px;
+  padding:11px;
+  border:1px solid #233550;
+  border-radius:12px;
+  background:#0a1423;
+}
+
+.website-row-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+
+.website-row-head b{
+  font-size:10px;
+}
+
+.score{
+  color:#b69aff;
+  font-size:19px;
+  font-weight:950;
+}
+
+.website-row p{
+  margin:5px 0 0;
+  color:#71839c;
+  font-size:9px;
+  line-height:1.45;
+}
+
+.build{
+  width:100%;
+  height:44px;
+  margin-top:10px;
+  border:0;
+  border-radius:11px;
+  background:linear-gradient(135deg,#8b54ff,#5d72ff);
+  color:#fff;
+  font-weight:900;
+  cursor:pointer;
+  box-shadow:0 12px 30px rgba(103,77,255,.24);
+}
+
+.secondary-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
+  margin-top:6px;
+}
+
+.secondary-actions button{
+  height:32px;
+  border:1px solid #263954;
+  border-radius:9px;
+  background:#0a1423;
+  color:#8495ac;
+  font-size:9px;
+  cursor:pointer;
+}
+
+/* MAP BOTTOM AI */
+.map-ai{
+  position:absolute;
+  z-index:800;
+  left:50%;
+  bottom:22px;
+  transform:translateX(-50%);
+  width:min(590px,calc(100% - 430px));
+  height:48px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:0 8px 0 13px;
+  border:1px solid #344563;
+  border-radius:15px;
+  background:rgba(7,14,26,.95);
+  backdrop-filter:blur(20px);
+  box-shadow:0 20px 60px rgba(0,0,0,.45);
+}
+
+.map-ai strong{
+  color:#a887ff;
+  font-size:16px;
+}
+
+.map-ai input{
+  flex:1;
+  min-width:0;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#fff;
+  font-size:11px;
+}
+
+.map-ai button{
+  height:32px;
+  border:0;
+  border-radius:9px;
+  padding:0 11px;
+  background:#7655ec;
+  color:#fff;
+  font-size:9px;
+  font-weight:850;
+  cursor:pointer;
+}
+
+.prototype-note{
+  position:absolute;
+  z-index:700;
+  left:18px;
+  bottom:15px;
+  color:#52637b;
+  font-size:8px;
+  pointer-events:none;
+}
+
+.toast{
+  position:absolute;
+  z-index:1000;
+  top:80px;
+  right:18px;
+  max-width:300px;
+  padding:10px 12px;
+  border:1px solid #354865;
+  border-radius:10px;
+  background:#091421;
+  color:#b7c3d3;
+  box-shadow:0 15px 40px rgba(0,0,0,.35);
+  font-size:10px;
+  opacity:0;
+  transform:translateY(-5px);
+  pointer-events:none;
+  transition:.18s ease;
+}
+
+.toast.show{
+  opacity:1;
+  transform:none;
+}
+
+.loading-dot{
+  display:none;
+  width:12px;
+  height:12px;
+  border:2px solid #40506b;
+  border-top-color:#a783ff;
+  border-radius:50%;
+  animation:spin .7s linear infinite;
+}
+
+.loading .loading-dot{display:block}
+.loading .area-search-icon{display:none}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media(max-width:1150px){
+  .discover{grid-template-columns:330px minmax(0,1fr)}
+  .business-card{width:320px}
+  .map-searchbar{width:min(480px,calc(100% - 150px))}
+  .map-ai{display:none}
+}
+
+@media(max-width:800px){
+  .discover{grid-template-columns:1fr}
+  .discover-side{
+    position:absolute;
+    z-index:1100;
+    left:10px;
+    top:10px;
+    bottom:10px;
+    width:min(340px,calc(100% - 20px));
+    border:1px solid #263854;
+    border-radius:17px;
+    overflow:hidden;
+    box-shadow:0 25px 80px rgba(0,0,0,.55);
+  }
+  .map-stage{height:100%}
+  .map-searchbar{left:auto;right:10px;transform:none;width:calc(100% - 30px)}
+  .map-badge,.legend{display:none}
+  .business-card{right:10px;bottom:10px;width:calc(100% - 20px)}
+}
+</style>
+
+
+
+
+
+{% if not current_is_admin %}
+<style id="VEYRA_DISCOVER_PAYWALL_V2">
+
+.discover{
+    filter:blur(11px) brightness(.38) saturate(.65) !important;
+    transform:scale(1.015);
+    transform-origin:center;
+    pointer-events:none !important;
+    user-select:none !important;
+}
+
+#veyra-discover-paywall{
+    position:fixed !important;
+    inset:0 !important;
+    z-index:2147483647 !important;
+
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+
+    padding:80px 20px 20px !important;
+
+    background:rgba(2,6,14,.36) !important;
+
+    font-family:
+        Inter,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif !important;
+}
+
+#veyra-discover-paywall *{
+    box-sizing:border-box;
+}
+
+.vd2-card{
+    position:relative !important;
+
+    width:min(460px,calc(100vw - 32px)) !important;
+
+    padding:32px !important;
+
+    border:1px solid rgba(139,124,255,.32) !important;
+    border-radius:22px !important;
+
+    background:
+        radial-gradient(
+            circle at 50% -20%,
+            rgba(104,95,156,.30),
+            transparent 42%
+        ),
+        #080d18 !important;
+
+    box-shadow:
+        0 35px 120px rgba(0,0,0,.75),
+        0 0 0 1px rgba(255,255,255,.025) inset !important;
+
+    color:#fff !important;
+}
+
+.vd2-top{
+    display:flex;
+    align-items:center;
+    gap:8px;
+
+    color:#a99cff;
+    font-size:10px;
+    font-weight:900;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+}
+
+.vd2-dot{
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    background:#8b79ff;
+    box-shadow:0 0 14px #8b79ff;
+}
+
+.vd2-card h1{
+    margin:18px 0 9px !important;
+
+    color:#fff !important;
+
+    font-size:31px !important;
+    line-height:1.08 !important;
+    letter-spacing:-.04em !important;
+    font-weight:850 !important;
+}
+
+.vd2-description{
+    margin:0 !important;
+
+    color:#8c99ad !important;
+
+    font-size:13px !important;
+    line-height:1.6 !important;
+}
+
+.vd2-price{
+    display:flex;
+    align-items:flex-end;
+    gap:7px;
+
+    margin:25px 0 7px;
+}
+
+.vd2-price strong{
+    color:#fff;
+    font-size:46px;
+    line-height:.9;
+    letter-spacing:-.05em;
+}
+
+.vd2-price span{
+    padding-bottom:4px;
+
+    color:#78869a;
+    font-size:12px;
+}
+
+.vd2-access{
+    margin-bottom:22px;
+
+    color:#9b8dff;
+
+    font-size:10px;
+    font-weight:900;
+    letter-spacing:.1em;
+}
+
+.vd2-features{
+    display:grid;
+    gap:12px;
+
+    padding:18px 0 22px;
+
+    border-top:1px solid rgba(255,255,255,.07);
+}
+
+.vd2-feature{
+    display:flex;
+    align-items:center;
+    gap:10px;
+
+    color:#c7d0de;
+
+    font-size:12px;
+    font-weight:600;
+}
+
+.vd2-check{
+    width:20px;
+    height:20px;
+
+    display:grid;
+    place-items:center;
+
+    flex:0 0 20px;
+
+    border:1px solid rgba(143,127,255,.27);
+    border-radius:6px;
+
+    background:rgba(104,95,156,.18);
+
+    color:#a99cff;
+
+    font-size:11px;
+    font-weight:900;
+}
+
+.vd2-button{
+    width:100%;
+    height:50px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:9px;
+
+    border-radius:11px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #786ac9,
+            #685F9C
+        ) !important;
+
+    box-shadow:
+        0 13px 32px rgba(104,95,156,.28);
+
+    color:#fff !important;
+
+    text-decoration:none !important;
+
+    font-size:13px;
+    font-weight:850;
+
+    transition:
+        transform .16s ease,
+        filter .16s ease;
+}
+
+.vd2-button:hover{
+    transform:translateY(-1px);
+    filter:brightness(1.1);
+}
+
+.vd2-secure{
+    margin:14px 0 0 !important;
+
+    text-align:center;
+
+    color:#5f6d82 !important;
+
+    font-size:10px !important;
+}
+
+@media(max-width:600px){
+
+    #veyra-discover-paywall{
+        padding:70px 16px 16px !important;
+    }
+
+    .vd2-card{
+        padding:25px !important;
+    }
+
+    .vd2-card h1{
+        font-size:27px !important;
+    }
+}
+
+</style>
+
+<div id="veyra-discover-paywall">
+
+    <div class="vd2-card">
+
+        <div class="vd2-top">
+            <span class="vd2-dot"></span>
+            Veyra Discover
+        </div>
+
+        <h1>
+            Discover local opportunities anywhere.
+        </h1>
+
+        <p class="vd2-description">
+            Search local businesses and places around the world.
+            Find businesses that need websites and turn them
+            into your next Veyra project.
+        </p>
+
+        <div class="vd2-price">
+            <strong>$5</strong>
+            <span>/ month</span>
+        </div>
+
+        <div class="vd2-access">
+            FULL DISCOVER ACCESS
+        </div>
+
+        <div class="vd2-features">
+
+            <div class="vd2-feature">
+                <span class="vd2-check">✓</span>
+                Discover local businesses worldwide
+            </div>
+
+            <div class="vd2-feature">
+                <span class="vd2-check">✓</span>
+                Search any city, country, or industry
+            </div>
+
+            <div class="vd2-feature">
+                <span class="vd2-check">✓</span>
+                Find businesses without websites
+            </div>
+
+            <div class="vd2-feature">
+                <span class="vd2-check">✓</span>
+                Send opportunities directly into Veyra Studio
+            </div>
+
+        </div>
+
+        <a
+            class="vd2-button"
+            href="https://buy.stripe.com/fZueV657SdGl9gKbvp5Rm0f"
+        >
+            Unlock Discover for $5/month
+            <span>→</span>
+        </a>
+
+        <p class="vd2-secure">
+            Secure payment with Stripe · Cancel anytime
+        </p>
+
+    </div>
+
+</div>
+{% endif %}
+
+<div class="discover">
+  <aside class="discover-side">
+    <div class="discover-header">
+      <div class="discover-title-row">
+        <div>
+          <div class="discover-kicker">VEYRA DISCOVER</div>
+          <h1>Find your next build.</h1>
+          <p>Explore an area. Pick a business. Veyra handles the rest.</p>
+        </div>
+        <div class="live-pill"><i></i> MAP LIVE</div>
+      </div>
+
+      <div class="search-block">
+        <div class="search-box area" id="areaBox">
+          <svg viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="7"></circle>
+            <path d="m20 20-4-4"></path>
+          </svg>
+          <input id="areaSearch" placeholder="City, country, ZIP code or address">
+          <div class="loading-dot"></div>
+          <button class="search-go" id="areaGo">GO</button>
+        </div>
+
+        <div class="search-box">
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="8" r="3"></circle>
+            <path d="M5 20c.5-4.1 2.8-6 7-6s6.5 1.9 7 6"></path>
+          </svg>
+          <input id="businessSearch" placeholder="Barbers, auto shops, restaurants...">
+        </div>
+      </div>
+
+      <div class="filters">
+        <select id="industry">
+          <option value="all">All industries</option>
+          <option value="Barber">Barbers</option>
+          <option value="Auto">Auto shops</option>
+          <option value="Bakery">Bakeries</option>
+          <option value="Salon">Salons</option>
+          <option value="Plumber">Plumbers</option>
+        </select>
+
+        <select id="presence">
+          <option value="all">All web presence</option>
+          <option value="no">No website</option>
+          <option value="yes">Has website</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b id="loadedStat">0</b><span>Visible</span></div>
+      <div class="stat"><b id="leadStat">0</b><span>Opportunities</span></div>
+      <div class="stat"><b id="rateStat">0%</b><span>No website</span></div>
+    </div>
+
+    <div class="result-head">
+      <b>BUSINESSES IN THIS AREA</b>
+      <span id="resultCount">0 results</span>
+    </div>
+
+    <div class="results" id="results"></div>
+  </aside>
+
+  <section class="map-stage">
+    <div id="veyraMap"></div>
+
+    <div class="map-badge">
+      <b id="mapAreaLabel">Explore the world</b>
+      <span>Search or drag anywhere on Earth</span>
+    </div>
+
+    <div class="map-searchbar">
+      <svg viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="7"></circle>
+        <path d="m20 20-4-4"></path>
+      </svg>
+      <input id="mapLocationSearch" placeholder="Search anywhere in the world...">
+      <button id="useMyLocation" title="Use my location">◎</button>
+      <button id="mapLocationGo">Explore</button>
+    </div>
+
+    <button class="area-chip" id="searchArea">
+      ✦ Search this area
+    </button>
+
+    <div class="legend">
+      <span><i class="red"></i>No website</span>
+      <span><i class="green"></i>Has website</span>
+      <span><i style="background:#64748b"></i>Not checked</span>
+    </div>
+
+    <div class="business-card" id="businessCard"></div>
+
+    <div class="map-ai">
+      <strong>✦</strong>
+      <input id="aiQuery" placeholder="Find high-rated barbers with no website...">
+      <button id="aiSearch">Ask Veyra</button>
+    </div>
+
+    <div class="prototype-note">
+      Live worldwide business discovery · powered by Veyra
+    </div>
+
+    <div class="toast" id="toast"></div>
+  </section>
+</div>
+
+
+
+<script>
+const $ = id => document.getElementById(id);
+
+let businesses = [];
+let selectedBusiness = null;
+let discoverLoading = false;
+let markers = new Map();
+let currentArea = "the selected area";
+let toastTimer = null;
+
+let map = null;
+let googleMapsReady = false;
+
+function esc(value){
+  return String(value ?? "").replace(
+    /[&<>"']/g,
+    c=>({
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#39;"
+    }[c])
+  );
+}
+
+function showToast(message){
+  clearTimeout(toastTimer);
+  $("toast").textContent=message;
+  $("toast").classList.add("show");
+  toastTimer=setTimeout(
+    ()=>$("toast").classList.remove("show"),
+    2600
+  );
+}
+
+function markerColor(business){
+  if(selectedBusiness?.id===business.id)return "#8b5cf6";
+  if(business.websiteKnown!==true)return "#64748b";
+  if(business.website)return "#22c55e";
+  return "#ef4444";
+}
+
+function markerSvg(business){
+  const selected=selectedBusiness?.id===business.id;
+  const fill=markerColor(business);
+  const size=selected?42:34;
+
+  return {
+    url:"data:image/svg+xml;charset=UTF-8,"+encodeURIComponent(`
+      <svg width="${size}" height="${size+8}" viewBox="0 0 44 52"
+           xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M22 1C10.4 1 1 10.4 1 22c0 15.8 21 29 21 29s21-13.2 21-29C43 10.4 33.6 1 22 1Z"
+          fill="${fill}"
+          stroke="rgba(255,255,255,.92)"
+          stroke-width="${selected?3:2}"
+        />
+        <circle cx="22" cy="22" r="8" fill="#fff"/>
+      </svg>
+    `),
+    scaledSize:new google.maps.Size(size,size+8),
+    anchor:new google.maps.Point(size/2,size+8)
+  };
+}
+
+function businessMatchesFilters(b){
+  const q=$("businessSearch").value.trim().toLowerCase();
+  const industry=$("industry").value;
+  const presence=$("presence").value;
+
+  const text=[
+    b.name,
+    b.category,
+    b.address
+  ].join(" ").toLowerCase();
+
+  if(q && !text.includes(q))return false;
+  if(industry!=="all" && b.category!==industry)return false;
+  if(presence==="no" && !(b.websiteKnown===true && !b.website))return false;
+  if(presence==="yes" && !(b.websiteKnown===true && !!b.website))return false;
+
+  return true;
+}
+
+function visibleBusinesses(){
+  if(!map)return [];
+
+  const bounds=map.getBounds();
+  if(!bounds)return businesses.filter(businessMatchesFilters);
+
+  return businesses.filter(b=>
+    bounds.contains({lat:Number(b.lat),lng:Number(b.lng)}) &&
+    businessMatchesFilters(b)
+  );
+}
+
+function renderMarkers(){
+  if(!map || !window.google?.maps)return;
+
+  const visible=visibleBusinesses();
+  const wanted=new Set(visible.map(b=>String(b.id)));
+
+  markers.forEach((marker,id)=>{
+    if(!wanted.has(String(id))){
+      marker.setMap(null);
+      markers.delete(id);
+    }
+  });
+
+  visible.forEach(b=>{
+    const id=String(b.id);
+    let marker=markers.get(id);
+
+    if(!marker){
+      marker=new google.maps.Marker({
+        map,
+        position:{
+          lat:Number(b.lat),
+          lng:Number(b.lng)
+        },
+        title:b.name,
+        icon:markerSvg(b),
+        optimized:true,
+        clickable:true,
+        zIndex:1
+      });
+
+      marker.addListener("click",()=>{
+        selectBusiness(id,false);
+      });
+
+      markers.set(id,marker);
+      return;
+    }
+
+    marker.setPosition({
+      lat:Number(b.lat),
+      lng:Number(b.lng)
+    });
+
+    marker.setIcon(markerSvg(b));
+    marker.setZIndex(
+      selectedBusiness?.id===b.id ? 999 : 1
+    );
+  });
+}
+
+function renderResults(){
+  const list=visibleBusinesses();
+
+  $("loadedStat").textContent=list.length;
+
+  const checked=list.filter(b=>b.websiteKnown===true);
+  const opportunities=checked.filter(b=>!b.website).length;
+
+  $("leadStat").textContent=opportunities;
+  $("rateStat").textContent=checked.length
+    ? Math.round(opportunities/checked.length*100)+"%"
+    : "—";
+
+  $("resultCount").textContent=`${list.length} results`;
+
+  if(!list.length){
+    $("results").innerHTML=`
+      <div style="
+        margin:5px 3px;
+        padding:25px 15px;
+        border:1px dashed #273954;
+        border-radius:13px;
+        text-align:center;
+        color:#64758e;
+        font-size:10px
+      ">
+        Search anywhere in the world.<br><br>
+        <b style="color:#9f82ff">
+          Move the map, choose a category, then press Search this area.
+        </b>
+      </div>
+    `;
+    return;
+  }
+
+  $("results").innerHTML=list.map(b=>`
+    <article
+      class="business ${selectedBusiness?.id===b.id?"active":""}"
+      data-business="${b.id}"
+    >
+      <div class="business-top">
+        <div>
+          <h3>${esc(b.name)}</h3>
+          <div class="business-type">
+            ${esc(b.category)}${b.status ? " · "+esc(b.status) : ""}
+          </div>
+        </div>
+
+        <span class="web-status">
+          DETAILS ON SELECT
+        </span>
+      </div>
+
+      <div class="business-info">
+        <span>${b.rating ? `<strong>★ ${b.rating}</strong>${b.reviews != null ? ` (${b.reviews})` : ""}` : "Google business"}</span>
+        <span>${esc(b.address)}</span>
+      </div>
+
+      <div class="opportunity-mini">
+        <span>Veyra opportunity score</span>
+        <b>${b.score != null ? b.score+"/100" : "—"}</b>
+      </div>
+    </article>
+  `).join("");
+
+  document.querySelectorAll("[data-business]").forEach(el=>{
+    el.onclick=()=>selectBusiness(
+      el.dataset.business,
+      true
+    );
+  });
+}
+
+function render(){
+  renderMarkers();
+  renderResults();
+}
+
+function renderSelection(){
+  /*
+   * Selection only changes marker appearance + result active state.
+   * Don't rebuild unrelated map state.
+   */
+  renderMarkers();
+
+  document.querySelectorAll("[data-business]").forEach(el=>{
+    el.classList.toggle(
+      "active",
+      String(el.dataset.business)===String(selectedBusiness?.id || "")
+    );
+  });
+}
+
+function preparedPrompt(b){
+  if(!b.website){
+    return `Create a premium, modern, conversion-focused website for ${b.name}, a ${b.category.toLowerCase()} business in ${currentArea}. Use the business context already provided: ${b.address}, phone ${b.phone}, rating ${b.rating}/5 from ${b.reviews} reviews. The business currently has no detected website. Create a complete professional web presence with strong local trust signals, clear services, contact and directions calls to action, responsive mobile design, and a visual identity appropriate for a real ${b.category.toLowerCase()} business.`;
+  }
+
+  return `Create a premium modern redesign concept for ${b.name}, a ${b.category.toLowerCase()} business in ${currentArea}. Business context: ${b.address}, phone ${b.phone}, rating ${b.rating}/5 from ${b.reviews} reviews. Build a polished conversion-focused local business experience with strong service hierarchy, trust signals, contact and directions calls to action, responsive mobile design, and an elevated visual identity.`;
+}
+
+async function selectBusiness(id,fly=true){
+  console.log("[VEYRA DISCOVER] selectBusiness fired:", id);
+
+  let business=businesses.find(b=>String(b.id)===String(id));
+
+  if(!business){
+    console.error("[VEYRA DISCOVER] business not found:", id);
+    showToast("Veyra could not select that business.");
+    return;
+  }
+
+  console.log("[VEYRA DISCOVER] selected:", business);
+
+  selectedBusiness=business;
+
+  if(fly){
+    const target={
+      lat:Number(business.lat),
+      lng:Number(business.lng)
+    };
+
+    map.panTo(target);
+
+    if((map.getZoom() || 2)<14){
+      map.setZoom(14);
+    }
+  }
+
+  renderSelection();
+
+  $("businessCard").innerHTML=`
+    <div class="card-top">
+      <div>
+        <h2>${esc(business.name)}</h2>
+        <div class="card-type">
+          ${esc(business.category)} · ${esc(business.address)}
+        </div>
+      </div>
+
+      <button class="close-card" id="closeBusiness">×</button>
+    </div>
+
+    <div class="website-row">
+      <div class="website-row-head">
+        <b>✦ Veyra is understanding this business</b>
+      </div>
+      <p>Loading website, rating, reviews, phone, hours and business context…</p>
+    </div>
+  `;
+
+  $("businessCard").classList.add("show");
+
+  $("closeBusiness").onclick=()=>{
+    selectedBusiness=null;
+    $("businessCard").classList.remove("show");
+    renderSelection();
+  };
+
+  try{
+    const response=await fetch("/api/discover/details",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Accept":"application/json"
+      },
+      body:JSON.stringify({
+        place_id:business.id
+      })
+    });
+
+    const data=await response.json().catch(()=>({}));
+
+    if(!response.ok || !data.ok || !data.business){
+      throw new Error(data.error || "Business details could not be loaded.");
+    }
+
+    const index=businesses.findIndex(
+      b=>String(b.id)===String(id)
+    );
+
+    business={
+      ...business,
+      ...data.business,
+      websiteKnown:true,
+      detailsLoaded:true
+    };
+
+    if(index!==-1){
+      businesses[index]=business;
+    }
+
+    if(
+      !selectedBusiness ||
+      String(selectedBusiness.id)!==String(id)
+    ){
+      return;
+    }
+
+    selectedBusiness=business;
+
+    render();
+    renderBusinessCard(business);
+
+  }catch(error){
+    console.error("Veyra business details failed:",error);
+
+    if(
+      selectedBusiness &&
+      String(selectedBusiness.id)===String(id)
+    ){
+      renderBusinessCard(business,true);
+      showToast(
+        error.message ||
+        "Veyra couldn't load all business details."
+      );
+    }
+  }
+}
+
+function renderBusinessCard(b,error=false){
+  const rating=
+    b.rating!=null
+      ? `★ ${esc(b.rating)}${b.reviews!=null ? ` · ${esc(b.reviews)} reviews` : ""}`
+      : "Rating unavailable";
+
+  const openStatus=
+    b.open_now===true
+      ? "Open now"
+      : b.open_now===false
+        ? "Closed now"
+        : "";
+
+  const phone=b.phone || "Phone unavailable";
+
+  $("businessCard").innerHTML=`
+    <div class="card-top">
+      <div>
+        <h2>${esc(b.name)}</h2>
+        <div class="card-type">
+          ${esc(b.category)} · ${esc(b.address)}
+        </div>
+      </div>
+
+      <button class="close-card" id="closeBusiness">×</button>
+    </div>
+
+    <div class="card-meta">
+      <span><strong>${rating}</strong></span>
+      ${openStatus ? `<span>${esc(openStatus)}</span>` : ""}
+      <span>${esc(phone)}</span>
+    </div>
+
+    <div class="website-row">
+      <div class="website-row-head">
+        <b>
+          ${
+            error
+              ? "Partial business context"
+              : b.website
+                ? "Existing website detected"
+                : "Website opportunity detected"
+          }
+        </b>
+        <span class="score">
+          ${b.website ? "REDESIGN" : "NEW SITE"}
+        </span>
+      </div>
+
+      <p>
+        ${
+          error
+            ? "Veyra has the map context, but some additional business information could not be loaded."
+            : b.website
+              ? "Veyra found this business's existing website and can use it as context for a complete redesign."
+              : "No website was detected. Veyra can create a complete web presence from this business information."
+        }
+      </p>
+    </div>
+
+    <button class="build" id="buildWithVeyra">
+      ✦ Build with Veyra
+    </button>
+
+    <div class="secondary-actions">
+      ${
+        b.website
+          ? `<button id="visitWebsite">View current website</button>`
+          : ""
+      }
+      <button id="centerBusiness">Center on map</button>
+    </div>
+  `;
+
+  $("businessCard").classList.add("show");
+
+  $("closeBusiness").onclick=()=>{
+    selectedBusiness=null;
+    $("businessCard").classList.remove("show");
+    renderSelection();
+  };
+
+  $("centerBusiness").onclick=()=>{
+    map.panTo({
+      lat:Number(b.lat),
+      lng:Number(b.lng)
+    });
+    map.setZoom(15);
+  };
+
+  if(b.website && $("visitWebsite")){
+    $("visitWebsite").onclick=()=>{
+      window.open(b.website,"_blank","noopener,noreferrer");
+    };
+  }
+
+  $("buildWithVeyra").onclick=()=>{
+    sessionStorage.setItem(
+      "veyra_discover_business",
+      JSON.stringify(b)
+    );
+
+    sessionStorage.setItem(
+      "veyra_discover_autobuild",
+      "1"
+    );
+
+    location.href="/studio?discover=1&autobuild=1";
+  };
+}
+
+async function geocodeArea(query){
+  const clean=query.trim();
+  if(!clean)return;
+
+  $("areaBox").classList.add("loading");
+
+  try{
+    const url=
+      "https://nominatim.openstreetmap.org/search"+
+      "?format=jsonv2&addressdetails=1&limit=5&q="+encodeURIComponent(clean);
+
+    const response=await fetch(url,{
+      headers:{
+        "Accept":"application/json"
+      }
+    });
+
+    if(!response.ok){
+      throw new Error("Location search failed");
+    }
+
+    const data=await response.json();
+
+    if(!data.length){
+      showToast(`Couldn't find "${clean}".`);
+      return;
+    }
+
+    const place=data[0];
+    const lat=Number(place.lat);
+    const lng=Number(place.lon);
+
+    const address = place.address || {};
+    const locality =
+      address.city ||
+      address.town ||
+      address.village ||
+      address.municipality ||
+      address.county ||
+      "";
+
+    const country = address.country || "";
+
+    const friendlyArea =
+      [locality,country].filter(Boolean).join(", ") ||
+      place.display_name ||
+      clean;
+
+    currentArea=friendlyArea;
+    $("areaSearch").value=clean;
+    $("mapLocationSearch").value=clean;
+    $("mapAreaLabel").textContent=friendlyArea;
+
+    if(place.boundingbox?.length===4){
+      const [
+        south,
+        north,
+        west,
+        east
+      ]=place.boundingbox.map(Number);
+
+      const areaBounds=new google.maps.LatLngBounds(
+        {lat:south,lng:west},
+        {lat:north,lng:east}
+      );
+
+      map.fitBounds(areaBounds,45);
+
+      google.maps.event.addListenerOnce(map,"idle",()=>{
+        if((map.getZoom() || 2)>14){
+          map.setZoom(14);
+        }
+      });
+    }else{
+      map.panTo({lat,lng});
+      map.setZoom(13);
+    }
+
+    showToast(`Exploring ${friendlyArea}`);
+  }catch(error){
+    console.error(error);
+    showToast("Location search is unavailable right now.");
+  }finally{
+    $("areaBox").classList.remove("loading");
+  }
+}
+
+function currentSearchQuery(){
+  const typed=$("businessSearch").value.trim();
+  if(typed)return typed;
+
+  const industry=$("industry").value;
+  if(industry && industry!=="all")return industry;
+
+  return "businesses";
+}
+
+async function loadBusinessesForCurrentArea(queryOverride=null){
+  if(discoverLoading)return;
+
+  const query=(queryOverride || currentSearchQuery()).trim();
+  if(!query){
+    showToast("Enter a business or category first.");
+    return;
+  }
+
+  const bounds=map.getBounds();
+
+  if(!bounds){
+    showToast("Map is still loading.");
+    return;
+  }
+
+  const sw=bounds.getSouthWest();
+  const ne=bounds.getNorthEast();
+
+  const payload={
+    query,
+    limit:20,
+    bounds:{
+      south:sw.lat(),
+      west:sw.lng(),
+      north:ne.lat(),
+      east:ne.lng()
+    }
+  };
+
+  discoverLoading=true;
+  $("searchArea").classList.remove("show");
+
+  const originalText=$("searchArea").textContent;
+  $("searchArea").textContent="Searching…";
+
+  try{
+    const response=await fetch("/api/discover/search",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "Accept":"application/json"
+      },
+      body:JSON.stringify(payload)
+    });
+
+    const data=await response.json().catch(()=>({}));
+
+    if(!response.ok || !data.ok){
+      throw new Error(data.error || "Business search failed.");
+    }
+
+    businesses=(data.businesses || []).map(b=>({
+      ...b,
+      id:String(b.id),
+      phone:"",
+      website:null,
+      websiteKnown:false,
+      rating:null,
+      reviews:null,
+      score:null,
+      status:""
+    }));
+
+    selectedBusiness=null;
+    $("businessCard").classList.remove("show");
+
+    render();
+
+    if(businesses.length){
+      showToast(
+        `Loaded ${businesses.length} real businesses for "${query}".`
+      );
+    }else{
+      showToast(`No businesses found for "${query}" in this area.`);
+    }
+  }catch(error){
+    console.error("Veyra Discover search failed:",error);
+    showToast(error.message || "Veyra couldn't search this area.");
+  }finally{
+    discoverLoading=false;
+    $("searchArea").textContent=originalText;
+  }
+}
+
+function searchCurrentArea(){
+  return loadBusinessesForCurrentArea();
+}
+
+function runVeyraSearch(){
+  const query=$("aiQuery").value.trim();
+  if(!query)return;
+
+  const lower=query.toLowerCase();
+
+  if(
+    lower.includes("no website") ||
+    lower.includes("without website") ||
+    lower.includes("without a website")
+  ){
+    $("presence").value="no";
+  }else if(
+    lower.includes("has website") ||
+    lower.includes("with website") ||
+    lower.includes("with a website")
+  ){
+    $("presence").value="yes";
+  }
+
+  /*
+   * For now the full natural-language query goes directly to Google Places.
+   * Veyra's richer opportunity interpretation comes after Place Details.
+   */
+  $("businessSearch").value=query;
+
+  loadBusinessesForCurrentArea(query);
+}
+
+async function useMyLocation(){
+  if(!navigator.geolocation){
+    showToast("Your browser does not support location access.");
+    return;
+  }
+
+  showToast("Requesting your location...");
+
+  navigator.geolocation.getCurrentPosition(
+    async position=>{
+      const lat=position.coords.latitude;
+      const lng=position.coords.longitude;
+
+      map.panTo({lat,lng});
+      map.setZoom(13);
+
+      try{
+        const reverseUrl =
+          "https://nominatim.openstreetmap.org/reverse"+
+          "?format=jsonv2&addressdetails=1"+
+          "&lat="+encodeURIComponent(lat)+
+          "&lon="+encodeURIComponent(lng);
+
+        const response=await fetch(reverseUrl,{
+          headers:{"Accept":"application/json"}
+        });
+
+        if(response.ok){
+          const place=await response.json();
+          const address=place.address || {};
+
+          const locality =
+            address.city ||
+            address.town ||
+            address.village ||
+            address.municipality ||
+            address.county ||
+            "";
+
+          const country=address.country || "";
+
+          currentArea=
+            [locality,country].filter(Boolean).join(", ") ||
+            "Current location";
+
+          $("mapAreaLabel").textContent=currentArea;
+          $("areaSearch").value=currentArea;
+          $("mapLocationSearch").value=currentArea;
+        }else{
+          currentArea="Current location";
+          $("mapAreaLabel").textContent=currentArea;
+        }
+      }catch(error){
+        console.error(error);
+        currentArea="Current location";
+        $("mapAreaLabel").textContent=currentArea;
+      }
+
+      showToast(`Exploring ${currentArea}`);
+    },
+    error=>{
+      console.error(error);
+
+      if(error.code===1){
+        showToast("Location permission was not granted.");
+      }else{
+        showToast("Veyra couldn't get your location.");
+      }
+    },
+    {
+      enableHighAccuracy:false,
+      timeout:10000,
+      maximumAge:300000
+    }
+  );
+}
+
+$("useMyLocation").onclick=useMyLocation;
+
+/* area search */
+$("areaGo").onclick=()=>{
+  geocodeArea($("areaSearch").value);
+};
+
+$("areaSearch").addEventListener("keydown",event=>{
+  if(event.key==="Enter"){
+    geocodeArea($("areaSearch").value);
+  }
+});
+
+$("mapLocationGo").onclick=()=>{
+  const value=$("mapLocationSearch").value;
+  if(value.trim()){
+    $("areaSearch").value=value;
+    geocodeArea(value);
+  }
+};
+
+$("mapLocationSearch").addEventListener("keydown",event=>{
+  if(event.key==="Enter"){
+    const value=$("mapLocationSearch").value;
+    if(value.trim()){
+      $("areaSearch").value=value;
+      geocodeArea(value);
+    }
+  }
+});
+
+/* business filters */
+$("businessSearch").addEventListener("keydown",event=>{
+  if(event.key==="Enter"){
+    loadBusinessesForCurrentArea();
+  }
+});
+
+$("industry").addEventListener("change",()=>{
+  if($("industry").value!=="all"){
+    $("businessSearch").value=$("industry").value;
+    loadBusinessesForCurrentArea($("industry").value);
+  }else{
+    render();
+  }
+});
+
+$("presence").addEventListener("change",render);
+
+/* AI query */
+$("aiSearch").onclick=runVeyraSearch;
+
+$("aiQuery").addEventListener("keydown",event=>{
+  if(event.key==="Enter")runVeyraSearch();
+});
+
+/* search moved area */
+$("searchArea").onclick=searchCurrentArea;
+
+const VEYRA_MAP_STYLES=[
+  {
+    elementType:"geometry",
+    stylers:[{color:"#08111f"}]
+  },
+  {
+    elementType:"labels.text.fill",
+    stylers:[{color:"#8392aa"}]
+  },
+  {
+    elementType:"labels.text.stroke",
+    stylers:[{color:"#08111f"}]
+  },
+  {
+    featureType:"administrative",
+    elementType:"geometry.stroke",
+    stylers:[{color:"#24344d"}]
+  },
+  {
+    featureType:"administrative.country",
+    elementType:"labels.text.fill",
+    stylers:[{color:"#a8b3c7"}]
+  },
+  {
+    featureType:"administrative.locality",
+    elementType:"labels.text.fill",
+    stylers:[{color:"#c1cada"}]
+  },
+  {
+    featureType:"poi",
+    elementType:"geometry",
+    stylers:[{color:"#0d1929"}]
+  },
+  {
+    featureType:"poi",
+    elementType:"labels.text.fill",
+    stylers:[{color:"#64748b"}]
+  },
+  {
+    featureType:"poi.business",
+    stylers:[{visibility:"off"}]
+  },
+  {
+    featureType:"road",
+    elementType:"geometry",
+    stylers:[{color:"#17263a"}]
+  },
+  {
+    featureType:"road",
+    elementType:"geometry.stroke",
+    stylers:[{color:"#0c1727"}]
+  },
+  {
+    featureType:"road",
+    elementType:"labels.text.fill",
+    stylers:[{color:"#8c9bb1"}]
+  },
+  {
+    featureType:"road.highway",
+    elementType:"geometry",
+    stylers:[{color:"#263853"}]
+  },
+  {
+    featureType:"road.highway",
+    elementType:"geometry.stroke",
+    stylers:[{color:"#17243a"}]
+  },
+  {
+    featureType:"transit",
+    elementType:"geometry",
+    stylers:[{color:"#132137"}]
+  },
+  {
+    featureType:"transit.station",
+    elementType:"labels.text.fill",
+    stylers:[{color:"#718096"}]
+  },
+  {
+    featureType:"water",
+    elementType:"geometry",
+    stylers:[{color:"#030914"}]
+  },
+  {
+    featureType:"water",
+    elementType:"labels.text.fill",
+    stylers:[{color:"#52647f"}]
+  }
+];
+
+window.initVeyraDiscoverMap=function(){
+  map=new google.maps.Map(
+    document.getElementById("veyraMap"),
+    {
+      center:{lat:20,lng:0},
+      zoom:2,
+      minZoom:2,
+      styles:VEYRA_MAP_STYLES,
+      backgroundColor:"#030914",
+      disableDefaultUI:true,
+      zoomControl:true,
+      zoomControlOptions:{
+        position:google.maps.ControlPosition.RIGHT_BOTTOM
+      },
+      gestureHandling:"greedy",
+      clickableIcons:false,
+      keyboardShortcuts:false,
+      restriction:{
+        latLngBounds:{
+          north:85,
+          south:-85,
+          west:-180,
+          east:180
+        },
+        strictBounds:false
+      }
+    }
+  );
+
+  googleMapsReady=true;
+  bindGoogleMapEvents();
+  render();
+};
+
+function loadVeyraGoogleMaps(){
+  const key={{ google_maps_browser_key|tojson }};
+
+  if(!key){
+    console.error("GOOGLE_MAPS_BROWSER_KEY is not configured.");
+    showToast("Google Maps is not configured.");
+    return;
+  }
+
+  const script=document.createElement("script");
+  script.src=
+    "https://maps.googleapis.com/maps/api/js?key="+
+    encodeURIComponent(key)+
+    "&v=weekly&callback=initVeyraDiscoverMap";
+
+  script.async=true;
+  script.defer=true;
+
+  script.onerror=()=>{
+    console.error("Google Maps JavaScript failed to load.");
+    showToast("Google Maps couldn't load.");
+  };
+
+  document.head.appendChild(script);
+}
+
+function bindGoogleMapEvents(){
+  map.addListener("dragstart",()=>{
+    $("searchArea").classList.remove("show");
+  });
+
+  map.addListener("zoom_changed",()=>{
+    $("searchArea").classList.remove("show");
+  });
+
+  map.addListener("idle",()=>{
+    if(googleMapsReady){
+      $("searchArea").classList.add("show");
+      render();
+    }
+  });
+}
+loadVeyraGoogleMaps();
+</script>
+{% endblock %}
