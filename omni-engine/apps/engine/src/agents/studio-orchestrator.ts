@@ -27,6 +27,13 @@ import {
   isRealPhotoSearchConfigured,
   type ResolvedRealPhoto
 } from "../providers/real-photos.js";
+import {
+  deriveCreativeDirectives,
+  creativeDirectiveContext
+} from "../intelligence/creative-directors.js";
+import {
+  studioEditingContext
+} from "../studio/edit-contracts.js";
 
 export interface StudioBuildRequest {
   projectId?: string;
@@ -3133,8 +3140,25 @@ export async function orchestrateStudioBuildStage(
 
   const resolvedVisualContext = generatedVisualContext(resolvedVisuals);
 
+  const creativeDirectives = deriveCreativeDirectives({
+    prompt: req.prompt,
+    designDNA: plan.designDNA,
+    composition: plan.composition,
+    assets: plan.assets
+  });
+
+  const creativeContext =
+    creativeDirectiveContext(creativeDirectives);
+
+  const editabilityContext =
+    studioEditingContext();
+
   console.error(
     `[Veyra V4 STAGE] BUILD: ${resolvedVisuals.length} generated visual asset(s) ready`
+  );
+
+  console.error(
+    `[Veyra V4 STAGE] BUILD: Creative Directors active | photography=${creativeDirectives.photography.mode} | responsive=${creativeDirectives.responsive.strategy} | motion=${creativeDirectives.motion.intensity}`
   );
 
   console.error("[Veyra V4 STAGE] BUILD: Generating website");
@@ -3147,6 +3171,8 @@ export async function orchestrateStudioBuildStage(
       `DESIGN DNA:\n${plan.designDNA}`,
       `COMPOSITION BLUEPRINT:\n${plan.composition}`,
       `VISUAL EXPERIENCE PLAN:\n${plan.assets}`,
+      creativeContext,
+      editabilityContext,
       resolvedRealPhotoContext,
       resolvedVisualContext,
       `MANDATORY COMPLETION CONTRACT:\n${plan.completionContract}`
@@ -3222,6 +3248,19 @@ export async function orchestrateStudioRecomposeStage(
 
   const ctx = projectContext(req);
 
+  const creativeDirectives = deriveCreativeDirectives({
+    prompt: req.prompt,
+    designDNA: plan.designDNA,
+    composition: plan.composition,
+    assets: plan.assets
+  });
+
+  const creativeContext =
+    creativeDirectiveContext(creativeDirectives);
+
+  const editabilityContext =
+    studioEditingContext();
+
   const current: Candidate = currentState;
   const previousBest: Candidate = bestState;
 
@@ -3276,6 +3315,8 @@ export async function orchestrateStudioRecomposeStage(
             `DESIGN DNA:\n${plan.designDNA}`,
             `COMPOSITION BLUEPRINT:\n${plan.composition}`,
             `VISUAL EXPERIENCE PLAN:\n${plan.assets}`,
+            creativeContext,
+            editabilityContext,
             realPhotoContext(plan.resolvedRealPhotos ?? []),
             generatedVisualContext(plan.resolvedVisuals ?? []),
             `MANDATORY COMPLETION CONTRACT:\n${plan.completionContract}`,
@@ -3304,6 +3345,8 @@ export async function orchestrateStudioRecomposeStage(
             `DESIGN DNA:\n${plan.designDNA}`,
             `COMPOSITION BLUEPRINT:\n${plan.composition}`,
             `VISUAL EXPERIENCE PLAN:\n${plan.assets}`,
+            creativeContext,
+            editabilityContext,
             realPhotoContext(plan.resolvedRealPhotos ?? []),
             generatedVisualContext(plan.resolvedVisuals ?? []),
             `MANDATORY COMPLETION CONTRACT:\n${plan.completionContract}`,
