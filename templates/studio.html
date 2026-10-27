@@ -1510,6 +1510,9 @@ body{
   <a class="nav-item" href="{{url_for('projects_page')}}">
     <svg viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v10A1.5 1.5 0 0 1 19.5 20h-15A1.5 1.5 0 0 1 3 18.5z"/></svg><span>Projects</span>
   </a>
+  <a class="nav-item" href="{{url_for('discover_page')}}">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="m15.5 8.5-2.1 4.9-4.9 2.1 2.1-4.9z"/></svg><span>Discover</span>
+  </a>
   <a class="nav-item" href="{{url_for('templates_page')}}">
     <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>Templates</span>
   </a>
@@ -4145,7 +4148,1150 @@ function addMessage(role,text,card=null,steps=null,details=null,attachments=null
   });
 
   scrollChat();
+  return wrap;
 }
+
+function createVeyraActivity(text="Understanding your request…"){
+  const wrap=addMessage("assistant",text);
+
+  if(!wrap)return null;
+
+  wrap.classList.add("veyra-activity-message","is-working");
+
+  const body=wrap.querySelector(".message-body");
+  const paragraph=wrap.querySelector(".message-body > p");
+
+  if(body){
+    body.classList.add("veyra-activity-body");
+  }
+
+  if(paragraph){
+    paragraph.classList.add("veyra-activity-text");
+    paragraph.innerHTML=`
+      <span class="veyra-activity-copy">${esc(text)}</span>
+      <span class="veyra-activity-dots" aria-hidden="true">
+        <i></i><i></i><i></i>
+      </span>
+    `;
+  }
+
+  scrollChat();
+  return wrap;
+}
+
+function updateVeyraActivity(wrap,text){
+  if(!wrap)return;
+
+  const copy=wrap.querySelector(".veyra-activity-copy");
+  if(copy)copy.textContent=text;
+
+  scrollChat();
+}
+
+function completeVeyraActivity(wrap,text="Website ready"){
+  if(!wrap)return;
+
+  const copy=wrap.querySelector(".veyra-activity-copy");
+  if(copy)copy.textContent=text;
+
+  wrap.classList.remove("is-working");
+  wrap.classList.add("is-complete");
+
+  const dots=wrap.querySelector(".veyra-activity-dots");
+  if(dots)dots.remove();
+
+  scrollChat();
+}
+
+function removeVeyraActivity(wrap){
+  if(wrap && wrap.isConnected)wrap.remove();
+}
+
+const veyraActivityStyle=document.createElement("style");
+veyraActivityStyle.textContent=`
+.veyra-activity-message .veyra-activity-body > p{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  margin-top:4px;
+  color:#dfe6f3;
+}
+
+.veyra-activity-message.is-working .veyra-activity-body > p,
+.veyra-activity-message .veyra-activity-body > p{
+  min-height:22px;
+}
+
+.veyra-activity-copy{
+  transition:opacity .18s ease;
+}
+
+.veyra-activity-dots{
+  display:inline-flex;
+  align-items:center;
+  gap:3px;
+  flex:0 0 auto;
+}
+
+.veyra-activity-dots i{
+  display:block;
+  width:4px;
+  height:4px;
+  border-radius:999px;
+  background:currentColor;
+  opacity:.28;
+  animation:veyraActivityDot 1.15s ease-in-out infinite;
+}
+
+.veyra-activity-dots i:nth-child(2){
+  animation-delay:.14s;
+}
+
+.veyra-activity-dots i:nth-child(3){
+  animation-delay:.28s;
+}
+
+.veyra-activity-message.is-complete .veyra-activity-body > p{
+  color:#cbd5e1;
+}
+
+@keyframes veyraActivityDot{
+  0%,60%,100%{
+    opacity:.25;
+    transform:translateY(0);
+  }
+  30%{
+    opacity:1;
+    transform:translateY(-3px);
+  }
+}
+
+@media (prefers-reduced-motion:reduce){
+  .veyra-activity-dots i{
+    animation:none;
+    opacity:.65;
+  }
+}
+`;
+document.head.appendChild(veyraActivityStyle);
+
+
+/* VEYRA_STUDIO_DIRECT_EDIT_V1
+   Local Studio direct manipulation.
+   No AI/API calls are made by this system.
+*/
+let veyraEditMode=false;
+let veyraSelectedElement=null;
+let veyraSelectedId="";
+let veyraEditMutationTimer=null;
+let veyraEditHistoryTimer=null;
+let veyraEditSnapshotBefore=null;
+let veyraEditListenersBound=false;
+
+const veyraEditorStyle=document.createElement("style");
+veyraEditorStyle.textContent=`
+.veyra-direct-edit-bar{
+  position:fixed;
+  left:50%;
+  bottom:22px;
+  transform:translateX(-50%) translateY(16px);
+  z-index:99998;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:7px;
+  border:1px solid rgba(148,163,184,.22);
+  border-radius:14px;
+  background:rgba(9,14,24,.94);
+  box-shadow:0 18px 60px rgba(0,0,0,.38);
+  backdrop-filter:blur(18px);
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .18s ease,transform .18s ease;
+}
+.veyra-direct-edit-bar.show{
+  opacity:1;
+  pointer-events:auto;
+  transform:translateX(-50%) translateY(0);
+}
+.veyra-direct-edit-bar button{
+  border:0;
+  border-radius:9px;
+  padding:8px 10px;
+  background:transparent;
+  color:#dce5f3;
+  font:inherit;
+  font-size:12px;
+  cursor:pointer;
+}
+.veyra-direct-edit-bar button:hover{
+  background:rgba(148,163,184,.12);
+  color:#fff;
+}
+.veyra-direct-edit-bar button.danger:hover{
+  background:rgba(239,68,68,.14);
+  color:#fca5a5;
+}
+.veyra-direct-edit-label{
+  max-width:220px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  padding:0 8px;
+  color:#aeb9ca;
+  font-size:11px;
+  border-right:1px solid rgba(148,163,184,.16);
+}
+.veyra-edit-mode-pill{
+  position:fixed;
+  right:18px;
+  bottom:22px;
+  z-index:99998;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 11px;
+  border:1px solid rgba(148,163,184,.22);
+  border-radius:999px;
+  background:rgba(9,14,24,.92);
+  color:#dce5f3;
+  box-shadow:0 12px 40px rgba(0,0,0,.28);
+  backdrop-filter:blur(16px);
+  font-size:11px;
+}
+.veyra-edit-mode-pill i{
+  width:7px;
+  height:7px;
+  border-radius:999px;
+  background:#8b5cf6;
+  box-shadow:0 0 10px rgba(139,92,246,.8);
+}
+`;
+document.head.appendChild(veyraEditorStyle);
+
+const veyraDirectBar=document.createElement("div");
+veyraDirectBar.className="veyra-direct-edit-bar";
+veyraDirectBar.innerHTML=`
+  <span class="veyra-direct-edit-label" id="veyraDirectEditLabel">Element</span>
+  <button type="button" data-veyra-edit-action="text">Text</button>
+  <button type="button" data-veyra-edit-action="link">Link</button>
+  <button type="button" data-veyra-edit-action="image">Image</button>
+  <button type="button" data-veyra-edit-action="duplicate">Duplicate</button>
+  <button type="button" data-veyra-edit-action="hide">Hide</button>
+  <button type="button" class="danger" data-veyra-edit-action="delete">Delete</button>
+  <button type="button" data-veyra-edit-action="done">Done</button>
+`;
+document.body.appendChild(veyraDirectBar);
+
+const veyraModePill=document.createElement("div");
+veyraModePill.className="veyra-edit-mode-pill";
+veyraModePill.innerHTML="<i></i><span>Click preview to edit</span>";
+document.body.appendChild(veyraModePill);
+
+function veyraFrameDocument(){
+  try{
+    return frame?.contentDocument||frame?.contentWindow?.document||null;
+  }catch(_){
+    return null;
+  }
+}
+
+function veyraEnsureEditableIds(doc){
+  if(!doc?.body)return;
+
+  let sequence=0;
+  const used=new Set();
+
+  doc.body.querySelectorAll("[data-veyra-id]").forEach(el=>{
+    const id=String(el.getAttribute("data-veyra-id")||"").trim();
+    if(id)used.add(id);
+  });
+
+  const slug=value=>String(value||"")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g,"-")
+    .replace(/^-+|-+$/g,"")
+    .slice(0,48);
+
+  const nextId=(prefix="element")=>{
+    let id="";
+    do{
+      sequence++;
+      id=`${prefix}-${sequence}`;
+    }while(used.has(id));
+    used.add(id);
+    return id;
+  };
+
+  doc.body.querySelectorAll(
+    "section,header,footer,main,nav,article,aside"
+  ).forEach(el=>{
+    if(!el.hasAttribute("data-veyra-section")){
+      const seed=
+        el.id||
+        el.getAttribute("aria-label")||
+        el.querySelector("h1,h2,h3")?.textContent||
+        el.tagName.toLowerCase();
+
+      el.setAttribute(
+        "data-veyra-section",
+        slug(seed)||nextId("section")
+      );
+    }
+
+    if(!el.hasAttribute("data-veyra-id")){
+      el.setAttribute(
+        "data-veyra-id",
+        `section-${slug(el.getAttribute("data-veyra-section"))||sequence}`
+      );
+    }
+  });
+
+  doc.body.querySelectorAll(
+    "h1,h2,h3,h4,h5,h6,p,a,button,img,input,textarea,label,li,figure,figcaption"
+  ).forEach(el=>{
+    if(el.hasAttribute("data-veyra-id"))return;
+
+    const tag=el.tagName.toLowerCase();
+    const seed=
+      el.id||
+      el.getAttribute("name")||
+      el.getAttribute("aria-label")||
+      el.textContent||
+      tag;
+
+    el.setAttribute(
+      "data-veyra-id",
+      nextId(`${tag}-${slug(seed).slice(0,24)||"item"}`)
+    );
+  });
+}
+
+function veyraInstallFrameStyles(doc){
+  if(!doc?.head)return;
+
+  let style=doc.getElementById("veyra-studio-edit-style");
+
+  if(!style){
+    style=doc.createElement("style");
+    style.id="veyra-studio-edit-style";
+    doc.head.appendChild(style);
+  }
+
+  style.textContent=`
+    [data-veyra-studio-editable="true"]{
+      cursor:pointer !important;
+    }
+
+    [data-veyra-studio-editable="true"]:hover{
+      outline:1px dashed rgba(139,92,246,.9) !important;
+      outline-offset:3px !important;
+    }
+
+    [data-veyra-studio-selected="true"]{
+      outline:2px solid #8b5cf6 !important;
+      outline-offset:4px !important;
+      box-shadow:0 0 0 4px rgba(139,92,246,.13) !important;
+    }
+
+    [data-veyra-studio-inline-edit="true"]{
+      outline:2px solid #22c55e !important;
+      outline-offset:4px !important;
+      cursor:text !important;
+    }
+
+    [data-veyra-studio-hidden="true"]{
+      opacity:.24 !important;
+      filter:grayscale(.65) !important;
+    }
+  `;
+}
+
+function veyraCleanEditorArtifacts(root){
+  if(!root)return;
+
+  root.querySelectorAll(
+    "[data-veyra-studio-editable],[data-veyra-studio-selected],[data-veyra-studio-inline-edit]"
+  ).forEach(el=>{
+    el.removeAttribute("data-veyra-studio-editable");
+    el.removeAttribute("data-veyra-studio-selected");
+    el.removeAttribute("data-veyra-studio-inline-edit");
+    el.removeAttribute("contenteditable");
+    el.removeAttribute("spellcheck");
+  });
+
+  root.querySelector("#veyra-studio-edit-style")?.remove();
+}
+
+function veyraSerializePreview(){
+  const doc=veyraFrameDocument();
+  if(!doc?.body)return false;
+
+  const clone=doc.body.cloneNode(true);
+  veyraCleanEditorArtifacts(clone);
+
+  state.html=clone.innerHTML;
+  state.dirty=true;
+  setDirty(true);
+  scheduleAutosave("Direct edit autosaved");
+
+  return true;
+}
+
+function veyraElementLabel(el){
+  if(!el)return "Element";
+
+  const section=el.closest("[data-veyra-section]")?.getAttribute("data-veyra-section");
+  const id=el.getAttribute("data-veyra-id");
+  const tag=el.tagName.toLowerCase();
+
+  return [
+    tag,
+    id ? `#${id}` : "",
+    section ? `· ${section}` : ""
+  ].filter(Boolean).join(" ");
+}
+
+function veyraClearSelection(){
+  const doc=veyraFrameDocument();
+
+  if(doc){
+    doc.querySelectorAll("[data-veyra-studio-selected]").forEach(el=>{
+      el.removeAttribute("data-veyra-studio-selected");
+    });
+  }
+
+  veyraSelectedElement=null;
+  veyraSelectedId="";
+  veyraDirectBar.classList.remove("show");
+}
+
+function veyraSelectElement(el){
+  if(!el || el===veyraFrameDocument()?.body)return;
+
+  veyraClearSelection();
+
+  veyraSelectedElement=el;
+  veyraSelectedId=el.getAttribute("data-veyra-id")||"";
+  el.setAttribute("data-veyra-studio-selected","true");
+
+  const label=document.getElementById("veyraDirectEditLabel");
+  if(label)label.textContent=veyraElementLabel(el);
+
+  veyraDirectBar.classList.add("show");
+}
+
+function veyraFindSelected(){
+  const doc=veyraFrameDocument();
+  if(!doc)return null;
+
+  if(
+    veyraSelectedElement &&
+    doc.documentElement.contains(veyraSelectedElement)
+  ){
+    return veyraSelectedElement;
+  }
+
+  if(veyraSelectedId){
+    const safeId=
+      window.CSS?.escape
+        ? CSS.escape(veyraSelectedId)
+        : veyraSelectedId.replace(/["\\]/g,"\\$&");
+
+    return doc.querySelector(`[data-veyra-id="${safeId}"]`);
+  }
+
+  return null;
+}
+
+function veyraCommitDirectEdit(label="Direct edit"){
+  clearTimeout(veyraEditMutationTimer);
+
+  if(!veyraSerializePreview())return;
+
+  clearTimeout(veyraEditHistoryTimer);
+
+  veyraEditHistoryTimer=setTimeout(async()=>{
+    try{
+      await autosave(label);
+
+      if(state.project_id){
+        await createProjectVersion(label,"edit");
+
+        if($("historyDrawer")?.classList.contains("open")){
+          await refreshVersionHistory();
+        }
+      }
+    }catch(error){
+      console.error("Veyra direct-edit history save failed",error);
+    }
+  },1000);
+}
+
+function veyraBeginInlineTextEdit(el){
+  if(!el)return;
+
+  const tag=el.tagName.toLowerCase();
+
+  if(["img","input","textarea","select","video","audio","canvas","svg"].includes(tag)){
+    addMessage("assistant","Select a text element like a heading, paragraph, button, or link to edit its copy.");
+    return;
+  }
+
+  el.setAttribute("contenteditable","true");
+  el.setAttribute("spellcheck","true");
+  el.setAttribute("data-veyra-studio-inline-edit","true");
+
+  try{
+    el.focus({preventScroll:true});
+
+    const selection=el.ownerDocument.getSelection();
+    const range=el.ownerDocument.createRange();
+    range.selectNodeContents(el);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }catch(_){}
+
+  const finish=()=>{
+    el.removeAttribute("contenteditable");
+    el.removeAttribute("spellcheck");
+    el.removeAttribute("data-veyra-studio-inline-edit");
+    el.removeEventListener("blur",finish);
+    veyraCommitDirectEdit("Edited text");
+  };
+
+  el.addEventListener("blur",finish,{once:true});
+}
+
+function veyraEditLink(el){
+  const link=el.closest("a")||(
+    el.tagName.toLowerCase()==="a" ? el : null
+  );
+
+  if(!link){
+    addMessage("assistant","That element isn't a link. Select a link or button with a destination.");
+    return;
+  }
+
+  const current=link.getAttribute("href")||"";
+  const next=window.prompt("Link destination",current);
+
+  if(next===null)return;
+
+  const value=next.trim();
+
+  if(!value){
+    link.removeAttribute("href");
+  }else{
+    link.setAttribute("href",value);
+  }
+
+  veyraCommitDirectEdit("Edited link");
+}
+
+function veyraEditImage(el){
+  const image=
+    el.tagName.toLowerCase()==="img"
+      ? el
+      : el.querySelector?.("img");
+
+  if(!image){
+    addMessage("assistant","Select an image to replace its source.");
+    return;
+  }
+
+  const current=image.getAttribute("src")||"";
+  const next=window.prompt("Image URL",current);
+
+  if(next===null)return;
+
+  const value=next.trim();
+  if(!value)return;
+
+  image.setAttribute("src",value);
+
+  const alt=window.prompt(
+    "Image alt text",
+    image.getAttribute("alt")||""
+  );
+
+  if(alt!==null){
+    image.setAttribute("alt",alt.trim());
+  }
+
+  veyraCommitDirectEdit("Replaced image");
+}
+
+function veyraDuplicateElement(el){
+  if(!el?.parentNode)return;
+
+  const clone=el.cloneNode(true);
+
+  clone.querySelectorAll?.("[data-veyra-id]").forEach(node=>{
+    node.removeAttribute("data-veyra-id");
+  });
+
+  clone.removeAttribute?.("data-veyra-id");
+  clone.removeAttribute?.("data-veyra-studio-selected");
+
+  el.parentNode.insertBefore(clone,el.nextSibling);
+
+  const doc=veyraFrameDocument();
+  veyraEnsureEditableIds(doc);
+  veyraActivateEditableNodes(doc);
+
+  veyraCommitDirectEdit("Duplicated element");
+}
+
+function veyraToggleHidden(el){
+  if(!el)return;
+
+  const hidden=el.getAttribute("data-veyra-studio-hidden")==="true";
+
+  if(hidden){
+    el.removeAttribute("data-veyra-studio-hidden");
+    el.removeAttribute("hidden");
+  }else{
+    el.setAttribute("data-veyra-studio-hidden","true");
+    el.setAttribute("hidden","");
+  }
+
+  veyraCommitDirectEdit(hidden?"Showed element":"Hid element");
+}
+
+function veyraDeleteElement(el){
+  if(!el)return;
+
+  const section=el.closest("[data-veyra-section]");
+  const target=
+    section===el && el.parentElement?.tagName.toLowerCase()==="body"
+      ? el
+      : el;
+
+  const label=veyraElementLabel(target);
+
+  if(!window.confirm(`Delete ${label}?`))return;
+
+  target.remove();
+  veyraClearSelection();
+  veyraCommitDirectEdit("Deleted element");
+}
+
+function veyraActivateEditableNodes(doc){
+  if(!doc?.body)return;
+
+  veyraEnsureEditableIds(doc);
+  veyraInstallFrameStyles(doc);
+
+  doc.body.querySelectorAll("[data-veyra-id]").forEach(el=>{
+    el.setAttribute("data-veyra-studio-editable","true");
+  });
+}
+
+function veyraBindFrameEditing(){
+  const doc=veyraFrameDocument();
+  if(!doc?.body)return;
+
+  veyraActivateEditableNodes(doc);
+
+  if(doc.documentElement.dataset.veyraStudioBound==="true"){
+    return;
+  }
+
+  doc.documentElement.dataset.veyraStudioBound="true";
+
+  doc.addEventListener("click",event=>{
+    if(!veyraEditMode)return;
+
+    const target=event.target?.closest?.("[data-veyra-id]");
+
+    if(!target)return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    veyraSelectElement(target);
+  },true);
+
+  doc.addEventListener("dblclick",event=>{
+    if(!veyraEditMode)return;
+
+    const target=event.target?.closest?.("[data-veyra-id]");
+    if(!target)return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    veyraSelectElement(target);
+    veyraBeginInlineTextEdit(target);
+  },true);
+
+  doc.addEventListener("keydown",event=>{
+    if(!veyraEditMode)return;
+
+    const selected=veyraFindSelected();
+    if(!selected)return;
+
+    if(
+      (event.key==="Delete" || event.key==="Backspace") &&
+      !selected.isContentEditable
+    ){
+      event.preventDefault();
+      veyraDeleteElement(selected);
+    }
+
+    if(event.key==="Escape"){
+      selected.blur?.();
+      veyraClearSelection();
+    }
+
+    if(
+      event.key==="Enter" &&
+      !event.shiftKey &&
+      selected.isContentEditable
+    ){
+      event.preventDefault();
+      selected.blur();
+    }
+  },true);
+
+  const observer=new MutationObserver(()=>{
+    if(!veyraEditMode)return;
+
+    clearTimeout(veyraEditMutationTimer);
+
+    veyraEditMutationTimer=setTimeout(()=>{
+      veyraActivateEditableNodes(doc);
+    },120);
+  });
+
+  observer.observe(doc.body,{
+    subtree:true,
+    childList:true
+  });
+}
+
+function veyraEnableDirectEditing(){
+  veyraEditMode=true;
+  veyraModePill.style.display="flex";
+  veyraModePill.querySelector("span").textContent="Click preview to edit";
+  veyraBindFrameEditing();
+}
+
+function veyraDisableDirectEditing(){
+  veyraEditMode=false;
+  veyraClearSelection();
+
+  const doc=veyraFrameDocument();
+
+  if(doc){
+    doc.querySelectorAll("[data-veyra-studio-editable]").forEach(el=>{
+      el.removeAttribute("data-veyra-studio-editable");
+    });
+  }
+
+  veyraModePill.querySelector("span").textContent="Preview mode";
+}
+
+veyraDirectBar.addEventListener("click",event=>{
+  const button=event.target.closest("[data-veyra-edit-action]");
+  if(!button)return;
+
+  const action=button.dataset.veyraEditAction;
+  const el=veyraFindSelected();
+
+  if(action==="done"){
+    veyraClearSelection();
+    return;
+  }
+
+  if(!el)return;
+
+  if(action==="text")veyraBeginInlineTextEdit(el);
+  if(action==="link")veyraEditLink(el);
+  if(action==="image")veyraEditImage(el);
+  if(action==="duplicate")veyraDuplicateElement(el);
+  if(action==="hide")veyraToggleHidden(el);
+  if(action==="delete")veyraDeleteElement(el);
+});
+
+frame.addEventListener("load",()=>{
+  veyraSelectedElement=null;
+  veyraSelectedId="";
+  veyraDirectBar.classList.remove("show");
+
+  if(veyraEditMode){
+    requestAnimationFrame(()=>veyraBindFrameEditing());
+  }
+});
+
+document.addEventListener("keydown",event=>{
+  if(
+    (event.ctrlKey||event.metaKey) &&
+    event.shiftKey &&
+    event.key.toLowerCase()==="e"
+  ){
+    event.preventDefault();
+
+    if(veyraEditMode){
+      veyraDisableDirectEditing();
+    }else{
+      veyraEnableDirectEditing();
+    }
+  }
+});
+
+veyraEnableDirectEditing();
+
+
+/* VEYRA_STUDIO_REGEN_V1
+   Studio targeted regeneration controls.
+   Installing these controls makes NO AI/API calls.
+   Calls happen only when a user explicitly presses Regenerate.
+*/
+
+const veyraRegenStyle=document.createElement("style");
+veyraRegenStyle.textContent=`
+.veyra-regen-panel{
+  position:fixed;
+  right:18px;
+  bottom:82px;
+  width:min(340px,calc(100vw - 36px));
+  z-index:99997;
+  padding:12px;
+  border:1px solid rgba(148,163,184,.18);
+  border-radius:16px;
+  background:rgba(12,13,17,.96);
+  box-shadow:0 18px 60px rgba(0,0,0,.34);
+  backdrop-filter:blur(18px);
+  display:none;
+  color:#f8fafc;
+  font:500 12px/1.4 Inter,ui-sans-serif,system-ui,sans-serif;
+}
+.veyra-regen-panel.show{display:block}
+.veyra-regen-title{
+  font-size:12px;
+  font-weight:700;
+  margin-bottom:8px;
+}
+.veyra-regen-target{
+  color:#aeb5c2;
+  font-size:11px;
+  margin-bottom:8px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.veyra-regen-input{
+  width:100%;
+  min-height:76px;
+  resize:vertical;
+  box-sizing:border-box;
+  border:1px solid rgba(148,163,184,.2);
+  border-radius:11px;
+  padding:10px;
+  outline:none;
+  color:#fff;
+  background:#15171d;
+  font:500 12px/1.45 Inter,ui-sans-serif,system-ui,sans-serif;
+}
+.veyra-regen-input:focus{
+  border-color:rgba(104,95,156,.9);
+  box-shadow:0 0 0 3px rgba(104,95,156,.16);
+}
+.veyra-regen-actions{
+  display:flex;
+  gap:7px;
+  margin-top:9px;
+}
+.veyra-regen-btn{
+  flex:1;
+  border:1px solid rgba(148,163,184,.18);
+  border-radius:10px;
+  padding:9px 10px;
+  color:#fff;
+  background:#20232b;
+  cursor:pointer;
+  font:650 11px Inter,ui-sans-serif,system-ui,sans-serif;
+}
+.veyra-regen-btn.primary{
+  border-color:rgba(104,95,156,.65);
+  background:#685F9C;
+}
+.veyra-regen-btn:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+`;
+document.head.appendChild(veyraRegenStyle);
+
+const veyraRegenPanel=document.createElement("div");
+veyraRegenPanel.className="veyra-regen-panel";
+veyraRegenPanel.innerHTML=`
+  <div class="veyra-regen-title">Targeted regeneration</div>
+  <div class="veyra-regen-target" data-veyra-regen-target>No selection</div>
+  <textarea
+    class="veyra-regen-input"
+    data-veyra-regen-instruction
+    placeholder="Describe only what you want changed..."
+  ></textarea>
+  <div class="veyra-regen-actions">
+    <button class="veyra-regen-btn" data-veyra-regen-action="close">Cancel</button>
+    <button class="veyra-regen-btn primary" data-veyra-regen-action="run">Regenerate</button>
+  </div>
+`;
+document.body.appendChild(veyraRegenPanel);
+
+let veyraRegenMode="";
+let veyraRegenBusy=false;
+
+function veyraSelectedSection(){
+  const el=veyraCurrentSelectedElement?.();
+  return el?.closest?.("[data-veyra-section]")||null;
+}
+
+function veyraOpenRegeneration(mode){
+  const el=veyraCurrentSelectedElement?.();
+
+  if(!el){
+    addMessage("assistant","Select something in the preview first.");
+    return;
+  }
+
+  const section=el.closest?.("[data-veyra-section]");
+  const image=
+    el.tagName?.toLowerCase()==="img"
+      ? el
+      : el.querySelector?.("img");
+
+  if(mode==="asset" && !image){
+    addMessage("assistant","Select an image before using image regeneration.");
+    return;
+  }
+
+  if(mode==="section" && !section){
+    addMessage("assistant","That element is not inside an editable Veyra section.");
+    return;
+  }
+
+  veyraRegenMode=mode;
+
+  const target=veyraRegenPanel.querySelector("[data-veyra-regen-target]");
+  const input=veyraRegenPanel.querySelector("[data-veyra-regen-instruction]");
+
+  target.textContent=
+    mode==="section"
+      ? `Section · ${section.getAttribute("data-veyra-section")}`
+      : `Image · ${image.getAttribute("data-veyra-id")||"selected image"}`;
+
+  input.value="";
+  veyraRegenPanel.classList.add("show");
+
+  setTimeout(()=>input.focus(),0);
+}
+
+function veyraCloseRegeneration(){
+  if(veyraRegenBusy)return;
+  veyraRegenPanel.classList.remove("show");
+  veyraRegenMode="";
+}
+
+async function veyraRunTargetedRegeneration(){
+  if(veyraRegenBusy)return;
+
+  const instruction=
+    veyraRegenPanel
+      .querySelector("[data-veyra-regen-instruction]")
+      .value
+      .trim();
+
+  if(!instruction){
+    addMessage("assistant","Tell Veyra what you want changed first.");
+    return;
+  }
+
+  if(!veyraSerializePreview()){
+    addMessage("assistant","I couldn't capture the current preview.");
+    return;
+  }
+
+  const el=veyraCurrentSelectedElement?.();
+
+  if(!el){
+    addMessage("assistant","The selected element is no longer available.");
+    return;
+  }
+
+  const section=el.closest?.("[data-veyra-section]");
+  const image=
+    el.tagName?.toLowerCase()==="img"
+      ? el
+      : el.querySelector?.("img");
+
+  const payload={
+    mode:veyraRegenMode,
+    project_id:state.project_id||null,
+    instruction,
+    current:{
+      html:state.html||"",
+      css:state.css||"",
+      js:state.js||""
+    }
+  };
+
+  if(veyraRegenMode==="section"){
+    if(!section)return;
+
+    payload.section_id=
+      section.getAttribute("data-veyra-section");
+  }else{
+    if(!image)return;
+
+    payload.asset={
+      id:image.getAttribute("data-veyra-id")||"",
+      section_id:
+        section?.getAttribute("data-veyra-section")||null,
+      kind:"image",
+      current_url:image.getAttribute("src")||"",
+      alt:image.getAttribute("alt")||""
+    };
+  }
+
+  const runButton=
+    veyraRegenPanel.querySelector('[data-veyra-regen-action="run"]');
+
+  veyraRegenBusy=true;
+  runButton.disabled=true;
+  runButton.textContent="Regenerating…";
+
+  try{
+    const res=await fetch("/api/studio/regenerate",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload)
+    });
+
+    const data=await readJsonResponse(res);
+
+    if(!res.ok||data.ok===false){
+      throw new Error(
+        data.error||
+        data.code||
+        "Targeted regeneration failed."
+      );
+    }
+
+    if(typeof data.html==="string")state.html=data.html;
+    if(typeof data.css==="string")state.css=data.css;
+    if(typeof data.js==="string")state.js=data.js;
+
+    state.dirty=true;
+    setDirty(true);
+
+    renderPreview();
+    syncUI();
+
+    await autosave(
+      veyraRegenMode==="section"
+        ? "Section regenerated"
+        : "Image regenerated"
+    );
+
+    if(state.project_id){
+      await createProjectVersion(
+        veyraRegenMode==="section"
+          ? `Regenerated section ${payload.section_id}`
+          : "Regenerated image",
+        "edit"
+      );
+
+      if($("historyDrawer")?.classList.contains("open")){
+        await refreshVersionHistory();
+      }
+    }
+
+    addMessage(
+      "assistant",
+      veyraRegenMode==="section"
+        ? "Updated only the selected section."
+        : "Updated only the selected image."
+    );
+
+    veyraRegenPanel.classList.remove("show");
+    veyraRegenMode="";
+  }catch(error){
+    console.error("Veyra targeted regeneration failed",error);
+    addMessage(
+      "assistant",
+      "I couldn't regenerate that target: "+error.message
+    );
+  }finally{
+    veyraRegenBusy=false;
+    runButton.disabled=false;
+    runButton.textContent="Regenerate";
+  }
+}
+
+veyraRegenPanel.addEventListener("click",event=>{
+  const button=event.target.closest("[data-veyra-regen-action]");
+  if(!button)return;
+
+  const action=button.dataset.veyraRegenAction;
+
+  if(action==="close")veyraCloseRegeneration();
+  if(action==="run")veyraRunTargetedRegeneration();
+});
+
+function veyraInstallRegenButtons(){
+  if(
+    veyraDirectBar &&
+    !veyraDirectBar.querySelector('[data-veyra-action="regen-section"]')
+  ){
+    const sectionButton=document.createElement("button");
+    sectionButton.type="button";
+    sectionButton.dataset.veyraAction="regen-section";
+    sectionButton.textContent="Regenerate section";
+
+    const imageButton=document.createElement("button");
+    imageButton.type="button";
+    imageButton.dataset.veyraAction="regen-image";
+    imageButton.textContent="Regenerate image";
+
+    const done=
+      veyraDirectBar.querySelector('[data-veyra-action="done"]');
+
+    if(done){
+      veyraDirectBar.insertBefore(sectionButton,done);
+      veyraDirectBar.insertBefore(imageButton,done);
+    }else{
+      veyraDirectBar.append(sectionButton,imageButton);
+    }
+  }
+}
+
+veyraInstallRegenButtons();
+
+veyraDirectBar.addEventListener("click",event=>{
+  const button=event.target.closest("[data-veyra-action]");
+  if(!button)return;
+
+  if(button.dataset.veyraAction==="regen-section"){
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    veyraOpenRegeneration("section");
+  }
+
+  if(button.dataset.veyraAction==="regen-image"){
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    veyraOpenRegeneration("asset");
+  }
+},true);
+
+/* END VEYRA_STUDIO_REGEN_V1 */
+
+/* END VEYRA_STUDIO_DIRECT_EDIT_V1 */
+
 
 function renderPreview(){
   const safe=(state.js||"").replace(/<\/script>/gi,"<\\/script>");
@@ -4459,9 +5605,23 @@ function scheduleAutosave(reason="Changes autosaved"){
   autosaveTimer=setTimeout(()=>autosave(reason),850);
 }
 
-async function build(prompt){
+async function build(prompt,options={}){
   const veyraBuildStartedAt=Date.now();
   prompt=(prompt||"").trim();
+
+  const visiblePrompt=(
+    options.visiblePrompt!==undefined
+      ? options.visiblePrompt
+      : prompt
+  ).trim();
+
+  const activityStartText=(
+    options.activityStartText||
+    "Understanding your request"
+  ).trim();
+
+  const discoverBuild=options.discover===true;
+
   if(!prompt && !pendingAttachments.length)return;
 
   const attachmentsForBuild=pendingAttachments.map(a=>({...a}));
@@ -4474,15 +5634,16 @@ async function build(prompt){
 
   addMessage(
     "user",
-    prompt,
+    visiblePrompt,
     null,
     null,
     null,
     attachmentsForBuild
   );
+
   const historyUserMessage={
     role:"user",
-    text:prompt,
+    text:visiblePrompt,
     attachments:attachmentsForBuild
   };
 
@@ -4501,6 +5662,8 @@ async function build(prompt){
   sendBtn.disabled=true;
   $("engineStatus").textContent="Veyra is thinking…";
   setTyping(true,"Designing your update…");
+
+  let veyraActivity=null;
 
   try{
     const originalCurrent={
@@ -4561,20 +5724,61 @@ async function build(prompt){
     let v4State={};
     let data=null;
 
+    veyraActivity=createVeyraActivity(activityStartText);
+
     while(true){
       if(v4Stage==="plan"){
         $("engineStatus").textContent="Planning visual direction…";
         setTyping(true,"Planning the design system…");
+        updateVeyraActivity(
+          veyraActivity,
+          discoverBuild
+            ? "Understanding the business and planning the design"
+            : "Planning the design"
+        );
       }else if(v4Stage==="build"){
         $("engineStatus").textContent="Building and reviewing…";
         setTyping(true,"Building, rendering, and inspecting the website…");
+        updateVeyraActivity(
+          veyraActivity,
+          discoverBuild
+            ? "Building the business website"
+            : "Building your website"
+        );
       }else{
         const nextAttempt=Math.min(
           Number(v4State?.attempt||0)+1,
-          2
+          4
         );
-        $("engineStatus").textContent=`Refining visual quality ${nextAttempt}/2…`;
-        setTyping(true,"Reviewing the screenshot and improving the design…");
+
+        const isVisualRescue=nextAttempt===3;
+        const isPostRescueCleanup=nextAttempt===4;
+
+        $("engineStatus").textContent=isPostRescueCleanup
+          ? "Final quality verification…"
+          : isVisualRescue
+            ? "Final visual polish…"
+            : `Refining visual quality ${nextAttempt}/2…`;
+
+        setTyping(
+          true,
+          isPostRescueCleanup
+            ? "Verifying the final website and repairing technical details…"
+            : isVisualRescue
+              ? "Applying the final art-direction and visual quality pass…"
+              : "Reviewing the screenshot and improving the design…"
+        );
+
+        updateVeyraActivity(
+          veyraActivity,
+          isPostRescueCleanup
+            ? "Final quality verification"
+            : isVisualRescue
+              ? "Final visual polish · premium quality check"
+              : nextAttempt>1
+                ? `Polishing the website · pass ${nextAttempt}/2`
+                : "Reviewing and polishing the website"
+        );
       }
 
       const requestState={...v4State};
@@ -4582,7 +5786,7 @@ async function build(prompt){
       if(v4Stage==="recompose"){
         requestState.attempt=Math.min(
           Number(v4State?.attempt||0)+1,
-          2
+          4
         );
       }
 
@@ -4646,6 +5850,12 @@ async function build(prompt){
     syncUI();
 
     setTyping(false);
+    completeVeyraActivity(
+      veyraActivity,
+      discoverBuild
+        ? "Business website ready"
+        : "Website ready"
+    );
 
     const completedAssistantText=
       data.assistant_message||"Done — I updated the project.";
@@ -4721,7 +5931,7 @@ async function build(prompt){
       );
 
       await createProjectVersion(
-        prompt,
+        visiblePrompt,
         (originalCurrent.html||originalCurrent.css||originalCurrent.js)
           ? "edit"
           : "build"
@@ -4733,6 +5943,14 @@ async function build(prompt){
     }
   }catch(e){
     setTyping(false);
+
+    if(veyraActivity){
+      completeVeyraActivity(
+        veyraActivity,
+        "Build stopped"
+      );
+    }
+
     addMessage("assistant","I couldn’t finish that build: "+e.message);
     $("engineStatus").textContent="Build error";
   }finally{
@@ -4740,6 +5958,104 @@ async function build(prompt){
   }
 }
 
+
+
+async function startDiscoverAutobuild(){
+  const params=new URLSearchParams(location.search);
+
+  if(
+    params.get("discover")!=="1" ||
+    params.get("autobuild")!=="1"
+  ){
+    return;
+  }
+
+  let business=null;
+
+  try{
+    business=JSON.parse(
+      sessionStorage.getItem("veyra_discover_business") || "null"
+    );
+  }catch(error){
+    console.error("Veyra Discover handoff could not be read:",error);
+  }
+
+  if(!business || !business.name){
+    console.error("Veyra Discover autobuild has no business context.");
+    return;
+  }
+
+  /*
+    Remove the trigger BEFORE building so refreshing Studio cannot
+    accidentally spend credits/build the same business twice.
+  */
+  sessionStorage.removeItem("veyra_discover_autobuild");
+
+  const reviewSamples=Array.isArray(business.review_samples)
+    ? business.review_samples.slice(0,5)
+    : [];
+
+  const reviews=reviewSamples.map(review=>{
+    const author=review.author || "Customer";
+    const rating=review.rating!=null
+      ? `${review.rating}/5`
+      : "Rating unavailable";
+    const text=review.text || "";
+
+    return `- ${author} (${rating}): ${text}`;
+  }).join("\n");
+
+  const hours=Array.isArray(business.weekday_hours)
+    ? business.weekday_hours.join(" | ")
+    : "";
+
+  const internalPrompt=[
+    `Create a complete premium, modern, conversion-focused website for ${business.name}.`,
+    `This business was selected directly from Veyra Discover. Use the verified business context below as the source of truth.`,
+    ``,
+    `Business name: ${business.name}`,
+    `Category: ${business.category || business.type || "Local business"}`,
+    `Address: ${business.address || "Unavailable"}`,
+    `Phone: ${business.phone || "Unavailable"}`,
+    `Rating: ${business.rating != null ? business.rating : "Unavailable"}`,
+    `Review count: ${business.reviews != null ? business.reviews : "Unavailable"}`,
+    `Current website: ${business.website || "No website detected"}`,
+    `Google Maps URL: ${business.google_maps_url || "Unavailable"}`,
+    `Business status: ${business.business_status || "Unavailable"}`,
+    `Hours: ${hours || "Unavailable"}`,
+    reviews ? `Available customer review context:\n${reviews}` : "",
+    ``,
+    business.website
+      ? `Redesign and substantially improve the existing web presence. Analyze the current website when useful, preserve accurate business facts, and create a noticeably more polished result.`
+      : `No website was detected. Create the business a complete professional web presence from scratch.`,
+    ``,
+    `Make the design feel custom to this specific business rather than like a generic template. Include strong local trust signals, clear services, calls to action, contact information, directions/location context, responsive mobile design, accessibility, and polished visual hierarchy.`,
+    `Do not invent business facts, services, awards, prices, testimonials, or claims that were not provided. If customer reviews are used, preserve their attribution and do not present them as invented testimonials.`
+  ].filter(Boolean).join("\n");
+
+  $("engineStatus").textContent=`Preparing ${business.name}…`;
+  setTyping(true,"Veyra is understanding the business and preparing the build…");
+
+  /*
+    The complete Discover context stays internal to V4.
+    Studio only shows/persists a clean user-facing request.
+  */
+  const locationLabel=String(business.address||"")
+    .split(",")
+    .slice(0,2)
+    .join(",")
+    .trim();
+
+  const visiblePrompt=business.website
+    ? `Redesign ${business.name}${locationLabel ? ` · ${locationLabel}` : ""}`
+    : `Build ${business.name}${locationLabel ? ` · ${locationLabel}` : ""}`;
+
+  await build(internalPrompt,{
+    visiblePrompt,
+    discover:true,
+    activityStartText:"Understanding the business"
+  });
+}
 
 function shouldUseV4Build(prompt, attachments=[]){
   const text=String(prompt||"").trim().toLowerCase();
@@ -6448,6 +7764,13 @@ body.history-open{
   const engine = document.getElementById("engineStatus");
   if(engine) engine.textContent = "Veyra AI";
 })();
+
+window.addEventListener("load",()=>{
+  if(sessionStorage.getItem("veyra_discover_autobuild")==="1"){
+    setTimeout(startDiscoverAutobuild,350);
+  }
+});
+
 </script>
 
 </body>
