@@ -113,6 +113,13 @@ interface PlannedRealPhoto {
   subject?: string;
   crop_orientation?: string;
   visual_scale?: string;
+  intended_section?: string;
+  aspect_ratio?: string;
+  subject_placement?: string;
+  text_safe_area?: string;
+  mobile_crop?: string;
+  required_terms?: string[];
+  avoid_terms?: string[];
   essential: boolean;
   fallback?: string;
 }
@@ -131,6 +138,9 @@ interface ResolvedRealPhotoAsset {
   alt: string;
   width: number;
   height: number;
+  score?: number;
+  aspectRatio?: number;
+  artDirection?: ResolvedRealPhoto["artDirection"];
 }
 
 const MAX_REAL_PHOTOS_PER_BUILD = 4;
@@ -266,6 +276,46 @@ function parseRealPhotoPlan(
             typeof item.visual_scale === "string"
               ? item.visual_scale.trim()
               : undefined,
+          intended_section:
+            typeof item.intended_section === "string"
+              ? item.intended_section.trim()
+              : undefined,
+          aspect_ratio:
+            typeof item.aspect_ratio === "string"
+              ? item.aspect_ratio.trim()
+              : undefined,
+          subject_placement:
+            typeof item.subject_placement === "string"
+              ? item.subject_placement.trim()
+              : undefined,
+          text_safe_area:
+            typeof item.text_safe_area === "string"
+              ? item.text_safe_area.trim()
+              : undefined,
+          mobile_crop:
+            typeof item.mobile_crop === "string"
+              ? item.mobile_crop.trim()
+              : undefined,
+          required_terms:
+            Array.isArray(item.required_terms)
+              ? item.required_terms
+                  .filter(
+                    (value: unknown): value is string =>
+                      typeof value === "string" &&
+                      Boolean(value.trim())
+                  )
+                  .map((value: string) => value.trim())
+              : undefined,
+          avoid_terms:
+            Array.isArray(item.avoid_terms)
+              ? item.avoid_terms
+                  .filter(
+                    (value: unknown): value is string =>
+                      typeof value === "string" &&
+                      Boolean(value.trim())
+                  )
+                  .map((value: string) => value.trim())
+              : undefined,
           essential: item.essential === true,
           fallback:
             typeof item.fallback === "string"
@@ -310,6 +360,183 @@ function realPhotoOrientation(
   }
 
   return "landscape";
+}
+
+function realPhotoRole(
+  requirement: PlannedRealPhoto
+): "hero" | "supporting" | "gallery" | "background" | "detail" {
+  const value = [
+    requirement.id,
+    requirement.purpose,
+    requirement.intended_section,
+    requirement.visual_scale
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    value.includes("hero") ||
+    value.includes("masthead") ||
+    value.includes("above fold") ||
+    value.includes("first viewport")
+  ) {
+    return "hero";
+  }
+
+  if (
+    value.includes("background") ||
+    value.includes("backdrop")
+  ) {
+    return "background";
+  }
+
+  if (
+    value.includes("gallery") ||
+    value.includes("portfolio") ||
+    value.includes("work grid")
+  ) {
+    return "gallery";
+  }
+
+  if (
+    value.includes("detail") ||
+    value.includes("closeup") ||
+    value.includes("close-up")
+  ) {
+    return "detail";
+  }
+
+  return "supporting";
+}
+
+function realPhotoAspectRatio(
+  requirement: PlannedRealPhoto
+): number | undefined {
+  const value = (
+    requirement.aspect_ratio ||
+    requirement.crop_orientation ||
+    ""
+  )
+    .toLowerCase()
+    .replace(/\s+/g, "");
+
+  const ratioMatch =
+    value.match(/(\d+(?:\.\d+)?)[:/](\d+(?:\.\d+)?)/);
+
+  if (ratioMatch) {
+    const width = Number(ratioMatch[1]);
+    const height = Number(ratioMatch[2]);
+
+    if (
+      Number.isFinite(width) &&
+      Number.isFinite(height) &&
+      width > 0 &&
+      height > 0
+    ) {
+      return width / height;
+    }
+  }
+
+  const orientation =
+    realPhotoOrientation(
+      requirement.crop_orientation ||
+      requirement.aspect_ratio
+    );
+
+  if (orientation === "portrait") {
+    return 4 / 5;
+  }
+
+  if (orientation === "squarish") {
+    return 1;
+  }
+
+  if (
+    realPhotoRole(requirement) === "hero" ||
+    realPhotoRole(requirement) === "background"
+  ) {
+    return 16 / 9;
+  }
+
+  return 3 / 2;
+}
+
+function realPhotoSubjectPlacement(
+  value?: string
+): "left" | "center" | "right" | "auto" {
+  const normalized =
+    (value ?? "").toLowerCase();
+
+  if (normalized.includes("left")) {
+    return "left";
+  }
+
+  if (normalized.includes("right")) {
+    return "right";
+  }
+
+  if (
+    normalized.includes("center") ||
+    normalized.includes("middle")
+  ) {
+    return "center";
+  }
+
+  return "auto";
+}
+
+function realPhotoTextSafeArea(
+  value?: string
+): "left" | "right" | "top" | "bottom" | "none" | "auto" {
+  const normalized =
+    (value ?? "").toLowerCase();
+
+  if (normalized.includes("left")) {
+    return "left";
+  }
+
+  if (normalized.includes("right")) {
+    return "right";
+  }
+
+  if (normalized.includes("top")) {
+    return "top";
+  }
+
+  if (normalized.includes("bottom")) {
+    return "bottom";
+  }
+
+  if (
+    normalized.includes("none") ||
+    normalized.includes("no text")
+  ) {
+    return "none";
+  }
+
+  return "auto";
+}
+
+function realPhotoMobileCrop(
+  value?: string
+): "center" | "subject" | "top" | "bottom" {
+  const normalized =
+    (value ?? "").toLowerCase();
+
+  if (normalized.includes("top")) {
+    return "top";
+  }
+
+  if (normalized.includes("bottom")) {
+    return "bottom";
+  }
+
+  if (normalized.includes("center")) {
+    return "center";
+  }
+
+  return "subject";
 }
 
 function buildRealPhotoQuery(
@@ -385,15 +612,30 @@ async function resolveRealPhotos(
       const results: ResolvedRealPhoto[] =
         await searchRealPhotos(query, {
           orientation: realPhotoOrientation(
-            requirement.crop_orientation
+            requirement.crop_orientation ||
+            requirement.aspect_ratio
           ),
-          perPage: 8
+          perPage: 8,
+          role: realPhotoRole(requirement),
+          aspectRatio: realPhotoAspectRatio(requirement),
+          subjectPlacement: realPhotoSubjectPlacement(
+            requirement.subject_placement
+          ),
+          textSafeArea: realPhotoTextSafeArea(
+            requirement.text_safe_area
+          ),
+          mobileCrop: realPhotoMobileCrop(
+            requirement.mobile_crop
+          ),
+          excludeIds: Array.from(usedPhotoIds),
+          requiredTerms: requirement.required_terms,
+          avoidTerms: requirement.avoid_terms
         });
 
-      const photo =
-        results.find(
-          candidate => !usedPhotoIds.has(candidate.id)
-        ) ?? results[0];
+      // Provider results are already ranked by semantic fit,
+      // slot aspect ratio, orientation, resolution, and role.
+      // excludeIds prevents reuse across major page roles.
+      const photo = results[0];
 
       if (!photo) {
         console.error(
@@ -408,7 +650,9 @@ async function resolveRealPhotos(
         id: requirement.id,
         purpose: requirement.purpose,
         subject: requirement.subject,
-        intended_section: requirement.purpose,
+        intended_section:
+          requirement.intended_section ||
+          requirement.purpose,
         essential: requirement.essential,
         url: photo.url,
         provider: photo.provider,
@@ -417,7 +661,10 @@ async function resolveRealPhotos(
         sourceUrl: photo.sourceUrl,
         alt: photo.alt,
         width: photo.width,
-        height: photo.height
+        height: photo.height,
+        score: photo.score,
+        aspectRatio: photo.aspectRatio,
+        artDirection: photo.artDirection
       });
 
       console.error(
