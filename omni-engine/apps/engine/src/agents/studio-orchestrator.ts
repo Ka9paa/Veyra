@@ -252,6 +252,97 @@ const FALLBACK_ASSETS = JSON.stringify(
   2
 );
 
+function isTransientBuildProviderError(error: unknown) {
+  const candidate = error as {
+    status?: number;
+    message?: string;
+  };
+
+  const status =
+    typeof candidate?.status === "number"
+      ? candidate.status
+      : undefined;
+
+  const message =
+    error instanceof Error ? error.message : String(error);
+
+  return (
+    status === 408 ||
+    status === 409 ||
+    status === 429 ||
+    (typeof status === "number" && status >= 500 && status <= 599) ||
+    /\b(?:408|409|429|500|502|503|504|520|522|524)\b/.test(message) ||
+    /cloudflare|temporar(?:y|ily)|upstream|overloaded|rate.?limit/i.test(message)
+  );
+}
+
+function buildProviderFailure(error: unknown): Error {
+  if (!isTransientBuildProviderError(error)) {
+    return error instanceof Error
+      ? error
+      : new Error(String(error));
+  }
+
+  const candidate = error as {
+    status?: number;
+    headers?: {
+      get?: (name: string) => string | null;
+      [key: string]: unknown;
+    };
+  };
+
+  let retryAfter: string | undefined;
+
+  try {
+    if (candidate?.headers && typeof candidate.headers.get === "function") {
+      retryAfter = candidate.headers.get("retry-after") ?? undefined;
+    } else if (candidate?.headers) {
+      const raw = candidate.headers["retry-after"];
+      if (typeof raw === "string") retryAfter = raw;
+    }
+  } catch {
+    // Ignore malformed provider headers.
+  }
+
+  const status =
+    typeof candidate?.status === "number"
+      ? candidate.status
+      : "unknown";
+
+  const wrapped = new Error(
+    [
+      "VEYRA_BUILD_UPSTREAM_RETRYABLE",
+      `status=${status}`,
+      retryAfter ? `retry_after=${retryAfter}` : "",
+      "PLAN completed successfully; do not regenerate PLAN.",
+      "Retry only the BUILD stage using the preserved plan."
+    ].filter(Boolean).join(" | ")
+  );
+
+  (wrapped as Error & {
+    code?: string;
+    status?: number;
+    retryAfter?: string;
+    retryable?: boolean;
+  }).code = "VEYRA_BUILD_UPSTREAM_RETRYABLE";
+
+  const typed = wrapped as Error & {
+    code?: string;
+    status?: number;
+    retryAfter?: string;
+    retryable?: boolean;
+  };
+
+  if (typeof candidate?.status === "number") {
+    typed.status = candidate.status;
+  }
+
+  typed.retryAfter = retryAfter;
+  typed.retryable = true;
+
+  return wrapped;
+}
+
 async function recoverableDesignDNA(
   ctx: string
 ): Promise<string> {
@@ -2652,10 +2743,12 @@ export async function orchestrateStudio(
 
   console.error("[Veyra V4] Building first composition...");
 
-  const firstRaw = await runModel(
-    "code",
-    BUILDER_SYSTEM,
-    [
+  let firstRaw: string;
+
+  try {
+    firstRaw = await runModel(
+      "code",
+      BUILDER_SYSTEM,    [
       ctx,
       `DESIGN DNA:\n${designDNA}`,
       `COMPOSITION BLUEPRINT:\n${composition}`,
@@ -2665,7 +2758,16 @@ export async function orchestrateStudio(
       maxOutputTokens: 24000,
       reasoningEffort: "low"
     }
-  );
+    );
+  } catch (error) {
+    if (isTransientBuildProviderError(error)) {
+      console.error(
+        "[Veyra V4 RECOVERY] Builder upstream failure is retryable; preserving completed PLAN"
+      );
+    }
+
+    throw buildProviderFailure(error);
+  }
 
   let firstSite: SiteCode;
 
@@ -3640,10 +3742,12 @@ export async function orchestrateStudioBuildStage(
 
   console.error("[Veyra V4 STAGE] BUILD: Generating website");
 
-  const raw = await runModel(
-    "code",
-    BUILDER_SYSTEM,
-    [
+  let raw: string;
+
+  try {
+    raw = await runModel(
+      "code",
+      BUILDER_SYSTEM,    [
       ctx,
       `DESIGN DNA:\n${plan.designDNA}`,
       `COMPOSITION BLUEPRINT:\n${plan.composition}`,
@@ -3661,7 +3765,16 @@ export async function orchestrateStudioBuildStage(
       maxOutputTokens: 24000,
       reasoningEffort: "low"
     }
-  );
+    );
+  } catch (error) {
+    if (isTransientBuildProviderError(error)) {
+      console.error(
+        "[Veyra V4 RECOVERY] Builder upstream failure is retryable; preserving completed PLAN"
+      );
+    }
+
+    throw buildProviderFailure(error);
+  }
 
   const site = parseSite(raw);
 

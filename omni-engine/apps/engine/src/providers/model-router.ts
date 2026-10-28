@@ -18,11 +18,11 @@ export async function runModel(
 ) {
   const startedAt = Date.now();
   const label =
+    lane === "code" ? "builder" :
+    lane === "repair" ? "repair" :
     system.includes("Design DNA Director") ? "design-dna" :
     system.includes("Principal Composition Architect") ? "composition" :
     system.includes("ASSET") ? "assets" :
-    lane === "code" ? "builder" :
-    lane === "repair" ? "repair" :
     lane;
 
   console.error(
@@ -89,6 +89,34 @@ export async function runModel(
     );
   };
 
+  const isTransientProviderError = (error: unknown) => {
+    const candidate = error as {
+      status?: number;
+      message?: string;
+      headers?: unknown;
+    };
+
+    const status =
+      typeof candidate?.status === "number"
+        ? candidate.status
+        : undefined;
+
+    const message =
+      error instanceof Error ? error.message : String(error);
+
+    return (
+      status === 408 ||
+      status === 409 ||
+      status === 429 ||
+      (typeof status === "number" && status >= 500 && status <= 599) ||
+      /\b(?:408|409|429|500|502|503|504|520|522|524)\b/.test(message) ||
+      /cloudflare|temporar(?:y|ily)|upstream|overloaded|rate.?limit/i.test(message)
+    );
+  };
+
+  const shouldAvoidProviderFallback = (error: unknown) =>
+    isTimeoutError(error) || isTransientProviderError(error);
+
   const hasOpenAI = Boolean(env.OPENAI_API_KEY);
   const hasAnthropic = Boolean(env.ANTHROPIC_API_KEY);
 
@@ -104,9 +132,9 @@ export async function runModel(
         callAnthropic(system, input, { timeoutMs: options.timeoutMs })
       );
     } catch (anthropicError) {
-      if (isTimeoutError(anthropicError)) {
+      if (shouldAvoidProviderFallback(anthropicError)) {
         console.error(
-          `[V4 MODEL] NO_FALLBACK ${label} | provider=anthropic | reason=timeout`
+          `[V4 MODEL] NO_FALLBACK ${label} | provider=anthropic | reason=timeout_or_transient`
         );
         throw anthropicError;
       }
