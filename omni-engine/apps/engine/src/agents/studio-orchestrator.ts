@@ -2486,14 +2486,15 @@ export async function orchestrateStudio(
     "[Veyra V4] Creating composition + asset strategy..."
   );
 
-  const [composition, assets] = await Promise.all([
+  const [compositionResult, assetsResult] = await Promise.allSettled([
     runModel(
       "design",
       COMPOSITION_SYSTEM,
       `${ctx}\n\nDESIGN DNA:\n${designDNA}`,
       {
         maxOutputTokens: 3500,
-        reasoningEffort: "low"
+        reasoningEffort: "low",
+        timeoutMs: 60_000
       }
     ),
 
@@ -2507,6 +2508,80 @@ export async function orchestrateStudio(
       }
     )
   ]);
+
+  const composition =
+    compositionResult.status === "fulfilled" &&
+    compositionResult.value.trim()
+      ? compositionResult.value
+      : JSON.stringify(
+          {
+            recovery_mode: "deterministic-composition-fallback",
+            hero_family: "project-appropriate",
+            navigation_composition:
+              "Clear responsive navigation preserving the primary conversion path.",
+            hero: {
+              height: "first-viewport dominant",
+              layout:
+                "Compose typography, supplied imagery, negative space, and primary action around one clear focal point.",
+              focal_object:
+                "Use the strongest truthful project-specific visual or typography treatment available.",
+              text_placement:
+                "Maintain strong hierarchy and readable contrast without defaulting mechanically to centered stacking.",
+              cta_placement:
+                "Place the primary action where it remains obvious on desktop and mobile."
+            },
+            section_strategy: [
+              "Preserve intentional variation in density, scale, alignment, and visual treatment.",
+              "Avoid repeating identical card grids or generic section templates.",
+              "Use supplied or resolved imagery as meaningful compositional material when appropriate.",
+              "Keep required conversion and informational sections easy to find."
+            ],
+            responsive_strategy:
+              "Recompose hierarchy, imagery, spacing, navigation, and actions for mobile rather than merely shrinking desktop.",
+            integrity:
+              "Do not invent business facts, prices, testimonials, awards, addresses, hours, or external destinations."
+          },
+          null,
+          2
+        );
+
+  if (compositionResult.status === "rejected") {
+    console.error(
+      "[Veyra V4 RECOVERY] Composition failed; continuing with deterministic composition fallback | reason=" +
+        (compositionResult.reason instanceof Error
+          ? compositionResult.reason.message
+          : String(compositionResult.reason))
+    );
+  }
+
+  const assets =
+    assetsResult.status === "fulfilled" &&
+    assetsResult.value.trim()
+      ? assetsResult.value
+      : JSON.stringify(
+          {
+            visual_strategy: {
+              imagery_importance: "medium",
+              authenticity_priority:
+                "Prefer supplied or truthful real imagery; never fabricate business evidence.",
+              fallback_strategy:
+                "Use intentional typography and layout when suitable imagery is unavailable."
+            },
+            generated_visuals: [],
+            asset_requirements: []
+          },
+          null,
+          2
+        );
+
+  if (assetsResult.status === "rejected") {
+    console.error(
+      "[Veyra V4 RECOVERY] Asset planning failed; continuing with deterministic asset fallback | reason=" +
+        (assetsResult.reason instanceof Error
+          ? assetsResult.reason.message
+          : String(assetsResult.reason))
+    );
+  }
 
   console.error("[Veyra V4] Building first composition...");
 
@@ -3202,14 +3277,15 @@ export async function orchestrateStudioPlan(
     "[Veyra V4 STAGE] PLAN: Composition + assets"
   );
 
-  const [composition, assets] = await Promise.all([
+  const [compositionResult, assetsResult] = await Promise.allSettled([
     runModel(
       "design",
       COMPOSITION_SYSTEM,
       `${ctx}\n\nDESIGN DNA:\n${designDNA}`,
       {
         maxOutputTokens: 3500,
-        reasoningEffort: "low"
+        reasoningEffort: "low",
+        timeoutMs: 60_000
       }
     ),
 
@@ -3223,6 +3299,80 @@ export async function orchestrateStudioPlan(
       }
     )
   ]);
+
+  const composition =
+    compositionResult.status === "fulfilled" &&
+    compositionResult.value.trim()
+      ? compositionResult.value
+      : JSON.stringify(
+          {
+            recovery_mode: "deterministic-composition-fallback",
+            hero_family: "project-appropriate",
+            navigation_composition:
+              "Clear responsive navigation preserving the primary conversion path.",
+            hero: {
+              height: "first-viewport dominant",
+              layout:
+                "Compose typography, supplied imagery, negative space, and primary action around one clear focal point.",
+              focal_object:
+                "Use the strongest truthful project-specific visual or typography treatment available.",
+              text_placement:
+                "Maintain strong hierarchy and readable contrast without defaulting mechanically to centered stacking.",
+              cta_placement:
+                "Place the primary action where it remains obvious on desktop and mobile."
+            },
+            section_strategy: [
+              "Preserve intentional variation in density, scale, alignment, and visual treatment.",
+              "Avoid repeating identical card grids or generic section templates.",
+              "Use supplied or resolved imagery as meaningful compositional material when appropriate.",
+              "Keep required conversion and informational sections easy to find."
+            ],
+            responsive_strategy:
+              "Recompose hierarchy, imagery, spacing, navigation, and actions for mobile rather than merely shrinking desktop.",
+            integrity:
+              "Do not invent business facts, prices, testimonials, awards, addresses, hours, or external destinations."
+          },
+          null,
+          2
+        );
+
+  if (compositionResult.status === "rejected") {
+    console.error(
+      "[Veyra V4 RECOVERY] Composition failed; continuing with deterministic composition fallback | reason=" +
+        (compositionResult.reason instanceof Error
+          ? compositionResult.reason.message
+          : String(compositionResult.reason))
+    );
+  }
+
+  const assets =
+    assetsResult.status === "fulfilled" &&
+    assetsResult.value.trim()
+      ? assetsResult.value
+      : JSON.stringify(
+          {
+            visual_strategy: {
+              imagery_importance: "medium",
+              authenticity_priority:
+                "Prefer supplied or truthful real imagery; never fabricate business evidence.",
+              fallback_strategy:
+                "Use intentional typography and layout when suitable imagery is unavailable."
+            },
+            generated_visuals: [],
+            asset_requirements: []
+          },
+          null,
+          2
+        );
+
+  if (assetsResult.status === "rejected") {
+    console.error(
+      "[Veyra V4 RECOVERY] Asset planning failed; continuing with deterministic asset fallback | reason=" +
+        (assetsResult.reason instanceof Error
+          ? assetsResult.reason.message
+          : String(assetsResult.reason))
+    );
+  }
 
   let completionContract = "";
 
