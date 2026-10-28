@@ -35,7 +35,10 @@ export async function runModel(
   ): Promise<T> => {
     const timeoutMs = Math.max(
       5_000,
-      Math.min(options.timeoutMs ?? 90_000, 120_000)
+      Math.min(
+        options.timeoutMs ?? (lane === "code" ? 240_000 : 90_000),
+        lane === "code" ? 240_000 : 120_000
+      )
     );
 
     let timer: ReturnType<typeof setTimeout> | undefined;
