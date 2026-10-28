@@ -3241,6 +3241,13 @@ VEYRA_V4_ENGINE_DIR = (
 VEYRA_V4_CLI = VEYRA_V4_ENGINE_DIR / "dist" / "v4-cli.js"
 
 
+class VeyraV4BridgeError(RuntimeError):
+    def __init__(self, message, payload=None, status=502):
+        super().__init__(message)
+        self.payload = payload if isinstance(payload, dict) else {}
+        self.status = int(status or 502)
+
+
 def run_veyra_v4(
     prompt,
     current=None,
@@ -3353,9 +3360,45 @@ def run_veyra_v4(
             except Exception:
                 pass
 
-            raise RuntimeError(
+            node_payload = {}
+
+            if detail:
+                try:
+                    parsed = json.loads(detail)
+
+                    if isinstance(parsed, dict):
+                        node_payload = parsed
+                except Exception:
+                    pass
+
+            node_code = str(node_payload.get("error") or "")
+            node_detail = str(
+                node_payload.get("detail")
+                or detail
+                or exc
+            )
+
+            retryable = bool(
+                node_payload.get("retryable")
+                or node_code == "VEYRA_BUILD_UPSTREAM_RETRYABLE"
+                or "VEYRA_BUILD_UPSTREAM_RETRYABLE" in node_detail
+            )
+
+            if retryable:
+                node_payload["error"] = "VEYRA_BUILD_UPSTREAM_RETRYABLE"
+                node_payload["retryable"] = True
+
+                raise VeyraV4BridgeError(
+                    node_detail,
+                    payload=node_payload,
+                    status=503,
+                ) from exc
+
+            raise VeyraV4BridgeError(
                 f"Veyra V4 Node function request failed: {exc}"
-                + (f" | {detail[-3000:]}" if detail else "")
+                + (f" | {detail[-3000:]}" if detail else ""),
+                payload=node_payload,
+                status=502,
             ) from exc
 
         try:
@@ -3787,11 +3830,54 @@ def api_build():
         data['engine'] = 'veyra-omni-design-dna-v4'
         used_model = primary_model
 
+    except VeyraV4BridgeError as exc:
+        app.logger.exception('Veyra Omni V4 bridge failed')
+
+        payload = exc.payload if isinstance(exc.payload, dict) else {}
+
+        if (
+            requested_v4_stage == "build"
+            and (
+                payload.get("retryable")
+                or payload.get("error") == "VEYRA_BUILD_UPSTREAM_RETRYABLE"
+            )
+        ):
+            return jsonify({
+                'ok': False,
+                'error': (
+                    'The AI provider temporarily stopped the website build. '
+                    'Your completed plan was preserved. Press Generate again '
+                    'to resume BUILD without planning again.'
+                ),
+                'code': 'VEYRA_BUILD_UPSTREAM_RETRYABLE',
+                'retryable': True,
+                'retry_after': payload.get('retryAfter'),
+                'v4_staged': True,
+                'v4_complete': False,
+                'v4_stage': 'build',
+                'v4_next_stage': 'build',
+                'v4_state': v4_state,
+                'engine': 'veyra-omni-design-dna-v4',
+                'credits_used': 0,
+                'credits_remaining': credits_before,
+                'credit_cost': credit_cost,
+                'is_followup': is_followup,
+            }), 503
+
+        return jsonify({
+            'ok': False,
+            'error': 'Veyra Omni V4 could not complete this build. No credits were used.',
+            'code': payload.get('error') or 'VEYRA_OMNI_V4_FAILED',
+            'engine': 'veyra-omni-design-dna-v4',
+            'credits_used': 0,
+            'credits_remaining': credits_before,
+            'credit_cost': credit_cost,
+            'is_followup': is_followup,
+        }), exc.status
+
     except Exception as exc:
         app.logger.exception('Veyra Omni V4 build failed')
 
-        # Never disguise a failed Omni V4 generation as a successful
-        # locally-generated website. The Studio must know the real build failed.
         return jsonify({
             'ok': False,
             'error': 'Veyra Omni could not complete this build. No credits were used.',

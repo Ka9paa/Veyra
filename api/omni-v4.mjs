@@ -222,13 +222,24 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error("[V4 NODE] failed", error);
 
-    return res.status(500).json({
+    const code =
+      error?.code === "VEYRA_BUILD_UPSTREAM_RETRYABLE"
+        ? "VEYRA_BUILD_UPSTREAM_RETRYABLE"
+        : "VEYRA_OMNI_V4_NODE_FAILED";
+
+    const retryable =
+      Boolean(error?.retryable) ||
+      code === "VEYRA_BUILD_UPSTREAM_RETRYABLE";
+
+    return res.status(retryable ? 503 : 500).json({
       ok: false,
-      error: "VEYRA_OMNI_V4_NODE_FAILED",
+      error: code,
       detail:
         error instanceof Error
           ? error.message
-          : String(error)
+          : String(error),
+      retryable,
+      retryAfter: error?.retryAfter ?? null
     });
   }
 }

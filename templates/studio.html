@@ -5720,9 +5720,27 @@ async function build(prompt,options={}){
       return;
     }
 
+    const v4ResumeKey="veyra:v4:pending-build";
+
     let v4Stage="plan";
     let v4State={};
     let data=null;
+
+    try{
+      const savedResume=JSON.parse(
+        sessionStorage.getItem(v4ResumeKey)||"null"
+      );
+
+      if(
+        savedResume &&
+        savedResume.stage==="build" &&
+        savedResume.state &&
+        savedResume.prompt===prompt
+      ){
+        v4Stage="build";
+        v4State=savedResume.state;
+      }
+    }catch(_resumeReadError){}
 
     veyraActivity=createVeyraActivity(activityStartText);
 
@@ -5805,6 +5823,36 @@ async function build(prompt,options={}){
       data=await readJsonResponse(res);
 
       if(!res.ok||data.ok===false){
+        if(
+          data?.retryable===true &&
+          data?.code==="VEYRA_BUILD_UPSTREAM_RETRYABLE" &&
+          data?.v4_state
+        ){
+          v4Stage="build";
+          v4State=data.v4_state;
+
+          try{
+            sessionStorage.setItem(
+              v4ResumeKey,
+              JSON.stringify({
+                stage:"build",
+                state:v4State,
+                prompt
+              })
+            );
+          }catch(_resumeWriteError){}
+
+          const retryError=new Error(
+            data.error||
+            "The website build was interrupted. Your completed plan was preserved. Press Generate again to resume."
+          );
+
+          retryError.code="VEYRA_BUILD_UPSTREAM_RETRYABLE";
+          retryError.retryable=true;
+
+          throw retryError;
+        }
+
         throw new Error(
           data.error||data.code||"Build failed"
         );
@@ -5822,7 +5870,24 @@ async function build(prompt,options={}){
 
       v4Stage=data.v4_next_stage;
       v4State=data.v4_state;
+
+      if(v4Stage==="build"){
+        try{
+          sessionStorage.setItem(
+            v4ResumeKey,
+            JSON.stringify({
+              stage:"build",
+              state:v4State,
+              prompt
+            })
+          );
+        }catch(_resumeWriteError){}
+      }
     }
+
+    try{
+      sessionStorage.removeItem(v4ResumeKey);
+    }catch(_resumeClearError){}
 
     state.title=data.title||state.title;
     state.html=data.html||"";
