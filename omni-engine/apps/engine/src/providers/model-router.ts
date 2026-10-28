@@ -78,6 +78,17 @@ export async function runModel(
     }
   };
 
+  const isTimeoutError = (error: unknown) => {
+    const message =
+      error instanceof Error ? error.message : String(error);
+
+    return (
+      message.includes("V4 model timeout:") ||
+      /timed? ?out/i.test(message) ||
+      /timeout/i.test(message)
+    );
+  };
+
   const hasOpenAI = Boolean(env.OPENAI_API_KEY);
   const hasAnthropic = Boolean(env.ANTHROPIC_API_KEY);
 
@@ -89,11 +100,23 @@ export async function runModel(
 
   if (lane === "design" && hasAnthropic) {
     try {
-      return await timed("anthropic", () => callAnthropic(system, input));
+      return await timed("anthropic", () =>
+        callAnthropic(system, input, { timeoutMs: options.timeoutMs })
+      );
     } catch (anthropicError) {
-      if (hasOpenAI) {
-        return await timed("openai", () => callOpenAI(system, input, options));
+      if (isTimeoutError(anthropicError)) {
+        console.error(
+          `[V4 MODEL] NO_FALLBACK ${label} | provider=anthropic | reason=timeout`
+        );
+        throw anthropicError;
       }
+
+      if (hasOpenAI) {
+        return await timed("openai", () =>
+          callOpenAI(system, input, options)
+        );
+      }
+
       throw anthropicError;
     }
   }
@@ -103,11 +126,15 @@ export async function runModel(
       return await timed("openai", () => callOpenAI(system, input, options));
     } catch (openAIError) {
       if (hasAnthropic) {
-        return await timed("anthropic", () => callAnthropic(system, input));
+        return await timed("anthropic", () =>
+        callAnthropic(system, input, { timeoutMs: options.timeoutMs })
+      );
       }
       throw openAIError;
     }
   }
 
-  return await timed("anthropic", () => callAnthropic(system, input));
+  return await timed("anthropic", () =>
+        callAnthropic(system, input, { timeoutMs: options.timeoutMs })
+      );
 }

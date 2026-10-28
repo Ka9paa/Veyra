@@ -158,6 +158,124 @@ interface ResolvedRealPhotoAsset {
 const MAX_REAL_PHOTOS_PER_BUILD = 4;
 const MAX_GENERATED_VISUALS_PER_BUILD = 2;
 
+const FALLBACK_DESIGN_DNA = JSON.stringify(
+  {
+    recovery_mode: "deterministic-design-dna-fallback",
+    brand_character: [
+      "project-specific",
+      "clear",
+      "intentional",
+      "credible"
+    ],
+    visual_thesis:
+      "Build a distinctive hierarchy from the user's actual request, supplied references, typography, imagery, and conversion goal.",
+    signature_moment:
+      "Create one strong first-viewport focal composition rather than generic stacked UI.",
+    color_logic: {
+      behavior:
+        "Derive color behavior from the user's request and supplied reference material.",
+      contrast:
+        "Maintain strong readable contrast and reserve accents for hierarchy and action."
+    },
+    typography:
+      "Use deliberate scale contrast, readable body text, controlled line length, and project-appropriate display treatment.",
+    shape_language:
+      "Avoid arbitrary card repetition; use borders, radii, framing, and geometry only when they support the concept.",
+    image_language:
+      "Prefer supplied or truthful raster imagery and compose around it when imagery is important.",
+    spacing_rhythm:
+      "Alternate open and dense moments intentionally instead of applying uniform spacing everywhere.",
+    motion_language:
+      "Use restrained motion that reinforces hierarchy and respects reduced-motion preferences.",
+    first_viewport:
+      "Establish one dominant focal point, clear project identity, and obvious primary action.",
+    mobile_transformation:
+      "Recompose ordering, crops, spacing, typography, and actions for mobile rather than simply shrinking desktop.",
+    anti_patterns: [
+      "generic SaaS card grids when inappropriate",
+      "meaningless gradients",
+      "repeated identical sections",
+      "fake business facts",
+      "decorative imagery unrelated to the project"
+    ]
+  },
+  null,
+  2
+);
+
+const FALLBACK_COMPOSITION = JSON.stringify(
+  {
+    recovery_mode: "deterministic-composition-fallback",
+    hero_family: "project-appropriate",
+    navigation_composition:
+      "Clear responsive navigation preserving the primary conversion path.",
+    hero: {
+      height: "first-viewport dominant",
+      layout:
+        "Compose typography, supplied imagery, negative space, and primary action around one clear focal point.",
+      focal_object:
+        "Use the strongest truthful project-specific visual or typography treatment available.",
+      text_placement:
+        "Maintain strong hierarchy and readable contrast without defaulting mechanically to centered stacking.",
+      cta_placement:
+        "Place the primary action where it remains obvious on desktop and mobile."
+    },
+    section_strategy: [
+      "Preserve intentional variation in density, scale, alignment, and visual treatment.",
+      "Avoid repeating identical card grids or generic section templates.",
+      "Use supplied or resolved imagery as meaningful compositional material when appropriate.",
+      "Keep required conversion and informational sections easy to find."
+    ],
+    responsive_strategy:
+      "Recompose hierarchy, imagery, spacing, navigation, and actions for mobile rather than merely shrinking desktop.",
+    integrity:
+      "Do not invent business facts, prices, testimonials, awards, addresses, hours, or external destinations."
+  },
+  null,
+  2
+);
+
+const FALLBACK_ASSETS = JSON.stringify(
+  {
+    recovery_mode: "deterministic-asset-fallback",
+    visual_strategy: {
+      imagery_importance: "medium",
+      authenticity_priority:
+        "Prefer supplied or truthful real imagery; never fabricate business evidence.",
+      fallback_strategy:
+        "Use intentional typography and layout when suitable imagery is unavailable."
+    },
+    generated_visuals: [],
+    asset_requirements: []
+  },
+  null,
+  2
+);
+
+async function recoverableDesignDNA(
+  ctx: string
+): Promise<string> {
+  try {
+    return await runModel(
+      "design",
+      DESIGN_DNA_SYSTEM,
+      ctx,
+      {
+        maxOutputTokens: 3000,
+        reasoningEffort: "low",
+        timeoutMs: 55_000
+      }
+    );
+  } catch (error) {
+    console.error(
+      "[Veyra V4 RECOVERY] Design DNA failed; continuing with deterministic fallback | reason=" +
+        (error instanceof Error ? error.message : String(error))
+    );
+
+    return FALLBACK_DESIGN_DNA;
+  }
+}
+
 function parseGeneratedVisualPlan(raw: string): PlannedGeneratedVisual[] {
   try {
     const parsed = extractJson(raw);
@@ -2472,15 +2590,7 @@ export async function orchestrateStudio(
 
   console.error("[Veyra V4] Creating Design DNA...");
 
-  const designDNA = await runModel(
-    "design",
-    DESIGN_DNA_SYSTEM,
-    ctx,
-    {
-      maxOutputTokens: 3000,
-      reasoningEffort: "low"
-    }
-  );
+  const designDNA = await recoverableDesignDNA(ctx);
 
   console.error(
     "[Veyra V4] Creating composition + asset strategy..."
@@ -2504,7 +2614,8 @@ export async function orchestrateStudio(
       `${ctx}\n\nDESIGN DNA:\n${designDNA}`,
       {
         maxOutputTokens: 3000,
-        reasoningEffort: "low"
+        reasoningEffort: "low",
+        timeoutMs: 55_000
       }
     )
   ]);
@@ -2513,37 +2624,7 @@ export async function orchestrateStudio(
     compositionResult.status === "fulfilled" &&
     compositionResult.value.trim()
       ? compositionResult.value
-      : JSON.stringify(
-          {
-            recovery_mode: "deterministic-composition-fallback",
-            hero_family: "project-appropriate",
-            navigation_composition:
-              "Clear responsive navigation preserving the primary conversion path.",
-            hero: {
-              height: "first-viewport dominant",
-              layout:
-                "Compose typography, supplied imagery, negative space, and primary action around one clear focal point.",
-              focal_object:
-                "Use the strongest truthful project-specific visual or typography treatment available.",
-              text_placement:
-                "Maintain strong hierarchy and readable contrast without defaulting mechanically to centered stacking.",
-              cta_placement:
-                "Place the primary action where it remains obvious on desktop and mobile."
-            },
-            section_strategy: [
-              "Preserve intentional variation in density, scale, alignment, and visual treatment.",
-              "Avoid repeating identical card grids or generic section templates.",
-              "Use supplied or resolved imagery as meaningful compositional material when appropriate.",
-              "Keep required conversion and informational sections easy to find."
-            ],
-            responsive_strategy:
-              "Recompose hierarchy, imagery, spacing, navigation, and actions for mobile rather than merely shrinking desktop.",
-            integrity:
-              "Do not invent business facts, prices, testimonials, awards, addresses, hours, or external destinations."
-          },
-          null,
-          2
-        );
+      : FALLBACK_COMPOSITION;
 
   if (compositionResult.status === "rejected") {
     console.error(
@@ -2558,21 +2639,7 @@ export async function orchestrateStudio(
     assetsResult.status === "fulfilled" &&
     assetsResult.value.trim()
       ? assetsResult.value
-      : JSON.stringify(
-          {
-            visual_strategy: {
-              imagery_importance: "medium",
-              authenticity_priority:
-                "Prefer supplied or truthful real imagery; never fabricate business evidence.",
-              fallback_strategy:
-                "Use intentional typography and layout when suitable imagery is unavailable."
-            },
-            generated_visuals: [],
-            asset_requirements: []
-          },
-          null,
-          2
-        );
+      : FALLBACK_ASSETS;
 
   if (assetsResult.status === "rejected") {
     console.error(
@@ -3213,39 +3280,61 @@ export async function orchestrateStudioPlan(
     "[Veyra V4 STAGE] PLAN: Design Directions"
   );
 
-  const rawDesignDirections = await runModel(
-    "design",
-    DESIGN_DIRECTIONS_SYSTEM,
-    ctx,
-    {
-      maxOutputTokens: 5000,
-      reasoningEffort: "low"
+  let directionContext = "";
+
+  try {
+    const rawDesignDirections = await runModel(
+      "design",
+      DESIGN_DIRECTIONS_SYSTEM,
+      ctx,
+      {
+        maxOutputTokens: 5000,
+        reasoningEffort: "low",
+        timeoutMs: 55_000
+      }
+    );
+
+    const designDirections =
+      normalizeDesignDirectionSelection(
+        extractJson(rawDesignDirections)
+      );
+
+    if (designDirections.directions.length !== 3) {
+      throw new Error(
+        `Design Directions must return exactly 3 concepts; received ${designDirections.directions.length}.`
+      );
     }
-  );
 
-  const designDirections =
-    normalizeDesignDirectionSelection(
-      extractJson(rawDesignDirections)
+    if (!designDirections.selectedDirectionId) {
+      throw new Error(
+        "Design Directions did not select a winning concept."
+      );
+    }
+
+    directionContext =
+      designDirectionContext(designDirections);
+
+    if (!directionContext) {
+      throw new Error(
+        "Selected Design Direction could not be resolved."
+      );
+    }
+
+    console.error(
+      `[Veyra V4 STAGE] PLAN: Direction selected | id=${designDirections.selectedDirectionId} | score=${designDirections.selection.total}`
     );
+  } catch (error) {
+    directionContext = [
+      "VEYRA DESIGN DIRECTION RECOVERY:",
+      "The dedicated Design Directions stage was unavailable.",
+      "Continue with an original project-specific direction derived directly from the user's written request, uploaded/reference evidence, and existing project context.",
+      "Prioritize a distinctive first viewport, clear hierarchy, intentional typography, truthful imagery, responsive recomposition, and a strong conversion path.",
+      "Do not invent business facts or copy third-party branding/layout geometry."
+    ].join("\n");
 
-  if (designDirections.directions.length !== 3) {
-    throw new Error(
-      `Design Directions must return exactly 3 concepts; received ${designDirections.directions.length}.`
-    );
-  }
-
-  if (!designDirections.selectedDirectionId) {
-    throw new Error(
-      "Design Directions did not select a winning concept."
-    );
-  }
-
-  const directionContext =
-    designDirectionContext(designDirections);
-
-  if (!directionContext) {
-    throw new Error(
-      "Selected Design Direction could not be resolved."
+    console.error(
+      "[Veyra V4 RECOVERY] Design Directions failed; continuing with deterministic direction | reason=" +
+        (error instanceof Error ? error.message : String(error))
     );
   }
 
@@ -3256,22 +3345,10 @@ export async function orchestrateStudioPlan(
   ].join("\n");
 
   console.error(
-    `[Veyra V4 STAGE] PLAN: Direction selected | id=${designDirections.selectedDirectionId} | score=${designDirections.selection.total}`
-  );
-
-  console.error(
     "[Veyra V4 STAGE] PLAN: Design DNA"
   );
 
-  const designDNA = await runModel(
-    "design",
-    DESIGN_DNA_SYSTEM,
-    ctx,
-    {
-      maxOutputTokens: 3000,
-      reasoningEffort: "low"
-    }
-  );
+  const designDNA = await recoverableDesignDNA(ctx);
 
   console.error(
     "[Veyra V4 STAGE] PLAN: Composition + assets"
@@ -3295,7 +3372,8 @@ export async function orchestrateStudioPlan(
       `${ctx}\n\nDESIGN DNA:\n${designDNA}`,
       {
         maxOutputTokens: 3000,
-        reasoningEffort: "low"
+        reasoningEffort: "low",
+        timeoutMs: 55_000
       }
     )
   ]);
@@ -3304,37 +3382,7 @@ export async function orchestrateStudioPlan(
     compositionResult.status === "fulfilled" &&
     compositionResult.value.trim()
       ? compositionResult.value
-      : JSON.stringify(
-          {
-            recovery_mode: "deterministic-composition-fallback",
-            hero_family: "project-appropriate",
-            navigation_composition:
-              "Clear responsive navigation preserving the primary conversion path.",
-            hero: {
-              height: "first-viewport dominant",
-              layout:
-                "Compose typography, supplied imagery, negative space, and primary action around one clear focal point.",
-              focal_object:
-                "Use the strongest truthful project-specific visual or typography treatment available.",
-              text_placement:
-                "Maintain strong hierarchy and readable contrast without defaulting mechanically to centered stacking.",
-              cta_placement:
-                "Place the primary action where it remains obvious on desktop and mobile."
-            },
-            section_strategy: [
-              "Preserve intentional variation in density, scale, alignment, and visual treatment.",
-              "Avoid repeating identical card grids or generic section templates.",
-              "Use supplied or resolved imagery as meaningful compositional material when appropriate.",
-              "Keep required conversion and informational sections easy to find."
-            ],
-            responsive_strategy:
-              "Recompose hierarchy, imagery, spacing, navigation, and actions for mobile rather than merely shrinking desktop.",
-            integrity:
-              "Do not invent business facts, prices, testimonials, awards, addresses, hours, or external destinations."
-          },
-          null,
-          2
-        );
+      : FALLBACK_COMPOSITION;
 
   if (compositionResult.status === "rejected") {
     console.error(
@@ -3349,21 +3397,7 @@ export async function orchestrateStudioPlan(
     assetsResult.status === "fulfilled" &&
     assetsResult.value.trim()
       ? assetsResult.value
-      : JSON.stringify(
-          {
-            visual_strategy: {
-              imagery_importance: "medium",
-              authenticity_priority:
-                "Prefer supplied or truthful real imagery; never fabricate business evidence.",
-              fallback_strategy:
-                "Use intentional typography and layout when suitable imagery is unavailable."
-            },
-            generated_visuals: [],
-            asset_requirements: []
-          },
-          null,
-          2
-        );
+      : FALLBACK_ASSETS;
 
   if (assetsResult.status === "rejected") {
     console.error(

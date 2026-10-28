@@ -14,6 +14,7 @@ export interface OpenAICallOptions {
   maxOutputTokens?: number;
   reasoningEffort?: "low" | "medium" | "high";
   costStage?: VeyraCostStage;
+  timeoutMs?: number;
 }
 
 export async function callOpenAI(
@@ -27,21 +28,32 @@ export async function callOpenAI(
 
   guardModelCall(options.costStage ?? "builder");
 
-  const response = await client.responses.create({
-    model: env.OPENAI_MODEL,
-    instructions,
-    input,
-    store: false,
-    max_output_tokens: options.maxOutputTokens ?? 32000,
-    reasoning: {
-      effort: options.reasoningEffort ?? "high"
-    },
-    text: {
-      format: {
-        type: "text"
+  const timeoutMs = Math.max(
+    5_000,
+    Math.min(options.timeoutMs ?? 90_000, 120_000)
+  );
+
+  const response = await client.responses.create(
+    {
+      model: env.OPENAI_MODEL,
+      instructions,
+      input,
+      store: false,
+      max_output_tokens: options.maxOutputTokens ?? 32000,
+      reasoning: {
+        effort: options.reasoningEffort ?? "high"
+      },
+      text: {
+        format: {
+          type: "text"
+        }
       }
+    },
+    {
+      timeout: timeoutMs,
+      maxRetries: 0
     }
-  });
+  );
 
   const output = response.output_text ?? "";
 
