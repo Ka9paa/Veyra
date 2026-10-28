@@ -7,6 +7,7 @@ export type ModelLane = "planner" | "code" | "design" | "repair";
 export interface ModelRunOptions {
   maxOutputTokens?: number;
   reasoningEffort?: "low" | "medium" | "high";
+  timeoutMs?: number;
 }
 
 export async function runModel(
@@ -28,18 +29,52 @@ export async function runModel(
     `[V4 MODEL] START ${label} | lane=${lane} | max_tokens=${options.maxOutputTokens ?? "default"}`
   );
 
-  const timed = async <T>(provider: string, fn: () => Promise<T>): Promise<T> => {
+  const timed = async <T>(
+    provider: string,
+    fn: () => Promise<T>
+  ): Promise<T> => {
+    const timeoutMs = Math.max(
+      5_000,
+      Math.min(options.timeoutMs ?? 90_000, 120_000)
+    );
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
+
+        console.error(
+          `[V4 MODEL] TIMEOUT ${label} | provider=${provider} | seconds=${seconds} | limit_ms=${timeoutMs}`
+        );
+
+        reject(
+          new Error(
+            `V4 model timeout: ${label} via ${provider} exceeded ${timeoutMs}ms`
+          )
+        );
+      }, timeoutMs);
+    });
+
     try {
-      const result = await fn();
+      const result = await Promise.race([
+        fn(),
+        timeout
+      ]);
+
       console.error(
         `[V4 MODEL] DONE ${label} | provider=${provider} | seconds=${((Date.now() - startedAt) / 1000).toFixed(1)}`
       );
+
       return result;
     } catch (error) {
       console.error(
         `[V4 MODEL] FAIL ${label} | provider=${provider} | seconds=${((Date.now() - startedAt) / 1000).toFixed(1)}`
       );
+
       throw error;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   };
 
