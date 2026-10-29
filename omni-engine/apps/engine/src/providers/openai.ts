@@ -30,7 +30,7 @@ export async function callOpenAI(
 
   const timeoutMs = Math.max(
     5_000,
-    Math.min(options.timeoutMs ?? 90_000, 120_000)
+    Math.min(options.timeoutMs ?? 90_000, 240_000)
   );
 
   const response = await client.responses.create(

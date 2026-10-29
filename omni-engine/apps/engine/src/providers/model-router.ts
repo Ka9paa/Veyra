@@ -29,17 +29,18 @@ export async function runModel(
     `[V4 MODEL] START ${label} | lane=${lane} | max_tokens=${options.maxOutputTokens ?? "default"}`
   );
 
+  const timeoutMs = Math.max(
+    5_000,
+    Math.min(
+      options.timeoutMs ?? (lane === "code" ? 240_000 : 90_000),
+      lane === "code" ? 240_000 : 120_000
+    )
+  );
+
   const timed = async <T>(
     provider: string,
     fn: () => Promise<T>
   ): Promise<T> => {
-    const timeoutMs = Math.max(
-      5_000,
-      Math.min(
-        options.timeoutMs ?? (lane === "code" ? 240_000 : 90_000),
-        lane === "code" ? 240_000 : 120_000
-      )
-    );
 
     let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -132,7 +133,7 @@ export async function runModel(
   if (lane === "design" && hasAnthropic) {
     try {
       return await timed("anthropic", () =>
-        callAnthropic(system, input, { timeoutMs: options.timeoutMs })
+        callAnthropic(system, input, { timeoutMs })
       );
     } catch (anthropicError) {
       if (shouldAvoidProviderFallback(anthropicError)) {
@@ -144,7 +145,7 @@ export async function runModel(
 
       if (hasOpenAI) {
         return await timed("openai", () =>
-          callOpenAI(system, input, options)
+          callOpenAI(system, input, { ...options, timeoutMs })
         );
       }
 
@@ -154,18 +155,28 @@ export async function runModel(
 
   if (hasOpenAI) {
     try {
-      return await timed("openai", () => callOpenAI(system, input, options));
+      return await timed("openai", () =>
+        callOpenAI(system, input, { ...options, timeoutMs })
+      );
     } catch (openAIError) {
+      if (shouldAvoidProviderFallback(openAIError)) {
+        console.error(
+          `[V4 MODEL] NO_FALLBACK ${label} | provider=openai | reason=timeout_or_transient`
+        );
+        throw openAIError;
+      }
+
       if (hasAnthropic) {
         return await timed("anthropic", () =>
-        callAnthropic(system, input, { timeoutMs: options.timeoutMs })
-      );
+          callAnthropic(system, input, { timeoutMs })
+        );
       }
+
       throw openAIError;
     }
   }
 
   return await timed("anthropic", () =>
-        callAnthropic(system, input, { timeoutMs: options.timeoutMs })
+        callAnthropic(system, input, { timeoutMs })
       );
 }
