@@ -3763,7 +3763,10 @@ export async function orchestrateStudioBuildStage(
     ].join("\n\n"),
     {
       maxOutputTokens: 24000,
-      reasoningEffort: "low"
+      reasoningEffort: "low",
+      // Reserve runtime for asset resolution, Chromium, screenshot QA,
+      // and the response path inside Vercel's 300 second function limit.
+      timeoutMs: 165_000
     }
     );
   } catch (error) {

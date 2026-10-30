@@ -78,6 +78,11 @@ export async function callOpenAIVisual(
 
   guardModelCall(options.costStage ?? "visual");
 
+  const timeoutMs = Math.max(
+    5_000,
+    Math.min(options.timeoutMs ?? 55_000, 90_000)
+  );
+
   const response = await client.responses.create({
     model: env.OPENAI_MODEL,
     instructions,
@@ -104,6 +109,9 @@ export async function callOpenAIVisual(
         ]
       }
     ]
+  }, {
+    timeout: timeoutMs,
+    maxRetries: 0
   });
 
   const output = response.output_text ?? "";
