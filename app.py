@@ -751,6 +751,22 @@ def current_user():
     return None
 
 
+def has_discover_access(user=None):
+    user = user or current_user()
+    if not user:
+        return False
+
+    # Website admins always have Discover access.
+    if is_admin(user):
+        return True
+
+    # Discord/admin/promo/purchase grants all use the same entitlement.
+    try:
+        return int(user.get('discover_active') or 0) == 1
+    except (TypeError, ValueError):
+        return False
+
+
 def is_admin(user=None):
     user=user or current_user()
     if not user:
@@ -2558,7 +2574,13 @@ def project_delete(project_id):
 @app.route('/app/discover')
 @login_required
 def discover_page():
-    return render_template('discover.html', user=current_user(), google_maps_browser_key=(os.getenv('GOOGLE_MAPS_BROWSER_KEY') or '').strip())
+    user = current_user()
+    return render_template(
+        'discover.html',
+        user=user,
+        discover_access=has_discover_access(user),
+        google_maps_browser_key=(os.getenv('GOOGLE_MAPS_BROWSER_KEY') or '').strip()
+    )
 
 
 def _google_places_request(url, payload=None, field_mask=None):
@@ -2597,6 +2619,13 @@ def _google_places_request(url, payload=None, field_mask=None):
 @app.route('/api/discover/search', methods=['POST'])
 @login_required
 def discover_search():
+    user = current_user()
+    if not has_discover_access(user):
+        return jsonify({
+            'ok': False,
+            'error': 'Veyra Discover access is required.'
+        }), 403
+
     body = request.get_json(silent=True) or {}
 
     query = str(body.get('query') or '').strip()
