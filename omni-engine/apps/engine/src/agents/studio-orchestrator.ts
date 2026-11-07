@@ -7,6 +7,7 @@ import {
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runModel } from "../providers/model-router.js";
+import { runtimeCostSnapshot } from "../runtime/cost-guard.js";
 import { renderWebsite, type RenderDiagnostics } from "../visual/renderer.js";
 import {
   critiqueScreenshot,
@@ -1613,6 +1614,100 @@ DO NOT DEFAULT TO:
 
 Composition comes before decoration.
 
+PROJECT INTENT AUTHORITY — HARD RULES:
+
+The user's explicit project type, requested sections, content priorities,
+visual references, palette, and functional goals outrank stylistic novelty.
+
+Do NOT reinterpret a familiar website category into a different product type
+merely to make the result feel more creative.
+
+Examples:
+- a store must unmistakably behave and read as a store
+- a restaurant site must foreground food, menu/reservation intent, and atmosphere
+- a portfolio must foreground the work
+- a local service business must foreground services, proof, and conversion
+- a SaaS product may use interface/product composition when appropriate
+- a gaming storefront must foreground the game/community/store experience,
+  products or packages, purchasing paths, community/server conversion, and
+  relevant visual subject matter
+
+CATEGORY GRAMMAR:
+
+When the request is commerce/storefront oriented, prioritize:
+- product/category discovery
+- featured offerings
+- product/package imagery when imagery is available
+- names, useful descriptions, pricing only when supplied or safely represented
+- obvious purchase/view actions
+- trust/community/proof where appropriate
+- strong conversion hierarchy
+- requested FAQ/support/legal/community sections
+
+Do NOT replace commerce hierarchy with:
+- fake telemetry
+- command-center interfaces
+- invented dashboards
+- system status theater
+- coordinates
+- deployment language
+- terminal aesthetics
+- fake monitoring panels
+- arbitrary technical readouts
+unless the user explicitly requests that visual language.
+
+PALETTE AUTHORITY — HARD RULE:
+
+Explicit user-specified colors are constraints, not suggestions.
+
+If the user specifies a palette:
+- derive backgrounds, surfaces, text, borders, accents, states, and imagery
+  treatment from that palette
+- do not infer a new dominant/accent color from the brand name, industry,
+  subject matter, or semantic associations
+- a word such as red, blue, green, gold, neon, fire, ice, or similar inside a
+  brand/product/category name does NOT authorize using that color
+- additional colors may only appear when functionally necessary and should
+  remain subordinate unless the user requested them
+
+REQUESTED CONTENT AUTHORITY:
+
+Requested sections must materially shape the page.
+Do not technically include a requested section while visually replacing its
+purpose with unrelated creative filler.
+
+UNFINISHED-LOOKING CONTENT IS FORBIDDEN IN A FINISHED DESIGN:
+
+Do not intentionally design final-facing sections around copy such as:
+- pending
+- coming soon
+- reserved media
+- awaiting media
+- ready for deployment
+- awaiting connection
+- media unavailable
+- telemetry offline
+- placeholder
+- image pending
+or equivalent fake operational/status language merely because factual content
+or imagery is unavailable.
+
+When information is unknown, design truthfully around what IS known.
+When imagery is unavailable, use a deliberate typography/layout fallback
+without pretending that future content is waiting to be connected.
+
+CREATIVITY MUST SERVE THE PROJECT:
+
+Original composition is encouraged, but novelty must never overpower:
+1. user intent,
+2. category usability,
+3. requested content,
+4. requested palette,
+5. visual subject matter,
+6. conversion goals.
+
+A creative website that looks like the wrong kind of website is a failed design.
+
 Return ONLY valid JSON.
 `;
 
@@ -1939,6 +2034,76 @@ You receive:
 - completion contract
 
 Implement those decisions faithfully.
+
+USER INTENT / CATEGORY FIDELITY — NON-NEGOTIABLE:
+
+The rendered website must immediately read as the type of website the user
+requested. Do not transform a store, restaurant, portfolio, local business,
+gaming community, or other familiar category into a generic experimental
+landing page, dashboard, SaaS interface, command center, or editorial poster.
+
+For commerce/storefront requests:
+- make products, packages, categories, or offerings visually discoverable
+- create clear browse/view/purchase hierarchy
+- give product/package content meaningful visual presence
+- use supplied relevant imagery at useful scale
+- make conversion actions obvious
+- preserve requested community, support, FAQ, legal, or proof sections
+- do not allow an abstract hero concept to consume the experience at the
+  expense of the actual store
+
+Do NOT invent fake operational UI to fill visual space.
+Unless explicitly requested, avoid fabricated:
+- telemetry
+- coordinates
+- command consoles
+- deployment states
+- system diagnostics
+- fake live feeds
+- technical status panels
+- monitoring interfaces
+- arbitrary server readouts
+
+PALETTE FIDELITY — NON-NEGOTIABLE:
+
+When the original request explicitly specifies colors, those colors define the
+site's visual palette.
+
+Do not introduce a dominant or recurring color merely because it is suggested
+by:
+- the brand name
+- a product name
+- an industry term
+- a category name
+- semantic association
+
+For example, a word containing or implying "red" does not authorize a red
+accent when the user requested black, white, charcoal, and grey.
+
+Use explicit requested colors for:
+- page backgrounds
+- surfaces
+- typography
+- borders
+- CTA hierarchy
+- hover/focus states
+- decorative details
+- image overlays/color treatment
+
+Any additional functional color must remain minimal and subordinate.
+
+NO FAKE PLACEHOLDER EXPERIENCE:
+
+A finished site must not visibly contain invented future-state filler such as:
+"PENDING", "READY FOR DEPLOYMENT", "AWAITING CONNECTION",
+"RESERVED MEDIA", "MEDIA UNAVAILABLE", "TELEMETRY OFFLINE",
+"IMAGE PENDING", "PLACEHOLDER", or equivalent wording used to occupy a section.
+
+Do not create giant empty media frames waiting for content.
+
+If a real image is supplied, use it.
+If no suitable image is supplied, create an intentional truthful layout
+fallback rather than pretending missing media will arrive later.
 
 REAL PHOTOGRAPHY RULES — STRICT:
 
@@ -2619,12 +2784,43 @@ async function evaluateCandidate(
   const criticStartedAt = Date.now();
   console.error("[V4 TIMING] Screenshot critic START");
 
-  const review = await critiqueScreenshot(
-    rendered.screenshotBase64,
-    req.prompt,
-    rendered.diagnostics,
-    visualExperiencePlan
-  );
+  const remainingVisualCalls =
+    runtimeCostSnapshot().remaining.modelCalls;
+
+  let review: VisualReview;
+
+  if (remainingVisualCalls <= 0) {
+    console.error("[V4 QA] Screenshot critic SKIPPED | AI budget exhausted");
+
+    review = {
+      score: 0,
+      pass: false,
+      composition: 0,
+      typography: 0,
+      hierarchy: 0,
+      imagery: 0,
+      polish: 0,
+      originality: 0,
+      brandSpecificity: 0,
+      firstViewport: 0,
+      artDirection: 0,
+      visualPlanFidelity: 0,
+      depthSpatial: 0,
+      cinematicQuality: 0,
+      templateResistance: 0,
+      verdict: "Visual review not performed: AI call budget exhausted.",
+      issues: ["Visual quality has not been verified."],
+      strengths: [],
+      repairInstructions: []
+    };
+  } else {
+    review = await critiqueScreenshot(
+      rendered.screenshotBase64,
+      req.prompt,
+      rendered.diagnostics,
+      visualExperiencePlan
+    );
+  }
 
   console.error(
     `[V4 TIMING] Screenshot critic DONE | seconds=${((Date.now() - criticStartedAt) / 1000).toFixed(1)} | score=${review.score}`
@@ -4020,9 +4216,12 @@ export async function orchestrateStudioRecomposeStage(
       repairInstructions.join("\n\n"),
       {
         maxOutputTokens: completionRepairMode
-          ? 18000
-          : 26000,
-        reasoningEffort: "low"
+          ? 12000
+          : 16000,
+        reasoningEffort: "low",
+        timeoutMs: completionRepairMode
+          ? 120_000
+          : 60_000
       }
     );
 
@@ -4293,14 +4492,46 @@ export async function orchestrateStudioRecomposeStage(
       };
     }
 
+    const repairTimedOut =
+      /V4 model timeout: repair/i.test(detail) ||
+      /repair.*timed? ?out/i.test(detail);
+
+    // If the repair provider times out but the previous candidate already
+    // passed deterministic browser/completion QA, preserve the usable site
+    // instead of throwing away the entire build.
+    const repairBudgetExhausted =
+      /cost guard blocked another model call/i.test(detail) ||
+      /AI (?:call )?budget exhausted/i.test(detail) ||
+      runtimeCostSnapshot().remaining.modelCalls <= 0;
+
+    if (
+      previousBestHealthy &&
+      (repairTimedOut || repairBudgetExhausted)
+    ) {
+      console.error(
+        `[Veyra V4 STAGE] RECOMPOSE repair unavailable (timeout or AI budget exhausted) | accepting technically healthy previous candidate | score=${previousBest.review.score}`
+      );
+
+      return {
+        ok: true,
+        stage: "complete",
+        plan,
+        candidate: current,
+        best: previousBest,
+        attempt,
+        complete: true,
+        result: candidateToResult(previousBest)
+      };
+    }
+
     if (previousBestHealthy) {
       console.error(
         `[Veyra V4 STAGE] RECOMPOSE repair failed | previous candidate is technically healthy but visually unaccepted | score=${previousBest.review.score} | refusing Website Ready`
       );
     }
 
-    // Fail closed. Never tell Studio an incomplete OR visually
-    // substandard website that it is ready.
+    // Non-timeout failures still fail closed unless the previous candidate
+    // already satisfied the normal acceptance requirements.
     throw new Error(
       `Veyra could not complete the website to the required quality standard: ${detail}`
     );

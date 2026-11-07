@@ -26,7 +26,7 @@ export async function runModel(
     lane;
 
   console.error(
-    `[V4 MODEL] START ${label} | lane=${lane} | max_tokens=${options.maxOutputTokens ?? "default"}`
+    `[V4 MODEL] START ${label} | lane=${lane} | openai_model=${env.OPENAI_MODEL} | anthropic_model=${env.ANTHROPIC_MODEL} | max_tokens=${options.maxOutputTokens ?? "default"}`
   );
 
   const timeoutMs = Math.max(

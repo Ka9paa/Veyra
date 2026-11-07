@@ -1056,9 +1056,25 @@ ${safeScript(input.js)}
           );
         }
 
+        /*
+         * Button behavior is intentionally diagnostic-only.
+         *
+         * DOM inspection cannot reliably detect listeners registered through
+         * addEventListener(), delegated event handlers, framework bindings,
+         * or other runtime interaction systems. Treating these buttons as a
+         * deterministic completion failure creates false positives and can
+         * reject an otherwise healthy generated website.
+         *
+         * Truly required interactions are still enforced through required
+         * action markers, invalidActionMarkers, dead/empty links, missing
+         * navigation targets, interaction tests, page errors, and the other
+         * deterministic completion checks.
+         */
         if (inertButtons.length) {
-          completionFailures.push(
-            inertButtons.length + " button(s) have no detectable behavior"
+          console.warn(
+            "[V4 QA] Diagnostic: " +
+              inertButtons.length +
+              " button(s) have no DOM-detectable behavior"
           );
         }
 
@@ -1606,15 +1622,33 @@ ${safeScript(input.js)}
       );
     }
 
+    // The viewport screenshot is the primary visual-QA artifact.
+    // Keep it required so screenshot QA still has real visual evidence.
     const screenshot = await page.screenshot({
       type: "png",
       fullPage: false
     });
 
-    const fullPageScreenshot = await page.screenshot({
-      type: "png",
-      fullPage: true
-    });
+    // Full-page captures are heavier in serverless Chromium and can
+    // occasionally terminate the browser after a successful viewport
+    // capture. Do not discard an otherwise healthy render solely because
+    // the secondary full-page artifact failed.
+    let fullPageScreenshot: Buffer;
+
+    try {
+      fullPageScreenshot = await page.screenshot({
+        type: "png",
+        fullPage: true
+      });
+    } catch (error) {
+      console.error(
+        `[V4 BROWSER] full-page screenshot failed; using viewport screenshot fallback | error=${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+
+      fullPageScreenshot = screenshot;
+    }
 
     return {
       screenshotBase64: screenshot.toString("base64"),

@@ -25,7 +25,7 @@ export interface VeyraCostUsage {
 }
 
 export const DEFAULT_VEYRA_COST_BUDGET: VeyraCostBudget = {
-  maxModelCalls: 12,
+  maxModelCalls: 16,
   maxRepairCalls: 4,
   maxGeneratedVisuals: 2,
   maxPhotoSearches: 4
