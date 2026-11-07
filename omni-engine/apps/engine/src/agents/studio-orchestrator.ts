@@ -4408,9 +4408,40 @@ export async function orchestrateStudioRecomposeStage(
         };
       }
 
-      throw new Error(
-        `Veyra visual QA did not reach the required premium acceptance standard after the dedicated visual rescue. Best visual score: ${best.review.score}.`
+      // Premium visual QA was not met after the final rescue.
+      // Return a technically healthy draft instead of a 502.
+      const draftCandidate =
+        bestCompletionHealthy ? best : repaired;
+
+      if (
+        draftCandidate.diagnostics.completionFailures.length !== 0 ||
+        draftCandidate.diagnostics.hardFailures.length !== 0
+      ) {
+        throw new Error(
+          "Veyra visual rescue exhausted without a technically healthy candidate."
+        );
+      }
+
+      console.error(
+        `[Veyra V4 STAGE] RECOMPOSE visual rescue exhausted | returning technically healthy draft | score=${draftCandidate.review.score} | premiumAccepted=false`
       );
+
+      const draftResult = candidateToResult(draftCandidate);
+
+      draftResult.quality.notes.unshift(
+        "VISUAL QUALITY WARNING: Premium visual QA was not met. This website is a usable draft and may require further design improvements."
+      );
+
+      return {
+        ok: true,
+        stage: "complete",
+        plan,
+        candidate: repaired,
+        best: draftCandidate,
+        attempt,
+        complete: true,
+        result: draftResult
+      };
     }
 
     // --------------------------------------------------------
