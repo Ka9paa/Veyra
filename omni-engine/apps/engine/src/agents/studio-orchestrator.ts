@@ -236,6 +236,109 @@ const FALLBACK_COMPOSITION = JSON.stringify(
   2
 );
 
+
+function fallbackAssetsForPrompt(prompt: string): string {
+  const text = String(prompt || "").toLowerCase();
+
+  if (
+    /\b(no images?|without images?|no photos?|without photos?|text.only|typography.only)\b/i.test(text)
+  ) {
+    return FALLBACK_ASSETS;
+  }
+
+  const categories: Array<[RegExp, string, string]> = [
+    [/\b(car dealership|dealership|car inventory|auto sales)\b/i,
+      "premium automotive dealership vehicles", "luxury vehicle exterior"],
+    [/\b(restaurant|cafe|coffee shop|bakery|food truck)\b/i,
+      "restaurant food photography", "beautifully presented food"],
+    [/\b(barber|barbershop|hair salon|salon)\b/i,
+      "professional barber salon interior", "barber tools and haircut detail"],
+    [/\b(real estate|realtor|property listings|homes for sale)\b/i,
+      "luxury residential architecture", "modern residential interior"],
+    [/\b(gym|fitness|personal trainer)\b/i,
+      "premium fitness gym interior", "fitness equipment detail"],
+    [/\b(hotel|resort|hospitality)\b/i,
+      "premium hotel architecture", "elegant hotel interior"],
+    [/\b(fashion|clothing|apparel|streetwear)\b/i,
+      "editorial fashion photography", "fashion garment detail"],
+    [/\b(construction|contractor|renovation)\b/i,
+      "architectural construction photography", "building material detail"]
+  ];
+
+  const category = categories.find(([pattern]) => pattern.test(text));
+  const explicitlyVisual =
+    /\b(photo|photos|photography|images?|pictures?|gallery|visuals?)\b/i.test(text);
+
+  if (!category && !explicitlyVisual) {
+    return FALLBACK_ASSETS;
+  }
+
+  const primary = category?.[1] ||
+    "professional editorial photography relevant to the requested website";
+  const secondary = category?.[2] ||
+    "editorial detail relevant to the requested website";
+
+  const requirements = [
+    {
+      id: "fallback-hero-photo",
+      type: "remote-image",
+      purpose: "Hero photography",
+      subject: primary,
+      intended_section: "hero",
+      crop_orientation: "landscape",
+      aspect_ratio: "16:9",
+      visual_scale: "large",
+      essential: true
+    },
+    {
+      id: "fallback-supporting-photo",
+      type: "remote-image",
+      purpose: "Supporting editorial photography",
+      subject: secondary,
+      intended_section: "features",
+      crop_orientation: "landscape",
+      aspect_ratio: "4:3",
+      essential: false
+    }
+  ];
+
+  return JSON.stringify({
+    recovery_mode: "intent-aware-photo-fallback",
+    visual_strategy: {
+      imagery_importance: "high",
+      authenticity_priority:
+        "Use truthful editorial photography, not invented business evidence.",
+      fallback_strategy:
+        "If photography cannot be resolved, use a clean typography-led layout."
+    },
+    generated_visuals: [],
+    asset_requirements: requirements
+  }, null, 2);
+}
+
+function recoverEmptyAssetPlan(raw: string, prompt: string): string {
+  try {
+    const parsed = extractJson(raw);
+
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      (
+        (Array.isArray(parsed.asset_requirements) &&
+         parsed.asset_requirements.length > 0) ||
+        (Array.isArray(parsed.generated_visuals) &&
+         parsed.generated_visuals.length > 0)
+      )
+    ) {
+      return raw;
+    }
+  } catch {
+    // Invalid asset JSON uses the deterministic recovery plan.
+  }
+
+  return fallbackAssetsForPrompt(prompt);
+}
+
 const FALLBACK_ASSETS = JSON.stringify(
   {
     recovery_mode: "deterministic-asset-fallback",
@@ -3691,11 +3794,12 @@ export async function orchestrateStudioPlan(
     );
   }
 
-  const assets =
-    assetsResult.status === "fulfilled" &&
-    assetsResult.value.trim()
+  const assets = recoverEmptyAssetPlan(
+    assetsResult.status === "fulfilled"
       ? assetsResult.value
-      : FALLBACK_ASSETS;
+      : "",
+    req.prompt
+  );
 
   if (assetsResult.status === "rejected") {
     console.error(
@@ -4568,3 +4672,5 @@ export async function orchestrateStudioRecomposeStage(
     );
   }
 }
+
+export { runWithVeyraCostGuard } from "../runtime/cost-guard.js";

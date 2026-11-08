@@ -215,3 +215,5 @@ app.post("/v1/studio/build", async (req, reply) => {
     return reply.code(400).send({ ok: false, error: e.message });
   }
 });app.post("/v1/canvas/interpret",async(req,reply)=>{try{return await routeCanvas(req.body)}catch(e:any){req.log.error(e);return reply.code(400).send({ok:false,error:e.message})}});app.post("/v1/canvas/mutate",async(req,reply)=>{try{return await routeCanvas(req.body)}catch(e:any){req.log.error(e);return reply.code(400).send({ok:false,error:e.message})}});app.post("/v1/features/amplify",async(req,reply)=>{try{return await amplifyFeature(req.body)}catch(e:any){req.log.error(e);return reply.code(400).send({ok:false,error:e.message})}});app.post("/v1/repair",async(req,reply)=>{try{return await selfHeal(req.body as any)}catch(e:any){req.log.error(e);return reply.code(400).send({ok:false,error:e.message})}});app.post("/v1/deploy",async(req,reply)=>{try{return await deployProject(req.body as any)}catch(e:any){req.log.error(e);return reply.code(400).send({ok:false,error:e.message})}});await app.listen({port:env.PORT,host:"0.0.0.0"});
+
+export { runWithVeyraCostGuard } from "./runtime/cost-guard.js";

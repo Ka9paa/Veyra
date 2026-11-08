@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 export type VeyraCostStage =
   | "reference"
   | "directions"
@@ -173,30 +175,45 @@ export function createVeyraCostGuard(
 
 const runtimeCostGuard = createVeyraCostGuard();
 
+const requestCostGuards = new AsyncLocalStorage<VeyraCostGuard>();
+
+export function runWithVeyraCostGuard<T>(
+  callback: () => T
+): T {
+  return requestCostGuards.run(
+    createVeyraCostGuard(),
+    callback
+  );
+}
+
+function activeCostGuard(): VeyraCostGuard {
+  return requestCostGuards.getStore() ?? runtimeCostGuard;
+}
+
 export function getVeyraRuntimeCostGuard(): VeyraCostGuard {
-  return runtimeCostGuard;
+  return activeCostGuard();
 }
 
 export function guardModelCall(
   stage: VeyraCostStage
 ): void {
-  runtimeCostGuard.model(stage);
+  activeCostGuard().model(stage);
 }
 
 export function guardGeneratedVisual(): void {
-  runtimeCostGuard.generatedVisual();
+  activeCostGuard().generatedVisual();
 }
 
 export function guardPhotoSearch(): void {
-  runtimeCostGuard.photoSearch();
+  activeCostGuard().photoSearch();
 }
 
 export function runtimeCostSnapshot() {
   return {
-    usage: runtimeCostGuard.snapshot(),
-    remaining: runtimeCostGuard.remaining(),
+    usage: activeCostGuard().snapshot(),
+    remaining: activeCostGuard().remaining(),
     budget: {
-      ...runtimeCostGuard.budget
+      ...activeCostGuard().budget
     }
   };
 }

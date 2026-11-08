@@ -126,7 +126,8 @@ export default async function handler(req, res) {
       orchestrateStudio,
       orchestrateStudioPlan,
       orchestrateStudioBuildStage,
-      orchestrateStudioRecomposeStage
+      orchestrateStudioRecomposeStage,
+      runWithVeyraCostGuard
     } = await import("./_v4-engine.mjs");
 
     const buildRequest = {
@@ -177,6 +178,7 @@ export default async function handler(req, res) {
 
     let result;
 
+    result = await runWithVeyraCostGuard(async () => {
     if (stage === "plan") {
       result = await orchestrateStudioPlan(buildRequest);
     } else if (stage === "build") {
@@ -213,6 +215,8 @@ export default async function handler(req, res) {
       // Studio flow has been proven in Preview.
       result = await orchestrateStudio(buildRequest);
     }
+    return result;
+    });
 
     console.log(
       `[V4 NODE] complete | stage=${result.stage || "legacy"} | complete=${result.complete ?? true}`

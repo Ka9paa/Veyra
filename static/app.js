@@ -202,3 +202,345 @@ document.addEventListener('DOMContentLoaded',()=>{
   const vf=document.getElementById('vouchForm');vf?.addEventListener('submit',async e=>{e.preventDefault();const fd=new FormData(vf),status=document.getElementById('vouchStatus');status.textContent='Submitting…';const payload=Object.fromEntries(fd.entries());try{const r=await fetch('/api/vouches',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const j=await r.json();status.textContent=j.message||j.error;if(j.ok){vf.reset();status.classList.add('good')}}catch{status.textContent='Could not submit right now.'}});
 });
 function escapeHtmlV27(s){return String(s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+
+
+/* VEYRA QUOTE ESTIMATOR V1 */
+(() => {
+  const money = n => new Intl.NumberFormat('en-US', {
+    style:'currency',currency:'USD',maximumFractionDigits:0
+  }).format(n);
+
+  const escape = s => String(s ?? '').replace(/[&<>"']/g,
+    c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  const css = `
+  .vq-btn{border:1px solid #8275bb;background:#685f9c;color:white;
+    padding:10px 15px;border-radius:10px;font-weight:700;cursor:pointer}
+  .vq-overlay{position:fixed;inset:0;background:rgba(4,6,15,.82);
+    backdrop-filter:blur(12px);z-index:99999;display:grid;place-items:center;
+    padding:20px;overflow:auto}
+  .vq-panel{width:min(900px,100%);max-height:94vh;overflow:auto;
+    background:#10111b;color:#f5f3ff;border:1px solid #38334e;
+    border-radius:20px;box-shadow:0 25px 100px #0009;font:14px Arial,sans-serif}
+  .vq-head{padding:24px 28px;border-bottom:1px solid #302b40;
+    display:flex;justify-content:space-between;gap:15px;align-items:center}
+  .vq-head h2{font-size:24px;margin:5px 0}
+  .vq-muted{color:#a9a4ba;font-size:12px}
+  .vq-close{background:transparent;border:0;color:#ddd;font-size:28px;cursor:pointer}
+  .vq-body{padding:25px 28px}
+  .vq-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+  .vq-field{display:flex;flex-direction:column;gap:7px;margin-bottom:13px}
+  .vq-field label{font-size:12px;color:#bdb8d1;font-weight:700}
+  .vq-field input,.vq-field textarea{width:100%;box-sizing:border-box;
+    background:#1b1b29;border:1px solid #403a54;border-radius:9px;
+    padding:12px;color:white;font:inherit}
+  .vq-field textarea{min-height:85px;resize:vertical}
+  .vq-stats{display:grid;grid-template-columns:repeat(3,1fr);
+    gap:12px;margin:20px 0}
+  .vq-stat{background:#1c1a2c;border:1px solid #35304b;border-radius:12px;padding:17px}
+  .vq-stat strong{display:block;font-size:22px;margin-top:8px}
+  .vq-stat span{color:#aaa4bd;font-size:11px}
+  .vq-features{display:flex;flex-wrap:wrap;gap:7px;margin:14px 0 20px}
+  .vq-feature{padding:7px 10px;border:1px solid #403954;
+    border-radius:30px;background:#201c30;font-size:12px}
+  .vq-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+  .vq-actions button{border:1px solid #524b6b;background:#242137;
+    color:white;border-radius:10px;padding:12px 17px;cursor:pointer}
+  .vq-actions .primary{background:#685f9c;border-color:#685f9c;font-weight:700}
+  .vq-note{font-size:12px;color:#b3acc6;line-height:1.6;margin-top:15px}
+  @media(max-width:650px){.vq-grid,.vq-stats{grid-template-columns:1fr}}
+  `;
+
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+
+  function analyze() {
+    const html = String(state.html || '');
+    const styles = String(state.css || '');
+    const js = String(state.js || '');
+    const combined = html + '\n' + styles + '\n' + js;
+    const doc = new DOMParser().parseFromString(html,'text/html');
+    const features = [];
+    const add = (name,hours) => features.push({name,hours});
+
+    const sections = doc.querySelectorAll(
+      'main section,body > section,section[id]'
+    ).length;
+    const forms = doc.querySelectorAll('form').length;
+    const buttons = doc.querySelectorAll('button').length;
+    const images = doc.querySelectorAll('img,picture,video').length;
+    const links = [...doc.querySelectorAll('a[href]')];
+    const paths = new Set(links.map(a=>a.getAttribute('href'))
+      .filter(x=>x && x.startsWith('/') && !x.startsWith('//'))
+      .map(x=>x.split(/[?#]/)[0]));
+    const pageCount = Math.max(1,paths.size);
+
+    add('Website structure and layout',4);
+    add('Visual styling and typography',4);
+
+    if(sections >= 4) add('Multi-section page design',3);
+    if(pageCount > 1) add('Additional linked page structure',Math.min(12,(pageCount-1)*2));
+    if(forms) add('Form interface design',Math.min(8,forms*2));
+    if(images >= 3) add('Image and media presentation',2);
+    if(buttons >= 4) add('Interactive interface elements',2);
+    if(/@media|grid-template|flex-wrap/i.test(styles))
+      add('Responsive layout rules',3);
+    if(/addEventListener|onclick|onchange/i.test(combined))
+      add('Client-side interactions',3);
+    if(/animation:|@keyframes|transition:/i.test(styles))
+      add('Motion and transitions',2);
+    if(/<nav\b/i.test(html)) add('Navigation interface',2);
+    if(/fetch\s*\(|axios\./i.test(js))
+      add('API request code (integration requires verification)',3);
+
+    const hours = features.reduce((n,f)=>n+f.hours,0);
+    return {features,hours,sections,forms,buttons,images,pageCount};
+  }
+
+  function openQuote() {
+    if(!state.html || !state.html.trim()) {
+      toast('Build a website before generating a quote');
+      return;
+    }
+
+    document.getElementById('vqOverlay')?.remove();
+    const analysis = analyze();
+    const projectKey = 'veyra-quote-' + (state.projectId || state.title);
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(projectKey)||'{}'); }
+    catch {}
+
+    const overlay = document.createElement('div');
+    overlay.id = 'vqOverlay';
+    overlay.className = 'vq-overlay';
+
+    overlay.innerHTML = `
+      <div class="vq-panel" role="dialog" aria-modal="true"
+           aria-label="Generate client quote">
+        <div class="vq-head">
+          <div>
+            <div class="vq-muted">VEYRA STUDIO / BUSINESS TOOLS</div>
+            <h2>Generate Quote</h2>
+            <div class="vq-muted">Project-based website pricing and proposal</div>
+          </div>
+          <button class="vq-close" id="vqClose" aria-label="Close">×</button>
+        </div>
+        <div class="vq-body">
+          <div class="vq-grid">
+            <div class="vq-field"><label>Client / Business Name</label>
+              <input id="vqClient" placeholder="Client business name"></div>
+            <div class="vq-field"><label>Prepared By</label>
+              <input id="vqSeller" placeholder="Your agency or name"></div>
+            <div class="vq-field"><label>Hourly Rate ($)</label>
+              <input id="vqRate" type="number" min="1" step="1"></div>
+            <div class="vq-field"><label>Profit Markup (%)</label>
+              <input id="vqMarkup" type="number" min="0" step="5"></div>
+            <div class="vq-field"><label>Estimated Hours</label>
+              <input id="vqHours" type="number" min="1" step="1"></div>
+            <div class="vq-field"><label>Client Selling Price ($)</label>
+              <input id="vqPrice" type="number" min="1" step="1"></div>
+            <div class="vq-field"><label>Project Preview URL</label>
+              <input id="vqUrl" placeholder="https://example.com"></div>
+            <div class="vq-field"><label>Quote Valid For (Days)</label>
+              <input id="vqValid" type="number" min="1" value="14"></div>
+          </div>
+
+          <div class="vq-stats">
+            <div class="vq-stat"><span>ESTIMATED LABOR COST</span>
+              <strong id="vqCost"></strong></div>
+            <div class="vq-stat"><span>SUGGESTED SELLING PRICE</span>
+              <strong id="vqSuggested"></strong></div>
+            <div class="vq-stat"><span>PROJECT HOURS</span>
+              <strong id="vqHourStat"></strong></div>
+          </div>
+
+          <div class="vq-muted">DETECTED PROJECT SCOPE</div>
+          <div class="vq-features">
+            ${analysis.features.map(f=>
+              `<span class="vq-feature">${escape(f.name)} · ${f.hours}h</span>`
+            ).join('')}
+          </div>
+
+          <div class="vq-field"><label>Project Description</label>
+            <textarea id="vqDescription"></textarea></div>
+          <div class="vq-field"><label>Additional Terms</label>
+            <textarea id="vqTerms"></textarea></div>
+
+          <div class="vq-actions">
+            <button class="primary" id="vqPDF">Generate PDF Proposal</button>
+            <button id="vqSave">Save Draft</button>
+            <button id="vqReset">Recalculate Estimate</button>
+          </div>
+          <p class="vq-note">Estimates are based on detectable frontend code,
+          not verified backend functionality, live integrations, hosting,
+          or a professional QA audit. Review the scope before sending.</p>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    const get = id => overlay.querySelector('#'+id);
+    const value = id => get(id).value.trim();
+    const set = (id,v) => {get(id).value=v;};
+
+    set('vqClient',saved.client||'');
+    set('vqSeller',saved.seller||'');
+    set('vqRate',saved.rate??50);
+    set('vqMarkup',saved.markup??100);
+    set('vqHours',saved.hours??analysis.hours);
+    set('vqUrl',saved.url||'');
+    set('vqValid',saved.valid??14);
+    set('vqDescription',saved.description||
+      `Design and development of ${state.title}, including the frontend components identified in the project.`);
+    set('vqTerms',saved.terms||
+      '50% deposit to begin and 50% upon completion. Hosting, domain registration, ongoing maintenance, third-party services and backend integrations are excluded unless explicitly agreed.');
+
+    let manualPrice = saved.price != null;
+    set('vqPrice',saved.price??'');
+
+    function calculate() {
+      const hours = Math.max(1,Number(value('vqHours'))||1);
+      const rate = Math.max(1,Number(value('vqRate'))||1);
+      const markup = Math.max(0,Number(value('vqMarkup'))||0);
+      const cost = Math.round(hours*rate);
+      const suggested = Math.round(cost*(1+markup/100));
+      get('vqCost').textContent = money(cost);
+      get('vqSuggested').textContent = money(suggested);
+      get('vqHourStat').textContent = hours+'h';
+      if(!manualPrice) set('vqPrice',suggested);
+      return {hours,rate,markup,cost,suggested};
+    }
+
+    function collect() {
+      return {
+        client:value('vqClient'),seller:value('vqSeller'),
+        rate:value('vqRate'),markup:value('vqMarkup'),
+        hours:value('vqHours'),price:value('vqPrice'),
+        url:value('vqUrl'),valid:value('vqValid'),
+        description:value('vqDescription'),terms:value('vqTerms')
+      };
+    }
+
+    function saveDraft() {
+      localStorage.setItem(projectKey,JSON.stringify(collect()));
+      toast('Quote draft saved in this browser');
+    }
+
+    ['vqRate','vqMarkup','vqHours'].forEach(id=>
+      get(id).addEventListener('input',calculate));
+    get('vqPrice').addEventListener('input',()=>{manualPrice=true});
+    get('vqClose').onclick = ()=>overlay.remove();
+    overlay.addEventListener('click',e=>{
+      if(e.target===overlay)overlay.remove();
+    });
+    get('vqSave').onclick = saveDraft;
+    get('vqReset').onclick = ()=>{
+      manualPrice=false;
+      set('vqHours',analysis.hours);
+      calculate();
+    };
+
+    get('vqPDF').onclick = ()=>{
+      const q=collect();
+      const price=Number(q.price);
+      if(!q.client || !q.seller) {
+        toast('Enter client name and prepared by');
+        return;
+      }
+      if(!Number.isFinite(price)||price<=0) {
+        toast('Enter a valid selling price');
+        return;
+      }
+
+      const validDays=Math.max(1,Number(q.valid)||14);
+      const issued=new Date();
+      const expiry=new Date(issued.getTime()+validDays*86400000);
+      const date=d=>d.toLocaleDateString('en-US',{
+        year:'numeric',month:'long',day:'numeric'
+      });
+      const safeUrl=/^https?:\/\//i.test(q.url)?q.url:'';
+      const html=`
+      <!doctype html><html><head><meta charset="utf-8">
+      <title>Website Proposal - ${escape(q.client)}</title>
+      <style>
+      @page{size:A4;margin:18mm}
+      body{font:14px Arial,sans-serif;color:#252336;line-height:1.6}
+      header{border-bottom:3px solid #685f9c;padding-bottom:20px}
+      .brand{font-size:26px;font-weight:800;color:#685f9c}
+      .eyebrow{color:#685f9c;font-weight:700;letter-spacing:2px;font-size:11px}
+      h1{font-size:34px;margin:15px 0}
+      h2{font-size:16px;margin-top:28px;border-bottom:1px solid #ddd;padding-bottom:8px}
+      .meta{display:flex;justify-content:space-between;gap:20px}
+      .muted{color:#666}
+      .price{background:#f2effa;padding:22px;margin:25px 0;border-left:5px solid #685f9c}
+      .price strong{display:block;font-size:32px;color:#453879}
+      ul{padding-left:20px}
+      li{margin:5px 0}
+      footer{margin-top:40px;border-top:1px solid #ddd;padding-top:15px;color:#777;font-size:11px}
+      .preserve{white-space:pre-wrap}
+      </style></head><body>
+      <header><div class="brand">${escape(q.seller)}</div>
+      <div class="eyebrow">WEBSITE DEVELOPMENT PROPOSAL</div></header>
+      <h1>${escape(state.title)}</h1>
+      <div class="meta">
+        <div><b>Prepared for</b><br>${escape(q.client)}</div>
+        <div><b>Issued</b><br>${date(issued)}<br>
+        <b>Valid until</b><br>${date(expiry)}</div>
+      </div>
+      <h2>Project Overview</h2>
+      <p class="preserve">${escape(q.description)}</p>
+      <h2>Proposed Scope</h2>
+      <ul>${analysis.features.map(f=>
+        `<li>${escape(f.name)}</li>`).join('')}</ul>
+      ${safeUrl?`<p><b>Project preview:</b> ${escape(safeUrl)}</p>`:''}
+      <div class="price"><span>PROPOSED PROJECT INVESTMENT</span>
+      <strong>${money(price)}</strong><span>USD · One-time project estimate</span></div>
+      <h2>Terms & Exclusions</h2>
+      <p class="preserve">${escape(q.terms)}</p>
+      <h2>Approval</h2>
+      <p>Client name: __________________________________</p>
+      <p>Signature: _____________________________________</p>
+      <p>Date: _________________________________________</p>
+      <footer>Prepared with Veyra Studio. This document is a proposal,
+      not a guarantee that unverified functionality is operational.</footer>
+      <script>window.onload=()=>{window.focus();window.print();};<\/script>
+      </body></html>`;
+
+      saveDraft();
+      const win=window.open('','_blank');
+      if(!win) {
+        toast('Allow pop-ups to generate the PDF');
+        return;
+      }
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+    };
+
+    calculate();
+  }
+
+  function installButton() {
+    if(!document.querySelector('.studio') ||
+       document.getElementById('veyraGenerateQuote')) return;
+
+    const exportBtn=document.getElementById('exportProjectBtn');
+    const saveBtn=document.getElementById('saveProjectBtn');
+    const target=exportBtn||saveBtn;
+    if(!target) return;
+
+    const btn=document.createElement('button');
+    btn.id='veyraGenerateQuote';
+    btn.type='button';
+    btn.className='vq-btn';
+    btn.textContent='Generate Quote';
+    btn.title='Estimate website development cost and prepare a client proposal';
+    btn.addEventListener('click',openQuote);
+    target.insertAdjacentElement('afterend',btn);
+  }
+
+  if(document.readyState==='loading')
+    document.addEventListener('DOMContentLoaded',installButton);
+  else installButton();
+})();
+
